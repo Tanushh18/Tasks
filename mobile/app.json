@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "Daily Tasks",
+    "slug": "daily-tasks-reminder",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Used so you can speak task, reminder and finance commands to the assistant.",
+        "NSSpeechRecognitionUsageDescription": "Used to convert your spoken commands into text for the assistant."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "POST_NOTIFICATIONS",
+        "RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.dailytasksreminder"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4F46E5"
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Used so you can speak task, reminder and finance commands to the assistant.",
+          "speechRecognitionPermission": "Used to convert your spoken commands into text for the assistant."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2b880eb1-75db-4535-af56-3b3053a1377e"
+      }
+    },
+    "owner": "tanush18"
+  }
+}
