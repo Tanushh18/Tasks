@@ -25,7 +25,8 @@
         "SCHEDULE_EXACT_ALARM",
         "USE_EXACT_ALARM",
         "POST_NOTIFICATIONS",
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "android.permission.USE_FULL_SCREEN_INTENT"
       ],
       "package": "com.anonymous.dailytasksreminder"
     },
@@ -35,13 +36,6 @@
     "plugins": [
       "expo-secure-store",
       "@react-native-community/datetimepicker",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#4F46E5"
-        }
-      ],
       [
         "expo-speech-recognition",
         {

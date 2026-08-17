@@ -1,120 +1,116 @@
-import * as Notifications from "expo-notifications";
+import notifee, {
+  AlarmType,
+  AndroidCategory,
+  AndroidImportance,
+  AndroidVisibility,
+  AuthorizationStatus,
+  RepeatFrequency,
+  TriggerType,
+  type Notification,
+  type Trigger,
+} from "@notifee/react-native";
 import { Platform } from "react-native";
 import type { Task } from "../types/models";
 
-export const TASK_CATEGORY = "task-reminder";
 export const ACTION_COMPLETE = "mark-complete";
 export const ACTION_SNOOZE = "snooze";
 export const ACTION_OPEN = "open-task";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+const ALARM_CHANNEL_ID = "task-alarms";
 
+/** True alarm behavior (not a polite notification): full-screen even over the lock screen, loops
+ * the ringtone, and bypasses Do Not Disturb — the same mechanism Android's own Clock app uses
+ * (AlarmType.SET_ALARM_CLOCK), because that's what a "reminder" means for this app: it should
+ * ring like the alarm you wake up to, not a banner you can miss. */
 export async function ensureNotificationSetup(): Promise<boolean> {
-  const settings = await Notifications.getPermissionsAsync();
-  let granted = settings.granted || settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
-
-  if (!granted) {
-    const request = await Notifications.requestPermissionsAsync();
-    granted = request.granted;
-  }
+  const settings = await notifee.requestPermission();
+  const granted =
+    settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
+    settings.authorizationStatus === AuthorizationStatus.PROVISIONAL;
 
   if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("task-reminders", {
-      name: "Task reminders",
-      importance: Notifications.AndroidImportance.HIGH,
+    await notifee.createChannel({
+      id: ALARM_CHANNEL_ID,
+      name: "Task Alarms",
+      importance: AndroidImportance.HIGH,
+      visibility: AndroidVisibility.PUBLIC,
+      bypassDnd: true,
+      sound: "default",
+      vibration: true,
     });
   }
-
-  await Notifications.setNotificationCategoryAsync(TASK_CATEGORY, [
-    { identifier: ACTION_COMPLETE, buttonTitle: "Mark Complete" },
-    { identifier: ACTION_SNOOZE, buttonTitle: "Snooze 10 min" },
-    { identifier: ACTION_OPEN, buttonTitle: "Open Task", options: { opensAppToForeground: true } },
-  ]);
 
   return granted;
 }
 
-function weekdayFromDateString(date: string): number {
-  // expo-notifications WEEKLY trigger uses 1-7 where 1 = Sunday, matching JS Date#getDay() + 1.
-  const jsDate = new Date(`${date}T00:00:00`);
-  return jsDate.getDay() + 1;
+function buildAlarmNotification(task: Task): Notification {
+  return {
+    title: "Task Reminder",
+    body: task.title,
+    data: { taskId: task.id },
+    android: {
+      channelId: ALARM_CHANNEL_ID,
+      category: AndroidCategory.ALARM,
+      importance: AndroidImportance.HIGH,
+      visibility: AndroidVisibility.PUBLIC,
+      loopSound: true,
+      autoCancel: false,
+      ongoing: true,
+      fullScreenAction: { id: "default" },
+      pressAction: { id: ACTION_OPEN },
+      actions: [
+        { title: "Mark Complete", pressAction: { id: ACTION_COMPLETE } },
+        { title: "Snooze 10 min", pressAction: { id: ACTION_SNOOZE } },
+      ],
+    },
+  };
 }
 
-/** Schedules (or reschedules) the local reminder notification for a task. Returns the new notification id, or null if no reminder is enabled. */
+/** Schedules (or reschedules) the alarm for a task. Returns the new notification id, or null if no reminder is enabled. */
 export async function scheduleTaskReminder(task: Task): Promise<string | null> {
   if (task.reminder.localNotificationId) {
-    await Notifications.cancelScheduledNotificationAsync(task.reminder.localNotificationId).catch(() => undefined);
+    await notifee.cancelTriggerNotification(task.reminder.localNotificationId).catch(() => undefined);
   }
 
   if (!task.reminder.enabled || task.completed) {
     return null;
   }
 
-  const [hour, minute] = task.time.split(":").map(Number);
-  const content: Notifications.NotificationContentInput = {
-    title: "Task Reminder",
-    body: task.title,
-    categoryIdentifier: TASK_CATEGORY,
-    data: { taskId: task.id },
-    sound: true,
-  };
-
-  let trigger: Notifications.SchedulableNotificationTriggerInput;
-
-  switch (task.recurrence.type) {
-    case "daily":
-      trigger = { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute };
-      break;
-    case "weekly":
-      trigger = {
-        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-        weekday: weekdayFromDateString(task.date),
-        hour,
-        minute,
-      };
-      break;
-    case "monthly": {
-      const day = Number(task.date.split("-")[2]);
-      trigger = { type: Notifications.SchedulableTriggerInputTypes.MONTHLY, day, hour, minute };
-      break;
-    }
-    default: {
-      // "none" and "custom" (custom-interval rescheduling is a Phase 3 feature) both fall back
-      // to a single one-time reminder at the stored notifyAt.
-      const date = task.reminder.notifyAt ? new Date(task.reminder.notifyAt) : null;
-      if (!date || date.getTime() <= Date.now()) return null;
-      trigger = { type: Notifications.SchedulableTriggerInputTypes.DATE, date };
-    }
+  const notifyAtMillis = task.reminder.notifyAt ? new Date(task.reminder.notifyAt).getTime() : null;
+  if (!notifyAtMillis || (task.recurrence.type === "none" && notifyAtMillis <= Date.now())) {
+    return null;
   }
 
-  return Notifications.scheduleNotificationAsync({ content, trigger });
+  let trigger: Trigger = {
+    type: TriggerType.TIMESTAMP,
+    timestamp: notifyAtMillis,
+    alarmManager: { type: AlarmType.SET_ALARM_CLOCK },
+  };
+
+  // Notifee's native repeat only covers hourly/daily/weekly. Monthly/custom recurrence falls
+  // back to a single one-time alarm at the stored notifyAt (same documented limitation as
+  // before) — the next occurrence gets rescheduled whenever the task is next edited/synced.
+  if (task.recurrence.type === "daily") {
+    trigger = { ...trigger, repeatFrequency: RepeatFrequency.DAILY };
+  } else if (task.recurrence.type === "weekly") {
+    trigger = { ...trigger, repeatFrequency: RepeatFrequency.WEEKLY };
+  }
+
+  return notifee.createTriggerNotification(buildAlarmNotification(task), trigger);
 }
 
 export async function cancelTaskReminder(localNotificationId: string | null): Promise<void> {
   if (!localNotificationId) return;
-  await Notifications.cancelScheduledNotificationAsync(localNotificationId).catch(() => undefined);
+  await notifee.cancelTriggerNotification(localNotificationId).catch(() => undefined);
 }
 
 export async function snoozeReminder(task: Task, minutes = 10): Promise<string> {
-  return Notifications.scheduleNotificationAsync({
-    content: {
-      title: "Task Reminder (snoozed)",
-      body: task.title,
-      categoryIdentifier: TASK_CATEGORY,
-      data: { taskId: task.id },
-      sound: true,
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: new Date(Date.now() + minutes * 60 * 1000),
-    },
-  });
+  return notifee.createTriggerNotification(
+    { ...buildAlarmNotification(task), title: "Task Reminder (snoozed)" },
+    {
+      type: TriggerType.TIMESTAMP,
+      timestamp: Date.now() + minutes * 60 * 1000,
+      alarmManager: { type: AlarmType.SET_ALARM_CLOCK },
+    }
+  );
 }
