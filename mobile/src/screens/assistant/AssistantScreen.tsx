@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as assistantApi from "../../api/assistant";
-import { getApiErrorMessage } from "../../api/client";
+import { getApiErrorMessage, isRequestCanceled } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -55,6 +55,7 @@ export function AssistantScreen({ route }: Props) {
   const [interactionId, setInteractionId] = useState<string | undefined>(undefined);
   const [pendingAction, setPendingAction] = useState<assistantApi.PendingAction | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const { isListening, transcript, error: voiceError, start, stop, clearTranscript } = useVoiceInput();
 
@@ -70,20 +71,29 @@ export function AssistantScreen({ route }: Props) {
       appendMessage("user", trimmed);
       setInput("");
       setSending(true);
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
       try {
-        const result = await assistantApi.sendAssistantMessage(trimmed, interactionId);
+        const result = await assistantApi.sendAssistantMessage(trimmed, interactionId, controller.signal);
         appendMessage("assistant", result.reply);
         setInteractionId(result.interactionId);
         setPendingAction(result.pendingAction);
         if (user?.speakAssistantReplies) speak(result.reply);
       } catch (err) {
-        appendMessage("assistant", getApiErrorMessage(err, "Sorry, I couldn't process that."));
+        if (!isRequestCanceled(err)) {
+          appendMessage("assistant", getApiErrorMessage(err, "Sorry, I couldn't process that."));
+        }
       } finally {
+        abortControllerRef.current = null;
         setSending(false);
       }
     },
     [sending, interactionId, appendMessage, user?.speakAssistantReplies]
   );
+
+  function handleStop() {
+    abortControllerRef.current?.abort();
+  }
 
   useEffect(() => {
     if (!isListening && transcript.trim()) {
@@ -211,13 +221,22 @@ export function AssistantScreen({ route }: Props) {
             editable={!sending}
           />
 
-          <Pressable
-            onPress={() => handleSend(input)}
-            disabled={sending || !input.trim()}
-            style={[styles.sendButton, { backgroundColor: colors.primary, borderRadius: radius.pill, opacity: sending || !input.trim() ? 0.5 : 1 }]}
-          >
-            <Ionicons name="send" size={18} color="#FFFFFF" />
-          </Pressable>
+          {sending ? (
+            <Pressable
+              onPress={handleStop}
+              style={[styles.sendButton, { backgroundColor: colors.danger, borderRadius: radius.pill }]}
+            >
+              <Ionicons name="stop" size={18} color="#FFFFFF" />
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => handleSend(input)}
+              disabled={!input.trim()}
+              style={[styles.sendButton, { backgroundColor: colors.primary, borderRadius: radius.pill, opacity: input.trim() ? 1 : 0.5 }]}
+            >
+              <Ionicons name="send" size={18} color="#FFFFFF" />
+            </Pressable>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

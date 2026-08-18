@@ -12,8 +12,16 @@ export interface AssistantTurnResult {
   pendingAction: PendingAction | null;
 }
 
-export async function sendAssistantMessage(message: string, previousInteractionId?: string): Promise<AssistantTurnResult> {
-  const { data } = await apiClient.post<AssistantTurnResult>("/assistant/message", { message, previousInteractionId });
+export async function sendAssistantMessage(
+  message: string,
+  previousInteractionId?: string,
+  signal?: AbortSignal
+): Promise<AssistantTurnResult> {
+  const { data } = await apiClient.post<AssistantTurnResult>(
+    "/assistant/message",
+    { message, previousInteractionId },
+    { signal }
+  );
   return data;
 }
 

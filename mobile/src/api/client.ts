@@ -65,6 +65,12 @@ export interface ApiErrorBody {
   error: { code: string; message: string; details?: unknown };
 }
 
+/** True when a request failed because it was deliberately aborted (e.g. a user-tapped Stop
+ * button), as opposed to a real network/server error — callers should skip showing an error. */
+export function isRequestCanceled(error: unknown): boolean {
+  return axios.isCancel(error) || (axios.isAxiosError(error) && error.code === "ERR_CANCELED");
+}
+
 export function getApiErrorMessage(error: unknown, fallback = "Something went wrong. Please try again."): string {
   if (axios.isAxiosError(error)) {
     const body = error.response?.data as ApiErrorBody | undefined;

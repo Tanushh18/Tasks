@@ -14,6 +14,7 @@ import { Card } from "../../components/Card";
 import { OfflineBanner } from "../../components/OfflineBanner";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { ErrorState, LoadingState } from "../../components/StateViews";
+import { TaskListItem } from "../../components/TaskListItem";
 import { cancelTaskReminder } from "../../notifications/notificationService";
 import { getPendingCount, isNetworkFailure } from "../../offline/offlineQueue";
 import { getJson, setJson } from "../../offline/storage";
@@ -123,6 +124,32 @@ export function HomeScreen({ navigation }: Props) {
     }
   }
 
+  function handleDeleteTask(task: Task) {
+    Alert.alert("Delete task", `Delete "${task.title}"? This cannot be undone.`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await cancelTaskReminder(task.reminder.localNotificationId);
+            await tasksApi.deleteTask(task.id);
+            setTodaysTasks((prev) => prev.filter((t) => t.id !== task.id));
+            setReminders((prev) => prev.filter((t) => t.id !== task.id));
+            const taskCounts = await tasksApi.getTaskCounts();
+            setCounts(taskCounts);
+          } catch (err) {
+            Alert.alert("Couldn't delete task", getApiErrorMessage(err));
+          }
+        },
+      },
+    ]);
+  }
+
+  function editTask(taskId: string) {
+    navigation.navigate("TasksTab", { screen: "TaskForm", params: { taskId } });
+  }
+
   if (loading) return <LoadingState label="Loading your dashboard…" />;
   if (error) return <ErrorState message={error} onRetry={() => { setLoading(true); load(); }} />;
 
@@ -211,31 +238,13 @@ export function HomeScreen({ navigation }: Props) {
       ) : (
         <View style={{ marginBottom: spacing.xl }}>
           {todaysTasks.map((task) => (
-            <Pressable
+            <TaskListItem
               key={task.id}
-              onPress={() => handleToggleComplete(task)}
-              style={[styles.taskRow, { borderColor: colors.border }]}
-            >
-              <Ionicons
-                name={task.completed ? "checkmark-circle" : "ellipse-outline"}
-                size={22}
-                color={task.completed ? colors.success : colors.textFaint}
-                style={{ marginRight: spacing.sm }}
-              />
-              <Text
-                style={[
-                  typography.body,
-                  {
-                    color: task.completed ? colors.textFaint : colors.text,
-                    textDecorationLine: task.completed ? "line-through" : "none",
-                    flex: 1,
-                  },
-                ]}
-              >
-                {task.title}
-              </Text>
-              <Text style={[typography.caption, { color: colors.textMuted }]}>{formatTimeLabel(task.time)}</Text>
-            </Pressable>
+              task={task}
+              onToggleComplete={() => handleToggleComplete(task)}
+              onPress={() => editTask(task.id)}
+              onDelete={() => handleDeleteTask(task)}
+            />
           ))}
         </View>
       )}
@@ -246,13 +255,20 @@ export function HomeScreen({ navigation }: Props) {
       ) : (
         <View style={{ marginBottom: spacing.xl }}>
           {reminders.map((task) => (
-            <Card key={task.id} style={{ marginBottom: spacing.sm, flexDirection: "row", alignItems: "center" }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[typography.bodyStrong, { color: colors.text }]}>{task.title}</Text>
-                <Text style={[typography.caption, { color: colors.textMuted }]}>{formatTimeLabel(task.time)}</Text>
-              </View>
-              {task.reminder.notifyAt ? <Badge label={formatRemaining(task.reminder.notifyAt)} tone="primary" /> : null}
-            </Card>
+            <Pressable key={task.id} onPress={() => editTask(task.id)}>
+              <Card style={{ marginBottom: spacing.sm, flexDirection: "row", alignItems: "center" }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[typography.bodyStrong, { color: colors.text }]}>{task.title}</Text>
+                  <Text style={[typography.caption, { color: colors.textMuted }]}>{formatTimeLabel(task.time)}</Text>
+                </View>
+                {task.reminder.notifyAt ? (
+                  <Badge label={formatRemaining(task.reminder.notifyAt)} tone="primary" />
+                ) : null}
+                <Pressable onPress={() => handleDeleteTask(task)} hitSlop={8} style={{ marginLeft: spacing.sm }}>
+                  <Ionicons name="trash-outline" size={18} color={colors.textFaint} />
+                </Pressable>
+              </Card>
+            </Pressable>
           ))}
         </View>
       )}
@@ -309,5 +325,4 @@ const styles = StyleSheet.create({
   quickActionsRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", columnGap: 16, rowGap: 16 },
   quickAction: { alignItems: "center", width: 72 },
   quickActionIcon: { width: 56, height: 56, alignItems: "center", justifyContent: "center" },
-  taskRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
 });
