@@ -16,7 +16,11 @@ export const ACTION_COMPLETE = "mark-complete";
 export const ACTION_SNOOZE = "snooze";
 export const ACTION_OPEN = "open-task";
 
-const ALARM_CHANNEL_ID = "task-alarms";
+// Android notification channels are immutable once created — a device that already ran an
+// earlier build already has "task-alarms" locked in with the old (default) sound, and Android
+// silently ignores later createChannel() calls for an existing id. Bumping the id forces a fresh
+// channel with the bundled alarm sound on every device, old installs included.
+const ALARM_CHANNEL_ID = "task-alarms-v2";
 
 /** True alarm behavior (not a polite notification): full-screen even over the lock screen, loops
  * the ringtone, and bypasses Do Not Disturb — the same mechanism Android's own Clock app uses
@@ -35,7 +39,7 @@ export async function ensureNotificationSetup(): Promise<boolean> {
       importance: AndroidImportance.HIGH,
       visibility: AndroidVisibility.PUBLIC,
       bypassDnd: true,
-      sound: "default",
+      sound: "alarm",
       vibration: true,
     });
   }
@@ -53,6 +57,7 @@ function buildAlarmNotification(task: Task): Notification {
       category: AndroidCategory.ALARM,
       importance: AndroidImportance.HIGH,
       visibility: AndroidVisibility.PUBLIC,
+      sound: "alarm",
       loopSound: true,
       autoCancel: false,
       ongoing: true,
