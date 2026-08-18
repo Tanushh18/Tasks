@@ -16,6 +16,14 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Only these auth endpoints must never trigger a refresh-and-retry: /login and /register aren't
+// authenticated in the first place, and /refresh is the refresh call itself (retrying it would
+// loop). Every other /auth/* route (e.g. /auth/me, /auth/settings) IS authenticated and must be
+// retried after a silent refresh — excluding the whole "/auth/" prefix here previously meant a
+// stale access token (they expire every 15 min) made the startup /auth/me call fail outright,
+// forcing a full re-login far more often than the 30-day refresh token should ever require.
+const NO_REFRESH_RETRY_URLS = ["/auth/login", "/auth/register", "/auth/refresh"];
+
 let refreshPromise: Promise<string | null> | null = null;
 
 async function refreshAccessToken(): Promise<string | null> {
@@ -38,7 +46,12 @@ apiClient.interceptors.response.use(
     const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
     const status = error.response?.status;
 
-    if (status === 401 && original && !original._retried && !original.url?.includes("/auth/")) {
+    if (
+      status === 401 &&
+      original &&
+      !original._retried &&
+      !NO_REFRESH_RETRY_URLS.some((url) => original.url?.includes(url))
+    ) {
       original._retried = true;
 
       if (!refreshPromise) {

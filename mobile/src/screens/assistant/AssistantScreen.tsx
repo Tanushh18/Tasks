@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as assistantApi from "../../api/assistant";
+import * as authApi from "../../api/auth";
 import { getApiErrorMessage, isRequestCanceled } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
@@ -44,9 +45,14 @@ function nextId(): string {
 
 type Props = BottomTabScreenProps<MainTabParamList, "AssistantTab">;
 
+const VOICE_LANGUAGES = [
+  { code: "en-US", label: "EN" },
+  { code: "hi-IN", label: "हिं" },
+];
+
 export function AssistantScreen({ route }: Props) {
   const { colors, spacing, radius, typography } = useTheme();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const listRef = useRef<FlatList<Message>>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -55,9 +61,23 @@ export function AssistantScreen({ route }: Props) {
   const [interactionId, setInteractionId] = useState<string | undefined>(undefined);
   const [pendingAction, setPendingAction] = useState<assistantApi.PendingAction | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [voiceLang, setVoiceLang] = useState(VOICE_LANGUAGES[0].code);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const { isListening, transcript, error: voiceError, start, stop, clearTranscript } = useVoiceInput();
+
+  async function handleToggleSpeak() {
+    if (!user) return;
+    const next = !user.speakAssistantReplies;
+    if (!next) stopSpeaking();
+    updateUser({ ...user, speakAssistantReplies: next });
+    try {
+      const updated = await authApi.updateSettings({ speakAssistantReplies: next });
+      updateUser(updated);
+    } catch {
+      updateUser({ ...user, speakAssistantReplies: !next });
+    }
+  }
 
   const appendMessage = useCallback((role: Message["role"], text: string) => {
     setMessages((prev) => [...prev, { id: nextId(), role, text }]);
@@ -78,7 +98,7 @@ export function AssistantScreen({ route }: Props) {
         appendMessage("assistant", result.reply);
         setInteractionId(result.interactionId);
         setPendingAction(result.pendingAction);
-        if (user?.speakAssistantReplies) speak(result.reply);
+        if (user?.speakAssistantReplies) speak(result.speech);
       } catch (err) {
         if (!isRequestCanceled(err)) {
           appendMessage("assistant", getApiErrorMessage(err, "Sorry, I couldn't process that."));
@@ -106,7 +126,7 @@ export function AssistantScreen({ route }: Props) {
 
   useEffect(() => {
     if (route.params?.autoListen) {
-      start();
+      start(voiceLang);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route.params?.autoListen]);
@@ -125,7 +145,7 @@ export function AssistantScreen({ route }: Props) {
       appendMessage("assistant", result.reply);
       setInteractionId(result.interactionId);
       setPendingAction(result.pendingAction);
-      if (user?.speakAssistantReplies) speak(result.reply);
+      if (user?.speakAssistantReplies) speak(result.speech);
     } catch (err) {
       appendMessage("assistant", getApiErrorMessage(err, "Sorry, something went wrong with that."));
     } finally {
@@ -138,16 +158,49 @@ export function AssistantScreen({ route }: Props) {
     if (isListening) {
       stop();
     } else {
-      start();
+      start(voiceLang);
     }
   }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={90}>
-        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm }}>
-          <Text style={[typography.h1, { color: colors.text }]}>Assistant</Text>
-          <Text style={[typography.caption, { color: colors.textMuted }]}>Ask about tasks or finances, or use a command.</Text>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            paddingHorizontal: spacing.lg,
+            paddingTop: spacing.md,
+            paddingBottom: spacing.sm,
+          }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[typography.h1, { color: colors.text }]}>Assistant</Text>
+            <Text style={[typography.caption, { color: colors.textMuted }]}>Ask about tasks or finances, or use a command.</Text>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+            <View style={{ flexDirection: "row", borderRadius: radius.pill, backgroundColor: colors.surfaceAlt, overflow: "hidden" }}>
+              {VOICE_LANGUAGES.map((l) => (
+                <Pressable
+                  key={l.code}
+                  onPress={() => setVoiceLang(l.code)}
+                  style={[styles.langChip, { backgroundColor: voiceLang === l.code ? colors.primary : "transparent" }]}
+                >
+                  <Text style={{ color: voiceLang === l.code ? "#FFFFFF" : colors.textMuted, fontWeight: "600", fontSize: 12 }}>
+                    {l.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable onPress={handleToggleSpeak} hitSlop={8} style={{ padding: 4 }}>
+              <Ionicons
+                name={user?.speakAssistantReplies ? "volume-high" : "volume-mute"}
+                size={22}
+                color={user?.speakAssistantReplies ? colors.primary : colors.textFaint}
+              />
+            </Pressable>
+          </View>
         </View>
 
         {messages.length === 0 ? (
@@ -245,6 +298,7 @@ export function AssistantScreen({ route }: Props) {
 
 const styles = StyleSheet.create({
   suggestion: { borderWidth: 1, padding: 12, marginBottom: 8 },
+  langChip: { paddingHorizontal: 10, height: 28, alignItems: "center", justifyContent: "center" },
   inputRow: { flexDirection: "row", alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, gap: 10 },
   micButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   input: { flex: 1, height: 44, borderWidth: 1, paddingHorizontal: 14, fontSize: 15 },

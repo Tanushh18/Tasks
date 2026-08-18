@@ -52,7 +52,7 @@ export function useVoiceInput() {
     setError(humanizeError(event.error));
   });
 
-  const start = useCallback(async (): Promise<boolean> => {
+  const start = useCallback(async (lang: string = "en-US"): Promise<boolean> => {
     setError(null);
     setTranscript("");
     if (!isVoiceInputAvailable) {
@@ -65,7 +65,7 @@ export function useVoiceInput() {
         setError("Microphone/speech permission was not granted. Enable it in device settings.");
         return false;
       }
-      speechModule.ExpoSpeechRecognitionModule.start({ lang: "en-US", interimResults: true, continuous: false });
+      speechModule.ExpoSpeechRecognitionModule.start({ lang, interimResults: true, continuous: false });
       return true;
     } catch {
       setError("Voice recognition failed to start. Please try again.");

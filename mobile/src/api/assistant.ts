@@ -8,6 +8,8 @@ export interface PendingAction {
 
 export interface AssistantTurnResult {
   reply: string;
+  /** Short, crisp confirmation meant for text-to-speech — read this aloud, never `reply` verbatim. */
+  speech: string;
   interactionId: string;
   pendingAction: PendingAction | null;
 }

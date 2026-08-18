@@ -9,6 +9,7 @@ import { getApiErrorMessage } from "../../api/client";
 import { EmptyState, ErrorState, LoadingState } from "../../components/StateViews";
 import { TaskListItem } from "../../components/TaskListItem";
 import { cancelTaskReminder } from "../../notifications/notificationService";
+import { enqueueTaskComplete, enqueueTaskDelete, isNetworkFailure } from "../../offline/offlineQueue";
 import { useTheme } from "../../theme/useTheme";
 import type { Task } from "../../types/models";
 import type { TasksStackParamList } from "../../navigation/types";
@@ -67,6 +68,11 @@ export function TaskListScreen({ navigation }: Props) {
       }
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
     } catch (err) {
+      if (isNetworkFailure(err)) {
+        if (nextCompleted) await cancelTaskReminder(task.reminder.localNotificationId);
+        await enqueueTaskComplete(task.id, nextCompleted);
+        return;
+      }
       setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
       Alert.alert("Couldn't update task", getApiErrorMessage(err));
     }
@@ -84,6 +90,11 @@ export function TaskListScreen({ navigation }: Props) {
             await tasksApi.deleteTask(task.id);
             setTasks((prev) => prev.filter((t) => t.id !== task.id));
           } catch (err) {
+            if (isNetworkFailure(err)) {
+              await enqueueTaskDelete(task.id);
+              setTasks((prev) => prev.filter((t) => t.id !== task.id));
+              return;
+            }
             Alert.alert("Couldn't delete task", getApiErrorMessage(err));
           }
         },

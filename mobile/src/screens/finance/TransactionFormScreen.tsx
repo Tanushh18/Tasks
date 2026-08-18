@@ -8,7 +8,7 @@ import { Button } from "../../components/Button";
 import { LoadingState } from "../../components/StateViews";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { TextField } from "../../components/TextField";
-import { enqueueTransactionCreate, isNetworkFailure } from "../../offline/offlineQueue";
+import { enqueueTransactionCreate, enqueueTransactionUpdate, isNetworkFailure } from "../../offline/offlineQueue";
 import { useTheme } from "../../theme/useTheme";
 import { formatDateLabel, formatTimeLabel, toHm, toIsoDate } from "../../utils/date";
 import type { FinanceAccount, TransactionType } from "../../types/models";
@@ -97,10 +97,14 @@ export function TransactionFormScreen({ navigation, route }: Props) {
       }
       navigation.goBack();
     } catch (err) {
-      if (!isEditing && isNetworkFailure(err)) {
+      if (isNetworkFailure(err)) {
         // No connection reached the server — queue it locally so the entry isn't lost; it syncs
-        // automatically (and safely, via its idempotency key) once you're back online.
-        await enqueueTransactionCreate(input);
+        // automatically (and safely, via its idempotency key for a new one) once you're back online.
+        if (isEditing && transactionId) {
+          await enqueueTransactionUpdate(transactionId, input);
+        } else {
+          await enqueueTransactionCreate(input);
+        }
         Alert.alert("Saved offline", "No connection right now — this will sync automatically once you're back online.");
         navigation.goBack();
         return;

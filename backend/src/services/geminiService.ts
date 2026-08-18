@@ -87,6 +87,17 @@ export async function sendUserMessage(params: {
   return extractResult(interaction);
 }
 
+/** The API requires a function result to be a JSON object, not a bare array — tools like
+ * getTasks/getTransactions/getFinanceAccounts return arrays directly, which the API rejects with
+ * "400 The 'type' parameter is required at 'input[0].result[0]'" (it tries to read each array
+ * element as its own typed content part). Wrap array/primitive results in an object envelope. */
+function toStructuredResult(result: unknown): Record<string, unknown> {
+  if (result === null || result === undefined) return {};
+  if (Array.isArray(result)) return { items: result };
+  if (typeof result === "object") return result as Record<string, unknown>;
+  return { value: result };
+}
+
 /** Continues a turn by handing back the result(s) of tool call(s) the model requested. */
 export async function sendFunctionResults(params: {
   results: FunctionResultInput[];
@@ -101,7 +112,7 @@ export async function sendFunctionResults(params: {
       type: "function_result" as const,
       call_id: r.callId,
       name: r.name,
-      result: (r.result ?? {}) as Record<string, unknown>,
+      result: toStructuredResult(r.result),
       ...(r.isError ? { is_error: true } : {}),
     })),
   });

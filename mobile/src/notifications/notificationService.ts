@@ -41,6 +41,7 @@ export async function ensureNotificationSetup(): Promise<boolean> {
       bypassDnd: true,
       sound: "alarm",
       vibration: true,
+      vibrationPattern: [500, 1000, 500, 1000],
     });
   }
 
@@ -61,6 +62,7 @@ function buildAlarmNotification(task: Task): Notification {
       loopSound: true,
       autoCancel: false,
       ongoing: true,
+      vibrationPattern: [500, 1000, 500, 1000],
       fullScreenAction: { id: "default" },
       pressAction: { id: ACTION_OPEN },
       actions: [

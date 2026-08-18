@@ -8,8 +8,8 @@ import { Button } from "../../components/Button";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { LoadingState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
-import { ensureNotificationSetup, scheduleTaskReminder } from "../../notifications/notificationService";
-import { enqueueTaskCreate, isNetworkFailure } from "../../offline/offlineQueue";
+import { cancelTaskReminder, ensureNotificationSetup, scheduleTaskReminder } from "../../notifications/notificationService";
+import { enqueueTaskCreate, enqueueTaskDelete, enqueueTaskUpdate, isNetworkFailure } from "../../offline/offlineQueue";
 import { useTheme } from "../../theme/useTheme";
 import { formatDateLabel, formatTimeLabel, toHm, toIsoDate, todayIso } from "../../utils/date";
 import type { Priority, RecurrenceType, Task } from "../../types/models";
@@ -118,11 +118,15 @@ export function TaskFormScreen({ navigation, route }: Props) {
 
       navigation.goBack();
     } catch (err) {
-      if (!isEditing && isNetworkFailure(err)) {
+      if (isNetworkFailure(err)) {
         // No connection reached the server at all — queue it locally rather than losing the
-        // task. It'll sync (and its reminder get scheduled) automatically once back online.
-        await enqueueTaskCreate(input);
-        Alert.alert("Saved offline", "No connection right now — this task will sync automatically once you're back online.");
+        // change. It'll sync (and its reminder get (re)scheduled) automatically once back online.
+        if (isEditing && taskId) {
+          await enqueueTaskUpdate(taskId, input);
+        } else {
+          await enqueueTaskCreate(input);
+        }
+        Alert.alert("Saved offline", "No connection right now — this will sync automatically once you're back online.");
         navigation.goBack();
         return;
       }
@@ -141,10 +145,16 @@ export function TaskFormScreen({ navigation, route }: Props) {
         style: "destructive",
         onPress: async () => {
           try {
-            await tasksApi.setTaskNotificationId(taskId, null);
+            await cancelTaskReminder(existingTask.reminder.localNotificationId);
             await tasksApi.deleteTask(taskId);
             navigation.goBack();
           } catch (err) {
+            if (isNetworkFailure(err)) {
+              await enqueueTaskDelete(taskId);
+              Alert.alert("Deleted offline", "No connection right now — this will sync automatically once you're back online.");
+              navigation.goBack();
+              return;
+            }
             Alert.alert("Couldn't delete task", getApiErrorMessage(err));
           }
         },

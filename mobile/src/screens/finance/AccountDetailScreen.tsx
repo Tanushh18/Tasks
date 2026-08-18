@@ -5,6 +5,7 @@ import React, { useCallback, useLayoutEffect, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import * as financeApi from "../../api/finance";
 import { getApiErrorMessage } from "../../api/client";
+import { enqueueTransactionDelete, isNetworkFailure } from "../../offline/offlineQueue";
 import { Badge } from "../../components/Badge";
 import { Card } from "../../components/Card";
 import { EmptyState, ErrorState, LoadingState } from "../../components/StateViews";
@@ -73,6 +74,11 @@ export function AccountDetailScreen({ navigation, route }: Props) {
             await financeApi.deleteTransaction(transaction.id);
             setTransactions((prev) => prev.filter((t) => t.id !== transaction.id));
           } catch (err) {
+            if (isNetworkFailure(err)) {
+              await enqueueTransactionDelete(transaction.id);
+              setTransactions((prev) => prev.filter((t) => t.id !== transaction.id));
+              return;
+            }
             Alert.alert("Couldn't delete transaction", getApiErrorMessage(err));
           }
         },

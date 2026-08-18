@@ -16,7 +16,7 @@ import { ScreenContainer } from "../../components/ScreenContainer";
 import { ErrorState, LoadingState } from "../../components/StateViews";
 import { TaskListItem } from "../../components/TaskListItem";
 import { cancelTaskReminder } from "../../notifications/notificationService";
-import { getPendingCount, isNetworkFailure } from "../../offline/offlineQueue";
+import { enqueueTaskComplete, enqueueTaskDelete, getPendingCount, isNetworkFailure } from "../../offline/offlineQueue";
 import { getJson, setJson } from "../../offline/storage";
 import { useTheme } from "../../theme/useTheme";
 import { formatCurrency } from "../../utils/currency";
@@ -119,6 +119,12 @@ export function HomeScreen({ navigation }: Props) {
       const taskCounts = await tasksApi.getTaskCounts();
       setCounts(taskCounts);
     } catch (err) {
+      if (isNetworkFailure(err)) {
+        if (nextCompleted) await cancelTaskReminder(task.reminder.localNotificationId);
+        await enqueueTaskComplete(task.id, nextCompleted);
+        setPendingCount(await getPendingCount());
+        return;
+      }
       setTodaysTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
       Alert.alert("Couldn't update task", getApiErrorMessage(err));
     }
@@ -139,6 +145,13 @@ export function HomeScreen({ navigation }: Props) {
             const taskCounts = await tasksApi.getTaskCounts();
             setCounts(taskCounts);
           } catch (err) {
+            if (isNetworkFailure(err)) {
+              await enqueueTaskDelete(task.id);
+              setTodaysTasks((prev) => prev.filter((t) => t.id !== task.id));
+              setReminders((prev) => prev.filter((t) => t.id !== task.id));
+              setPendingCount(await getPendingCount());
+              return;
+            }
             Alert.alert("Couldn't delete task", getApiErrorMessage(err));
           }
         },
@@ -154,6 +167,7 @@ export function HomeScreen({ navigation }: Props) {
   if (error) return <ErrorState message={error} onRetry={() => { setLoading(true); load(); }} />;
 
   return (
+    <View style={{ flex: 1 }}>
     <ScreenContainer onRefresh={load} refreshing={false}>
       <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
         <View>
@@ -232,7 +246,12 @@ export function HomeScreen({ navigation }: Props) {
         />
       </View>
 
-      <Text style={[typography.h3, { color: colors.text, marginBottom: spacing.md }]}>Today's tasks</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.md }}>
+        <Text style={[typography.h3, { color: colors.text }]}>Today's tasks</Text>
+        <Pressable onPress={() => navigation.navigate("TasksTab", { screen: "TaskList", params: undefined })} hitSlop={8}>
+          <Text style={[typography.captionStrong, { color: colors.primary }]}>View all</Text>
+        </Pressable>
+      </View>
       {todaysTasks.length === 0 ? (
         <Text style={[typography.body, { color: colors.textMuted, marginBottom: spacing.xl }]}>Nothing scheduled for today.</Text>
       ) : (
@@ -291,6 +310,13 @@ export function HomeScreen({ navigation }: Props) {
         ))
       )}
     </ScreenContainer>
+    <Pressable
+      onPress={() => navigation.navigate("AssistantTab", undefined)}
+      style={[styles.assistantFab, { backgroundColor: colors.primary, borderRadius: radius.pill }]}
+    >
+      <Ionicons name="sparkles" size={26} color="#FFFFFF" />
+    </Pressable>
+    </View>
   );
 }
 
@@ -320,6 +346,20 @@ function QuickAction({
 }
 
 const styles = StyleSheet.create({
+  assistantFab: {
+    position: "absolute",
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
   summaryRow: { flexDirection: "row", justifyContent: "space-between" },
   summaryCard: { flex: 1, alignItems: "center" },
   quickActionsRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", columnGap: 16, rowGap: 16 },
