@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { DateTime } from "luxon";
 import { User, type UserDocument } from "../models/User";
 import { ApiError } from "../utils/ApiError";
@@ -11,8 +12,62 @@ import {
   type FunctionResultInput,
   type InteractionResult,
 } from "./geminiService";
+import {
+  describeSavedTransaction,
+  detectLocale,
+  parseCommand,
+  phrasesFor,
+  type Locale,
+  type RuleOutcome,
+} from "./rules";
 
 const MAX_TOOL_ROUNDS = 5;
+
+/** Marks an interaction that never went through Gemini, so it is never replayed as a
+ * `previous_interaction_id` (the API would reject an id it didn't issue). */
+const LOCAL_INTERACTION_PREFIX = "local-";
+
+/** Marks a tool call the rule engine proposed. The locale is baked into the id because the
+ * confirm endpoint receives only ids and arguments — the original message, and with it the
+ * language the user wrote in, is gone by then. */
+const LOCAL_CALL_PREFIX = "localcall-";
+
+function newLocalInteractionId(): string {
+  return `${LOCAL_INTERACTION_PREFIX}${randomUUID()}`;
+}
+
+function newLocalCallId(locale: Locale): string {
+  return `${LOCAL_CALL_PREFIX}${locale}-${randomUUID()}`;
+}
+
+function isLocalCallId(callId: string): boolean {
+  return callId.startsWith(LOCAL_CALL_PREFIX);
+}
+
+function localeFromCallId(callId: string): Locale {
+  const rest = callId.slice(LOCAL_CALL_PREFIX.length);
+  const locale = rest.split("-")[0];
+  return locale === "hi" || locale === "hinglish" ? locale : "en";
+}
+
+/** Only a real Gemini interaction id may be sent back as `previousInteractionId`. */
+function llmInteractionId(previous?: string): string | undefined {
+  if (!previous || previous.startsWith(LOCAL_INTERACTION_PREFIX)) return undefined;
+  return previous;
+}
+
+/**
+ * True for failures where the model is simply unreachable right now — quota exhaustion (the free
+ * tier's 20-request/minute cap), rate limiting, upstream 5xx, and network timeouts. These get a
+ * graceful "rules only" reply instead of a 500, because the rule engine still works. Anything
+ * else rethrows, so genuine bugs stay visible.
+ */
+function isTransientAiFailure(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /\b(?:429|500|502|503|504)\b|quota|rate.?limit|resource_exhausted|exceeded|overloaded|unavailable|timeout|etimedout|econnreset|enotfound|fetch failed|network/i.test(
+    message
+  );
+}
 
 export interface PendingAction {
   callId: string;
@@ -182,11 +237,89 @@ async function driveToolLoop(
   return { reply, speech: deriveSpeech(reply, lastMutation), interactionId: result.interactionId, pendingAction: null };
 }
 
+/**
+ * Executes a mutation the rule engine already resolved, or hands it back for confirmation first.
+ * The rule engine does its own lookups in-process, so unlike the LLM path there is no multi-round
+ * tool loop here — one call, one reply.
+ */
+async function applyRuleOutcome(params: {
+  userId: string;
+  outcome: RuleOutcome;
+  user: UserDocument;
+  locale: Locale;
+  previousInteractionId?: string;
+}): Promise<AssistantTurnResult> {
+  const { outcome, user, locale } = params;
+  // Carrying a real Gemini id keeps a half-finished LLM thread alive across rule-handled turns.
+  const interactionId = llmInteractionId(params.previousInteractionId) ?? newLocalInteractionId();
+
+  if (outcome.kind === "reply") {
+    return { reply: outcome.reply, speech: outcome.speech, interactionId, pendingAction: null };
+  }
+
+  const needsConfirmation =
+    user.confirmFinancialActions && CONFIRMATION_REQUIRED_TOOLS.has(outcome.call.name);
+
+  if (needsConfirmation) {
+    const confirm = outcome.confirm ?? {
+      reply: describeProposedAction(outcome.call.name, outcome.call.arguments),
+      speech: describeProposedAction(outcome.call.name, outcome.call.arguments),
+    };
+    return {
+      reply: confirm.reply,
+      speech: confirm.speech,
+      interactionId,
+      pendingAction: {
+        callId: newLocalCallId(locale),
+        name: outcome.call.name,
+        arguments: outcome.call.arguments,
+      },
+    };
+  }
+
+  const result = await runToolCall(params.userId, {
+    callId: newLocalCallId(locale),
+    name: outcome.call.name,
+    arguments: outcome.call.arguments,
+  });
+
+  if (result.isError) {
+    const message = (result.result as { error?: string }).error ?? phrasesFor(locale).aiUnavailable();
+    return { reply: message, speech: message, interactionId, pendingAction: null };
+  }
+
+  return { reply: outcome.reply, speech: outcome.speech, interactionId, pendingAction: null };
+}
+
 export async function runAssistantTurn(params: {
   userId: string;
   message: string;
   previousInteractionId?: string;
 }): Promise<AssistantTurnResult> {
+  const user = await User.findById(params.userId);
+  if (!user) throw ApiError.notFound("User not found");
+
+  const locale = detectLocale(params.message);
+
+  // Rules first: everyday commands are answered here with no API call at all, which is what keeps
+  // the assistant working when the model's quota is exhausted (and keeps it free to run).
+  const outcome = await parseCommand({
+    userId: params.userId,
+    message: params.message,
+    timezone: user.timezone,
+    currency: user.currency,
+  });
+
+  if (outcome) {
+    return applyRuleOutcome({
+      userId: params.userId,
+      outcome,
+      user,
+      locale,
+      previousInteractionId: params.previousInteractionId,
+    });
+  }
+
   if (!isAiConfigured()) {
     throw new ApiError(
       503,
@@ -195,18 +328,66 @@ export async function runAssistantTurn(params: {
     );
   }
 
-  const user = await User.findById(params.userId);
-  if (!user) throw ApiError.notFound("User not found");
-
   const systemInstruction = await buildSystemInstruction(params.userId, user);
-  const initial = await sendUserMessage({
-    message: params.message,
-    systemInstruction,
-    tools: assistantTools,
-    previousInteractionId: params.previousInteractionId,
+
+  try {
+    const initial = await sendUserMessage({
+      message: params.message,
+      systemInstruction,
+      tools: assistantTools,
+      previousInteractionId: llmInteractionId(params.previousInteractionId),
+    });
+    return await driveToolLoop(params.userId, user.confirmFinancialActions, initial);
+  } catch (err) {
+    if (!isTransientAiFailure(err)) throw err;
+    // The model is unreachable, but the rule engine isn't — say what still works instead of 500ing.
+    const reply = phrasesFor(locale).aiBusy();
+    return { reply, speech: reply, interactionId: newLocalInteractionId(), pendingAction: null };
+  }
+}
+
+/** Confirmation round trip for an action the rule engine proposed — executed locally, worded from
+ * the tool arguments, with no model involved in either direction. */
+async function resolveLocalConfirmation(params: {
+  userId: string;
+  locale: Locale;
+  currency: string;
+  interactionId: string;
+  name: string;
+  arguments: Record<string, unknown>;
+  confirmed: boolean;
+}): Promise<AssistantTurnResult> {
+  const p = phrasesFor(params.locale);
+
+  if (!params.confirmed) {
+    const reply = p.transactionDeclined();
+    return { reply, speech: reply, interactionId: params.interactionId, pendingAction: null };
+  }
+
+  const result = await runToolCall(params.userId, {
+    callId: params.name,
+    name: params.name,
+    arguments: params.arguments,
   });
 
-  return driveToolLoop(params.userId, user.confirmFinancialActions, initial);
+  if (result.isError) {
+    const message = (result.result as { error?: string }).error ?? p.aiUnavailable();
+    return { reply: message, speech: message, interactionId: params.interactionId, pendingAction: null };
+  }
+
+  const described = await describeSavedTransaction({
+    userId: params.userId,
+    locale: params.locale,
+    currency: params.currency,
+    args: params.arguments,
+  });
+
+  return {
+    reply: described.reply,
+    speech: described.speech,
+    interactionId: params.interactionId,
+    pendingAction: null,
+  };
 }
 
 export async function confirmAssistantAction(params: {
@@ -219,6 +400,20 @@ export async function confirmAssistantAction(params: {
 }): Promise<AssistantTurnResult> {
   const user = await User.findById(params.userId);
   if (!user) throw ApiError.notFound("User not found");
+
+  // A rule-engine action never had a Gemini interaction behind it, so resolving it must not call
+  // the model — doing so would send back a call id the API never issued.
+  if (isLocalCallId(params.callId)) {
+    return resolveLocalConfirmation({
+      userId: params.userId,
+      locale: localeFromCallId(params.callId),
+      currency: user.currency,
+      interactionId: params.interactionId,
+      name: params.name,
+      arguments: params.arguments,
+      confirmed: params.confirmed,
+    });
+  }
 
   const functionResult: FunctionResultInput = params.confirmed
     ? await runToolCall(params.userId, { callId: params.callId, name: params.name, arguments: params.arguments })
