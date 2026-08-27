@@ -270,6 +270,20 @@ describe("assistant rule engine (no AI key configured)", () => {
       expect(tasks.body.tasks[0].time).toBe("18:00");
     });
 
+    it("keeps dates and times in the user's own language", async () => {
+      const api = await client();
+
+      // Regression: replies used to read '"दवाई लेना" 29 Aug at 8 AM के लिए जोड़ दिया' — the
+      // sentence in one language and the part carrying the information in another.
+      const hindi = await say(api, "परसों सुबह 8 बजे दवाई लेना याद दिलाना");
+      expect(hindi.reply).toMatch(/बजे/);
+      expect(hindi.reply).not.toMatch(/\bAM\b|\bPM\b|\bat\b/);
+
+      const hinglish = await say(api, "kal shaam 6 baje doodh lana yaad dilana");
+      expect(hinglish.reply).toMatch(/baje/);
+      expect(hinglish.reply).not.toMatch(/\bAM\b|\bPM\b/);
+    });
+
     it("handles a Devanagari command and replies in Hindi", async () => {
       const api = await client();
       const result = await say(api, "कल शाम 6 बजे दूध लाना याद दिलाना");

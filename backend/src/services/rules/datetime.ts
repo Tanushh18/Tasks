@@ -1,4 +1,5 @@
 import { DateTime } from "luxon";
+import type { Locale } from "./types";
 
 export type RecurrenceType = "daily" | "weekly" | "monthly";
 
@@ -607,4 +608,52 @@ export function describeTime(time: string): string {
   const suffix = hour >= 12 ? "PM" : "AM";
   const display = hour % 12 === 0 ? 12 : hour % 12;
   return minute === 0 ? `${display} ${suffix}` : `${display}:${String(minute).padStart(2, "0")} ${suffix}`;
+}
+
+const MONTHS_HI = [
+  "जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून",
+  "जुलाई", "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर",
+];
+
+/** Part of day used to disambiguate a 12-hour clock in Hindi/Hinglish, where "5 बजे" alone is
+ * ambiguous the way "5 o'clock" is in English. */
+function periodWord(hour: number, locale: Locale): string {
+  if (hour < 12) return locale === "hi" ? "सुबह" : "subah";
+  if (hour < 16) return locale === "hi" ? "दोपहर" : "dopahar";
+  if (hour < 20) return locale === "hi" ? "शाम" : "shaam";
+  return locale === "hi" ? "रात" : "raat";
+}
+
+/**
+ * Renders a date and time in the user's own language.
+ *
+ * Without this a Hindi reply came out as `"दवाई लेना" 29 Aug at 8 AM के लिए जोड़ दिया` — the
+ * sentence in one language and the part carrying the actual information in another, which is
+ * exactly the detail a reader needs most.
+ */
+export function describeWhenIn(date: string, time: string, now: DateTime, locale: Locale): string {
+  if (locale === "en") return `${describeDate(date, now)} at ${describeTime(time)}`;
+
+  const dt = DateTime.fromISO(date, { zone: now.zone });
+  const diff = dt.isValid ? Math.round(dt.startOf("day").diff(now.startOf("day"), "days").days) : NaN;
+
+  let day: string;
+  if (diff === 0) day = locale === "hi" ? "आज" : "aaj";
+  else if (diff === 1) day = locale === "hi" ? "कल" : "kal";
+  else if (diff === 2) day = locale === "hi" ? "परसों" : "parso";
+  else if (diff === -1) day = locale === "hi" ? "बीता कल" : "kal";
+  else if (!dt.isValid) day = date;
+  else if (locale === "hi") day = `${dt.day} ${MONTHS_HI[dt.month - 1]}`;
+  else day = dt.toFormat("d LLL");
+
+  const [rawHour, rawMinute] = time.split(":");
+  const hour = Number(rawHour);
+  const minute = Number(rawMinute);
+  if (!Number.isFinite(hour)) return day;
+
+  const display = hour % 12 === 0 ? 12 : hour % 12;
+  const clock = minute === 0 ? `${display}` : `${display}:${String(minute).padStart(2, "0")}`;
+  const oclock = locale === "hi" ? "बजे" : "baje";
+
+  return `${day} ${periodWord(hour, locale)} ${clock} ${oclock}`;
 }

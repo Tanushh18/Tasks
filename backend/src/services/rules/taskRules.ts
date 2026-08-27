@@ -1,6 +1,6 @@
 import type { TaskDocument } from "../../models/Task";
 import * as taskService from "../taskService";
-import { defaultSlot, describeDate, describeTime, parseWhen, type RecurrenceType } from "./datetime";
+import { defaultSlot, describeWhenIn, parseWhen, type RecurrenceType } from "./datetime";
 import { phrasesFor, type TaskLine } from "./phrases";
 import { blankSpans, capitalizeFirst, cleanPhrase, tokenCoverage, truncate } from "./text";
 import type { RuleContext, RuleOutcome } from "./types";
@@ -136,7 +136,7 @@ function localizedRecurrence(type: RecurrenceType, ctx: RuleContext): string {
 }
 
 function describeWhen(date: string, time: string, ctx: RuleContext): string {
-  return `${describeDate(date, ctx.now)} at ${describeTime(time)}`;
+  return describeWhenIn(date, time, ctx.now, ctx.locale);
 }
 
 function stripTrigger(text: string, triggers: RegExp[]): { matched: boolean; rest: string } {
