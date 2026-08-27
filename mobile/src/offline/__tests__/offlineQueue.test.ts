@@ -5,6 +5,9 @@ jest.mock("../storage", () => ({
   setJson: jest.fn(async (key: string, value: unknown) => {
     mockStore[key] = value;
   }),
+  removeJson: jest.fn(async (key: string) => {
+    delete mockStore[key];
+  }),
 }));
 
 let mockUuidCounter = 0;
@@ -53,11 +56,15 @@ import {
   isNetworkFailure,
   listPending,
 } from "../offlineQueue";
+import { setStorageScope } from "../scope";
 
 beforeEach(() => {
   mockStore = {};
   mockUuidCounter = 0;
   jest.clearAllMocks();
+  // The queue is namespaced per user now (offline/scope.ts) — these tests exercise the queue
+  // mechanics for one signed-in account. Cross-account isolation is covered in scope.test.ts.
+  setStorageScope("user-test");
 });
 
 describe("offline queue: enqueue + dedupe", () => {
@@ -86,11 +93,11 @@ describe("offline queue: enqueue + dedupe", () => {
     expect(pending[0]).toMatchObject({ kind: "task-delete", taskId: "task-1" });
   });
 
-  it("normalizes legacy queue items saved before update/delete support existed", async () => {
+  it("ignores anything left under the old shared queue key", async () => {
+    // Pre-namespacing items are discarded rather than migrated, because they cannot be attributed
+    // to an account — see discardLegacyQueue. Covered end-to-end in scope.test.ts.
     mockStore["dt_offline_queue"] = [{ id: "old-1", kind: "task", input: { title: "Old" }, createdAt: "2026-01-01" }];
-    expect(await getPendingCount()).toBe(1);
-    const pending = await listPending();
-    expect(pending[0].kind).toBe("task-create");
+    expect(await getPendingCount()).toBe(0);
   });
 });
 

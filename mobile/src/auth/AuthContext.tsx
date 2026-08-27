@@ -1,5 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import * as authApi from "../api/auth";
+import { discardLegacyQueue } from "../offline/offlineQueue";
+import { setStorageScope } from "../offline/scope";
 import type { User } from "../types/models";
 import { endSession, registerSessionExpiredHandler, restoreSession, setSessionTokens } from "./sessionStore";
 
@@ -20,35 +22,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Every setUser goes through here so the storage scope can never drift from the signed-in user:
+  // locally cached data (offline queue, dashboard cache) is keyed by it, and a stale scope would
+  // hand one account's data to another.
+  const applyUser = useCallback((next: User | null) => {
+    setStorageScope(next?.id ?? null);
+    setUser(next);
+  }, []);
+
   useEffect(() => {
-    registerSessionExpiredHandler(() => setUser(null));
+    registerSessionExpiredHandler(() => applyUser(null));
 
     (async () => {
+      // One-time cleanup of the shared, pre-namespacing queue.
+      await discardLegacyQueue().catch(() => undefined);
+
       const tokens = await restoreSession();
       if (tokens) {
         try {
           const me = await authApi.fetchMe();
-          setUser(me);
+          applyUser(me);
         } catch {
           await endSession();
-          setUser(null);
+          applyUser(null);
         }
       }
       setIsLoading(false);
     })();
-  }, []);
+  }, [applyUser]);
 
-  const register = useCallback(async (mobileNumber: string, mpin: string, confirmMpin: string) => {
-    const result = await authApi.register(mobileNumber, mpin, confirmMpin);
-    await setSessionTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
-    setUser(result.user);
-  }, []);
+  const register = useCallback(
+    async (mobileNumber: string, mpin: string, confirmMpin: string) => {
+      const result = await authApi.register(mobileNumber, mpin, confirmMpin);
+      await setSessionTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+      applyUser(result.user);
+    },
+    [applyUser]
+  );
 
-  const login = useCallback(async (mobileNumber: string, mpin: string) => {
-    const result = await authApi.login(mobileNumber, mpin);
-    await setSessionTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
-    setUser(result.user);
-  }, []);
+  const login = useCallback(
+    async (mobileNumber: string, mpin: string) => {
+      const result = await authApi.login(mobileNumber, mpin);
+      await setSessionTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+      applyUser(result.user);
+    },
+    [applyUser]
+  );
 
   const logout = useCallback(async () => {
     try {
@@ -57,8 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // even if the server call fails, clear the local session
     }
     await endSession();
-    setUser(null);
-  }, []);
+    applyUser(null);
+  }, [applyUser]);
 
   const refreshUser = useCallback(async () => {
     const me = await authApi.fetchMe();

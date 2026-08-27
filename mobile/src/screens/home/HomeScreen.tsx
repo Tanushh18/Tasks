@@ -17,6 +17,7 @@ import { ErrorState, LoadingState } from "../../components/StateViews";
 import { TaskListItem } from "../../components/TaskListItem";
 import { cancelTaskReminder } from "../../notifications/notificationService";
 import { enqueueTaskComplete, enqueueTaskDelete, getPendingCount, isNetworkFailure } from "../../offline/offlineQueue";
+import { scopedKey } from "../../offline/scope";
 import { getJson, setJson } from "../../offline/storage";
 import { useTheme } from "../../theme/useTheme";
 import { formatCurrency } from "../../utils/currency";
@@ -29,7 +30,9 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList>
 >;
 
-const DASHBOARD_CACHE_KEY = "dt_cache_home_dashboard";
+/** Namespaced per user (see offline/scope.ts) — this cache holds task counts and spending totals,
+ * which must never be shown to a different account that signs in on the same device. */
+const DASHBOARD_CACHE_KEY_BASE = "dt_cache_home_dashboard";
 
 interface DashboardCache {
   counts: TaskCounts;
@@ -74,16 +77,20 @@ export function HomeScreen({ navigation }: Props) {
       setReminders(upcomingReminders);
       setSummary(financeSummary);
       setOfflineCachedAt(null);
-      await setJson(DASHBOARD_CACHE_KEY, {
-        counts: taskCounts,
-        todaysTasks: todayList,
-        reminders: upcomingReminders,
-        summary: financeSummary,
-        cachedAt: new Date().toISOString(),
-      });
+      const cacheKey = scopedKey(DASHBOARD_CACHE_KEY_BASE);
+      if (cacheKey) {
+        await setJson(cacheKey, {
+          counts: taskCounts,
+          todaysTasks: todayList,
+          reminders: upcomingReminders,
+          summary: financeSummary,
+          cachedAt: new Date().toISOString(),
+        });
+      }
     } catch (err) {
       if (isNetworkFailure(err)) {
-        const cached = await getJson<DashboardCache>(DASHBOARD_CACHE_KEY);
+        const cacheKey = scopedKey(DASHBOARD_CACHE_KEY_BASE);
+        const cached = cacheKey ? await getJson<DashboardCache>(cacheKey) : null;
         if (cached) {
           setCounts(cached.counts);
           setTodaysTasks(cached.todaysTasks);

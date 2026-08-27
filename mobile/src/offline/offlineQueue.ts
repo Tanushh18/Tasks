@@ -3,9 +3,14 @@ import * as Crypto from "expo-crypto";
 import * as financeApi from "../api/finance";
 import * as tasksApi from "../api/tasks";
 import { cancelTaskReminder, scheduleTaskReminder } from "../notifications/notificationService";
-import { getJson, setJson } from "./storage";
+import { getStorageScope, requireScopedKey, scopedKey } from "./scope";
+import { getJson, removeJson, setJson } from "./storage";
 
-const QUEUE_KEY = "dt_offline_queue";
+/** Namespaced per user — see offline/scope.ts. Never read or written directly. */
+const QUEUE_KEY_BASE = "dt_offline_queue";
+
+/** The pre-namespacing key. Items left here belong to an account we can no longer identify. */
+const LEGACY_QUEUE_KEY = "dt_offline_queue";
 
 interface QueuedTaskCreate {
   id: string;
@@ -68,22 +73,30 @@ export type QueuedItem =
   | QueuedTransactionUpdate
   | QueuedTransactionDelete;
 
-// Only "creating while offline" existed before update/delete support was added — queue items
-// already saved on a device from that version used the old kind names. Map them forward so an
-// app update doesn't strand (or crash on) a pending item from before this change.
-function normalizeLegacyKind(item: QueuedItem | (Omit<QueuedItem, "kind"> & { kind: "task" | "transaction" })): QueuedItem {
-  if ((item.kind as string) === "task") return { ...item, kind: "task-create" } as QueuedTaskCreate;
-  if ((item.kind as string) === "transaction") return { ...item, kind: "transaction-create" } as QueuedTransactionCreate;
-  return item as QueuedItem;
-}
-
+// Note: the older `kind: "task" | "transaction"` names needed a forward-migration while the queue
+// lived under one shared key. Per-user keys are new as of this version, so a scoped queue can only
+// ever hold current kind names, and anything under the old shared key is discarded outright by
+// `discardLegacyQueue` rather than translated.
 async function getQueue(): Promise<QueuedItem[]> {
-  const raw = (await getJson<QueuedItem[]>(QUEUE_KEY)) ?? [];
-  return raw.map(normalizeLegacyKind);
+  const key = scopedKey(QUEUE_KEY_BASE);
+  if (!key) return [];
+  return (await getJson<QueuedItem[]>(key)) ?? [];
 }
 
 async function saveQueue(queue: QueuedItem[]): Promise<void> {
-  await setJson(QUEUE_KEY, queue);
+  await setJson(requireScopedKey(QUEUE_KEY_BASE), queue);
+}
+
+/**
+ * Discards any queue left by the version that stored items under a single shared key.
+ *
+ * Those items cannot be attributed to an account: whoever signs in first after updating is
+ * probably — but not certainly — the person who created them, and "probably" is not good enough
+ * when the queue can contain financial records. Dropping them loses at most a few unsynced
+ * entries; replaying them under the wrong account would corrupt someone else's money data.
+ */
+export async function discardLegacyQueue(): Promise<void> {
+  await removeJson(LEGACY_QUEUE_KEY);
 }
 
 function hasTaskId(item: QueuedItem): item is QueuedTaskUpdate | QueuedTaskDelete | QueuedTaskComplete {
@@ -214,6 +227,10 @@ async function syncItem(item: QueuedItem): Promise<void> {
  * (no point burning through the rest while still offline) but otherwise resolves every item —
  * a server response, success or error, removes that item from the queue either way. */
 export async function flushQueue(): Promise<{ synced: number; failed: number; stillOffline: boolean }> {
+  // Without a signed-in user there is no queue to attribute these writes to — flushing here is
+  // exactly how one account's queued items used to be posted under another account's session.
+  if (!getStorageScope()) return { synced: 0, failed: 0, stillOffline: false };
+
   const queue = await getQueue();
   if (queue.length === 0) return { synced: 0, failed: 0, stillOffline: false };
 
