@@ -2,176 +2,285 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useState } from "react";
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
-import * as authApi from "../../api/auth";
 import { getApiErrorMessage } from "../../api/client";
+import * as authApi from "../../api/auth";
 import { useAuth } from "../../auth/AuthContext";
 import { Card } from "../../components/Card";
+import { ConfirmationSheet } from "../../components/ConfirmationSheet";
 import { ScreenContainer } from "../../components/ScreenContainer";
-import { useTheme } from "../../theme/useTheme";
+import { SectionHeader } from "../../components/SectionHeader";
 import type { SettingsStackParamList } from "../../navigation/types";
+import { useTheme } from "../../theme/useTheme";
 
 type Props = NativeStackScreenProps<SettingsStackParamList, "SettingsMain">;
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP"];
 
-export function SettingsScreen({ navigation }: Props) {
-  const { colors, spacing, radius, typography } = useTheme();
-  const { user, logout, updateUser } = useAuth();
-  const [busy, setBusy] = useState(false);
+/**
+ * Deleting an account is irreversible and removes financial history, so it is gated behind two
+ * separate decisions (spec §54): the first asks whether to delete at all, the second spells out
+ * exactly what disappears. Nothing is called until the second is accepted.
+ */
+type DeleteStage = null | "confirm" | "final";
 
-  async function handleToggleNotifications(next: boolean) {
+export function SettingsScreen({ navigation }: Props) {
+  const { colors, spacing, radius, typography, touchTarget } = useTheme();
+  const { user, logout, updateUser } = useAuth();
+
+  const [busy, setBusy] = useState(false);
+  const [deleteStage, setDeleteStage] = useState<DeleteStage>(null);
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
+
+  async function updateSetting(patch: Parameters<typeof authApi.updateSettings>[0], revert: () => void) {
+    try {
+      updateUser(await authApi.updateSettings(patch));
+    } catch (err) {
+      revert();
+      Alert.alert("We couldn't save that change", getApiErrorMessage(err));
+    }
+  }
+
+  function toggleNotifications(next: boolean) {
     if (!user) return;
     updateUser({ ...user, notificationsEnabled: next });
-    try {
-      const updated = await authApi.updateSettings({ notificationsEnabled: next });
-      updateUser(updated);
-    } catch (err) {
-      updateUser({ ...user, notificationsEnabled: !next });
-      Alert.alert("Couldn't update setting", getApiErrorMessage(err));
-    }
+    void updateSetting({ notificationsEnabled: next }, () => updateUser({ ...user, notificationsEnabled: !next }));
   }
 
-  async function handleCurrencyChange(currency: string) {
-    if (!user) return;
-    try {
-      const updated = await authApi.updateSettings({ currency });
-      updateUser(updated);
-    } catch (err) {
-      Alert.alert("Couldn't update currency", getApiErrorMessage(err));
-    }
-  }
-
-  async function handleToggleConfirmFinancial(next: boolean) {
+  function toggleConfirmFinancial(next: boolean) {
     if (!user) return;
     updateUser({ ...user, confirmFinancialActions: next });
-    try {
-      const updated = await authApi.updateSettings({ confirmFinancialActions: next });
-      updateUser(updated);
-    } catch (err) {
-      updateUser({ ...user, confirmFinancialActions: !next });
-      Alert.alert("Couldn't update setting", getApiErrorMessage(err));
-    }
+    void updateSetting({ confirmFinancialActions: next }, () =>
+      updateUser({ ...user, confirmFinancialActions: !next })
+    );
   }
 
-  async function handleToggleSpeakReplies(next: boolean) {
+  function toggleSpeakReplies(next: boolean) {
     if (!user) return;
     updateUser({ ...user, speakAssistantReplies: next });
-    try {
-      const updated = await authApi.updateSettings({ speakAssistantReplies: next });
-      updateUser(updated);
-    } catch (err) {
-      updateUser({ ...user, speakAssistantReplies: !next });
-      Alert.alert("Couldn't update setting", getApiErrorMessage(err));
-    }
-  }
-
-  function handleLogout() {
-    Alert.alert("Log out", "You'll need your mobile number and MPIN to log back in.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Log out", style: "destructive", onPress: () => logout() },
-    ]);
-  }
-
-  function handleDeleteAccount() {
-    Alert.alert(
-      "Delete account",
-      "This permanently deletes your account, tasks, and financial data. This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete permanently",
-          style: "destructive",
-          onPress: async () => {
-            setBusy(true);
-            try {
-              await authApi.deleteAccount();
-              await logout();
-            } catch (err) {
-              setBusy(false);
-              Alert.alert("Couldn't delete account", getApiErrorMessage(err));
-            }
-          },
-        },
-      ]
+    void updateSetting({ speakAssistantReplies: next }, () =>
+      updateUser({ ...user, speakAssistantReplies: !next })
     );
+  }
+
+  async function changeCurrency(currency: string) {
+    if (!user || user.currency === currency) return;
+    const previous = user.currency;
+    updateUser({ ...user, currency });
+    void updateSetting({ currency }, () => updateUser({ ...user, currency: previous }));
+  }
+
+  async function performDelete() {
+    setBusy(true);
+    try {
+      await authApi.deleteAccount();
+      setDeleteStage(null);
+      await logout();
+    } catch (err) {
+      setBusy(false);
+      setDeleteStage(null);
+      Alert.alert("We couldn't delete your account", getApiErrorMessage(err));
+    }
   }
 
   return (
     <ScreenContainer>
-      <Text style={[typography.h1, { color: colors.text, marginBottom: spacing.lg }]}>Settings</Text>
+      <Text accessibilityRole="header" style={[typography.h1, { color: colors.text, marginBottom: spacing.xl }]}>
+        Settings
+      </Text>
 
-      <Card style={{ marginBottom: spacing.lg }}>
+      <SectionHeader title="Account" />
+      <Card style={{ marginBottom: spacing.md }}>
         <Text style={[typography.caption, { color: colors.textMuted }]}>Mobile number</Text>
         <Text style={[typography.h3, { color: colors.text, marginTop: 2 }]}>{user?.mobileNumber}</Text>
       </Card>
 
-      <Pressable onPress={() => navigation.navigate("ChangeMpin")}>
-        <Card style={[styles.row, { marginBottom: spacing.md }]}>
-          <Text style={[typography.bodyStrong, { color: colors.text, flex: 1 }]}>Change MPIN</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
-        </Card>
-      </Pressable>
+      <SettingRow
+        label="Change MPIN"
+        detail="Update the code you sign in with"
+        onPress={() => navigation.navigate("ChangeMpin")}
+      />
 
-      <Card style={[styles.row, { marginBottom: spacing.md }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[typography.bodyStrong, { color: colors.text }]}>Notifications</Text>
-          <Text style={[typography.caption, { color: colors.textMuted }]}>Task and reminder alerts</Text>
+      <View style={{ marginTop: spacing.xl }}>
+        <SectionHeader title="Notifications" />
+      </View>
+      <ToggleRow
+        label="Task reminders"
+        detail="Alerts on this phone when a task is due"
+        value={user?.notificationsEnabled ?? true}
+        onValueChange={toggleNotifications}
+      />
+
+      <View style={{ marginTop: spacing.xl }}>
+        <SectionHeader title="Assistant & voice" />
+      </View>
+      <ToggleRow
+        label="Confirm money changes"
+        detail="Ask before saving anything the assistant proposes"
+        value={user?.confirmFinancialActions ?? true}
+        onValueChange={toggleConfirmFinancial}
+      />
+      <ToggleRow
+        label="Speak replies out loud"
+        detail="Read answers aloud after you use your voice"
+        value={user?.speakAssistantReplies ?? true}
+        onValueChange={toggleSpeakReplies}
+      />
+
+      <View style={{ marginTop: spacing.xl }}>
+        <SectionHeader title="Money" subtitle="How amounts are shown" />
+      </View>
+      <Card style={{ marginBottom: spacing.md }}>
+        <Text style={[typography.bodyStrong, { color: colors.text, marginBottom: spacing.md }]}>Currency</Text>
+        <View style={styles.chipRow}>
+          {CURRENCIES.map((code) => {
+            const active = user?.currency === code;
+            return (
+              <Pressable
+                key={code}
+                onPress={() => changeCurrency(code)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.surfaceAlt,
+                    borderRadius: radius.pill,
+                    minHeight: touchTarget.min,
+                  },
+                ]}
+              >
+                <Text style={[typography.captionStrong, { color: active ? colors.onPrimary : colors.textMuted }]}>
+                  {code}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
-        <Switch value={user?.notificationsEnabled ?? true} onValueChange={handleToggleNotifications} />
       </Card>
 
-      <Card style={{ marginBottom: spacing.lg }}>
-        <Text style={[typography.bodyStrong, { color: colors.text, marginBottom: spacing.sm }]}>Currency</Text>
-        <View style={{ flexDirection: "row", gap: spacing.sm }}>
-          {CURRENCIES.map((c) => (
-            <Pressable
-              key={c}
-              onPress={() => handleCurrencyChange(c)}
-              style={[
-                styles.chip,
-                { backgroundColor: user?.currency === c ? colors.primary : colors.surfaceAlt, borderRadius: radius.pill },
-              ]}
-            >
-              <Text style={{ color: user?.currency === c ? "#FFFFFF" : colors.textMuted, fontWeight: "600" }}>{c}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </Card>
+      <View style={{ marginTop: spacing.xl }}>
+        <SectionHeader title="Sign in" />
+      </View>
+      <SettingRow label="Log out" icon="log-out-outline" onPress={() => setConfirmingLogout(true)} />
+      <SettingRow
+        label="Delete account"
+        detail="Removes everything, permanently"
+        icon="trash-outline"
+        destructive
+        onPress={() => setDeleteStage("confirm")}
+      />
 
-      <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>AI & Voice</Text>
-      <Card style={[styles.row, { marginBottom: spacing.md }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[typography.bodyStrong, { color: colors.text }]}>Confirm financial actions</Text>
-          <Text style={[typography.caption, { color: colors.textMuted }]}>Ask before saving transactions the assistant proposes</Text>
-        </View>
-        <Switch value={user?.confirmFinancialActions ?? true} onValueChange={handleToggleConfirmFinancial} />
-      </Card>
-      <Card style={[styles.row, { marginBottom: spacing.lg }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[typography.bodyStrong, { color: colors.text }]}>Speak assistant replies</Text>
-          <Text style={[typography.caption, { color: colors.textMuted }]}>Read responses aloud after voice commands</Text>
-        </View>
-        <Switch value={user?.speakAssistantReplies ?? true} onValueChange={handleToggleSpeakReplies} />
-      </Card>
+      <ConfirmationSheet
+        visible={confirmingLogout}
+        title="Log out?"
+        message="You'll need your mobile number and MPIN to sign back in."
+        confirmLabel="Log out"
+        onConfirm={() => {
+          setConfirmingLogout(false);
+          void logout();
+        }}
+        onCancel={() => setConfirmingLogout(false)}
+      />
 
-      <Pressable onPress={handleLogout}>
-        <Card style={[styles.row, { marginBottom: spacing.md }]}>
-          <Text style={[typography.bodyStrong, { color: colors.text, flex: 1 }]}>Log out</Text>
-          <Ionicons name="log-out-outline" size={20} color={colors.textFaint} />
-        </Card>
-      </Pressable>
+      {/* First decision: do you want to do this at all. */}
+      <ConfirmationSheet
+        visible={deleteStage === "confirm"}
+        title="Delete your account?"
+        message="We'll ask you once more before anything is removed."
+        confirmLabel="Continue"
+        destructive
+        onConfirm={() => setDeleteStage("final")}
+        onCancel={() => setDeleteStage(null)}
+      />
 
-      <Pressable onPress={handleDeleteAccount} disabled={busy}>
-        <Card style={[styles.row, { borderColor: colors.danger }]}>
-          <Text style={[typography.bodyStrong, { color: colors.danger, flex: 1 }]}>Delete account</Text>
-          <Ionicons name="trash-outline" size={20} color={colors.danger} />
-        </Card>
-      </Pressable>
+      {/* Second decision: exactly what is about to be lost. */}
+      <ConfirmationSheet
+        visible={deleteStage === "final"}
+        title="This can't be undone"
+        message="This will permanently remove your tasks, reminders and financial records."
+        details={user?.mobileNumber ? [{ label: "Account", value: user.mobileNumber }] : undefined}
+        confirmLabel="Delete permanently"
+        destructive
+        busy={busy}
+        onConfirm={performDelete}
+        onCancel={() => setDeleteStage(null)}
+      />
     </ScreenContainer>
   );
 }
 
+function SettingRow({
+  label,
+  detail,
+  icon = "chevron-forward",
+  destructive = false,
+  onPress,
+}: {
+  label: string;
+  detail?: string;
+  icon?: React.ComponentProps<typeof Ionicons>["name"];
+  destructive?: boolean;
+  onPress: () => void;
+}) {
+  const { colors, spacing, typography, touchTarget } = useTheme();
+  const tone = destructive ? colors.danger : colors.text;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={detail ? `${label}. ${detail}` : label}
+      style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+    >
+      <Card
+        style={[
+          styles.row,
+          { marginBottom: spacing.md, minHeight: touchTarget.large },
+          destructive ? { borderColor: colors.danger } : null,
+        ]}
+      >
+        <View style={styles.flex}>
+          <Text style={[typography.bodyStrong, { color: tone }]}>{label}</Text>
+          {detail ? (
+            <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>{detail}</Text>
+          ) : null}
+        </View>
+        <Ionicons name={icon} size={20} color={destructive ? colors.danger : colors.textFaint} />
+      </Card>
+    </Pressable>
+  );
+}
+
+function ToggleRow({
+  label,
+  detail,
+  value,
+  onValueChange,
+}: {
+  label: string;
+  detail: string;
+  value: boolean;
+  onValueChange: (next: boolean) => void;
+}) {
+  const { colors, spacing, typography, touchTarget } = useTheme();
+  return (
+    <Card style={[styles.row, { marginBottom: spacing.md, minHeight: touchTarget.large }]}>
+      <View style={styles.flex}>
+        <Text style={[typography.bodyStrong, { color: colors.text }]}>{label}</Text>
+        <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>{detail}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        accessibilityLabel={label}
+        trackColor={{ true: colors.primary, false: colors.border }}
+      />
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center" },
-  chip: { paddingHorizontal: 14, height: 34, alignItems: "center", justifyContent: "center" },
+  flex: { flex: 1 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12 },
+  chipRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  chip: { paddingHorizontal: 16, alignItems: "center", justifyContent: "center" },
 });

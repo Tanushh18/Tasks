@@ -1,7 +1,7 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import * as financeApi from "../../api/finance";
 import { getApiErrorMessage } from "../../api/client";
 import { Button } from "../../components/Button";
@@ -16,8 +16,12 @@ import type { FinanceStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<FinanceStackParamList, "TransactionForm">;
 
+/** Everyday categories, so the common case is one tap rather than typing. */
+const EXPENSE_CATEGORIES = ["Groceries", "Bills", "Travel", "Food", "Health", "Shopping"];
+const INCOME_CATEGORIES = ["Salary", "Refund", "Gift", "Interest"];
+
 export function TransactionFormScreen({ navigation, route }: Props) {
-  const { colors, spacing, radius, typography } = useTheme();
+  const { colors, spacing, radius, typography, touchTarget } = useTheme();
   const { transactionId } = route.params ?? {};
   const isEditing = Boolean(transactionId);
 
@@ -68,11 +72,11 @@ export function TransactionFormScreen({ navigation, route }: Props) {
   async function handleSave() {
     const numericAmount = Number(amount);
     if (!accountId) {
-      setError("Choose an account");
+      setError("Choose which account this belongs to.");
       return;
     }
     if (!numericAmount || numericAmount <= 0) {
-      setError("Enter a valid amount greater than 0");
+      setError("Enter an amount greater than zero.");
       return;
     }
     setError(null);
@@ -105,7 +109,10 @@ export function TransactionFormScreen({ navigation, route }: Props) {
         } else {
           await enqueueTransactionCreate(input);
         }
-        Alert.alert("Saved offline", "No connection right now — this will sync automatically once you're back online.");
+        Alert.alert(
+          "Saved on this phone",
+          "You're offline, so this hasn't reached your account yet. We'll sync it automatically when you're back online."
+        );
         navigation.goBack();
         return;
       }
@@ -119,8 +126,8 @@ export function TransactionFormScreen({ navigation, route }: Props) {
 
   return (
     <ScreenContainer>
-      <Text style={[typography.h2, { color: colors.text, marginBottom: spacing.lg }]}>
-        {isEditing ? "Edit Transaction" : "New Transaction"}
+      <Text accessibilityRole="header" style={[typography.h1, { color: colors.text, marginBottom: spacing.lg }]}>
+        {isEditing ? "Edit entry" : type === "IN" ? "Money received" : "Add expense"}
       </Text>
 
       {!route.params?.accountId && accounts.length > 1 ? (
@@ -146,20 +153,73 @@ export function TransactionFormScreen({ navigation, route }: Props) {
       <View style={{ flexDirection: "row", gap: spacing.sm, marginBottom: spacing.lg }}>
         <Pressable
           onPress={() => setType("IN")}
+          accessibilityRole="button"
+          accessibilityState={{ selected: type === "IN" }}
           style={[styles.typeButton, { backgroundColor: type === "IN" ? colors.successMuted : colors.surfaceAlt, borderRadius: radius.md }]}
         >
-          <Text style={{ color: type === "IN" ? colors.success : colors.textMuted, fontWeight: "700" }}>Cash In</Text>
+          <Text style={{ color: type === "IN" ? colors.success : colors.textMuted, fontWeight: "700" }}>
+            Money in
+          </Text>
         </Pressable>
         <Pressable
           onPress={() => setType("OUT")}
+          accessibilityRole="button"
+          accessibilityState={{ selected: type === "OUT" }}
           style={[styles.typeButton, { backgroundColor: type === "OUT" ? colors.dangerMuted : colors.surfaceAlt, borderRadius: radius.md }]}
         >
-          <Text style={{ color: type === "OUT" ? colors.danger : colors.textMuted, fontWeight: "700" }}>Cash Out</Text>
+          <Text style={{ color: type === "OUT" ? colors.danger : colors.textMuted, fontWeight: "700" }}>
+            Expense
+          </Text>
         </Pressable>
       </View>
 
-      <TextField label="Amount (₹)" value={amount} onChangeText={setAmount} placeholder="0" keyboardType="numeric" />
-      <TextField label="Category" value={category} onChangeText={setCategory} placeholder="e.g. Salary, Utilities, Groceries" />
+      {/* The amount is the point of this screen, so it gets its own oversized field. */}
+      <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.xs }]}>Amount</Text>
+      <View
+        style={[
+          styles.amountRow,
+          { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, marginBottom: spacing.lg },
+        ]}
+      >
+        <Text style={[typography.amount, { color: colors.textMuted }]}>₹</Text>
+        <TextInput
+          value={amount}
+          onChangeText={setAmount}
+          placeholder="0"
+          placeholderTextColor={colors.textFaint}
+          keyboardType="decimal-pad"
+          accessibilityLabel="Amount"
+          style={[typography.amount, styles.amountInput, { color: colors.text }]}
+        />
+      </View>
+
+      <TextField label="Category" value={category} onChangeText={setCategory} placeholder="e.g. Groceries" />
+      {/* One tap beats typing a category that is almost always one of a handful (spec §69). */}
+      <View style={[styles.chipRow, { marginBottom: spacing.lg }]}>
+        {(type === "IN" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((suggestion) => {
+          const active = category.trim().toLowerCase() === suggestion.toLowerCase();
+          return (
+            <Pressable
+              key={suggestion}
+              onPress={() => setCategory(suggestion)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: active ? colors.primary : colors.surfaceAlt,
+                  borderRadius: radius.pill,
+                  minHeight: touchTarget.min,
+                },
+              ]}
+            >
+              <Text style={[typography.caption, { color: active ? colors.onPrimary : colors.textMuted }]}>
+                {suggestion}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
       <TextField label="Description" value={description} onChangeText={setDescription} placeholder="Optional" />
 
       <View style={{ flexDirection: "row", gap: spacing.md, marginBottom: spacing.lg }}>
@@ -204,13 +264,21 @@ export function TransactionFormScreen({ navigation, route }: Props) {
 
       {error ? <Text style={[typography.caption, { color: colors.danger, marginBottom: spacing.md }]}>{error}</Text> : null}
 
-      <Button label={isEditing ? "Save changes" : "Save transaction"} onPress={handleSave} loading={saving} />
+      <Button
+        label={isEditing ? "Save changes" : type === "IN" ? "Save Money In" : "Save Expense"}
+        size="large"
+        onPress={handleSave}
+        loading={saving}
+      />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  chip: { paddingHorizontal: 14, height: 34, alignItems: "center", justifyContent: "center" },
+  chip: { paddingHorizontal: 14, alignItems: "center", justifyContent: "center" },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  amountRow: { flexDirection: "row", alignItems: "center", borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  amountInput: { flex: 1, padding: 0 },
   typeButton: { flex: 1, height: 44, alignItems: "center", justifyContent: "center" },
   pickerChip: { flex: 1, borderWidth: 1, padding: 12 },
 });
