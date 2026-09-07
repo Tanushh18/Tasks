@@ -324,7 +324,7 @@ export function HomeScreen({ navigation }: Props) {
             <QuickAction
               icon="chatbubble-ellipses"
               label="Ask Assistant"
-              onPress={() => navigation.navigate("AssistantTab", undefined)}
+              onPress={() => navigation.navigate("MoreTab", { screen: "Assistant", params: undefined })}
             />
             <QuickAction
               icon="calendar"
@@ -416,7 +416,7 @@ export function HomeScreen({ navigation }: Props) {
       </ScreenContainer>
 
       <Pressable
-        onPress={() => navigation.navigate("AssistantTab", { autoListen: true })}
+        onPress={() => navigation.navigate("MoreTab", { screen: "Assistant", params: { autoListen: true } })}
         accessibilityRole="button"
         accessibilityLabel="Speak to your assistant"
         accessibilityHint="Opens the assistant and starts listening"

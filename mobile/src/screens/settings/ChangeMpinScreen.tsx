@@ -6,6 +6,7 @@ import { getApiErrorMessage } from "../../api/client";
 import { Button } from "../../components/Button";
 import { PinInput } from "../../components/PinInput";
 import { ScreenContainer } from "../../components/ScreenContainer";
+import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/useTheme";
 import type { SettingsStackParamList } from "../../navigation/types";
 
@@ -13,6 +14,7 @@ type Props = NativeStackScreenProps<SettingsStackParamList, "ChangeMpin">;
 
 export function ChangeMpinScreen({ navigation }: Props) {
   const { colors, spacing, typography } = useTheme();
+  const { needsMpinChange, clearMustChangeMpin } = useAuth();
 
   const [currentMpin, setCurrentMpin] = useState("");
   const [newMpin, setNewMpin] = useState("");
@@ -31,7 +33,13 @@ export function ChangeMpinScreen({ navigation }: Props) {
     setSaving(true);
     try {
       await authApi.changeMpin(currentMpin, newMpin, confirmNewMpin);
-      Alert.alert("MPIN updated", "Your MPIN has been changed.", [{ text: "OK", onPress: () => navigation.goBack() }]);
+      if (needsMpinChange) {
+        // Forced flow (an admin-issued MPIN reset) — clear the flag so RootNavigator lets the
+        // user into the app; there's no screen to go back to here.
+        Alert.alert("MPIN updated", "Your MPIN has been changed.", [{ text: "OK", onPress: clearMustChangeMpin }]);
+      } else {
+        Alert.alert("MPIN updated", "Your MPIN has been changed.", [{ text: "OK", onPress: () => navigation.goBack() }]);
+      }
     } catch (err) {
       setError(getApiErrorMessage(err, "Could not change MPIN."));
     } finally {

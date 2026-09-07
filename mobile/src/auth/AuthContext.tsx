@@ -9,11 +9,15 @@ interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  /** True once signed in with `mustChangeMpin` still set — gates the app behind ChangeMpin until cleared. */
+  needsMpinChange: boolean;
   register: (name: string, mobileNumber: string, mpin: string, confirmMpin: string) => Promise<void>;
   login: (mobileNumber: string, mpin: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateUser: (user: User) => void;
+  /** Called once the forced MPIN change succeeds, to let the user into the app. */
+  clearMustChangeMpin: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -86,9 +90,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateUser = useCallback((next: User) => setUser(next), []);
 
+  const clearMustChangeMpin = useCallback(() => {
+    setUser((prev) => (prev ? { ...prev, mustChangeMpin: false } : prev));
+  }, []);
+
+  const needsMpinChange = Boolean(user?.mustChangeMpin);
+
   const value = useMemo(
-    () => ({ user, isLoading, isAuthenticated: Boolean(user), register, login, logout, refreshUser, updateUser }),
-    [user, isLoading, register, login, logout, refreshUser, updateUser]
+    () => ({
+      user,
+      isLoading,
+      isAuthenticated: Boolean(user),
+      needsMpinChange,
+      register,
+      login,
+      logout,
+      refreshUser,
+      updateUser,
+      clearMustChangeMpin,
+    }),
+    [user, isLoading, needsMpinChange, register, login, logout, refreshUser, updateUser, clearMustChangeMpin]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

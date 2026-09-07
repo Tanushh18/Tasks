@@ -1,9 +1,12 @@
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import * as financeApi from "../../api/finance";
 import { getApiErrorMessage } from "../../api/client";
+import * as ocrApi from "../../api/ocr";
 import { Button } from "../../components/Button";
 import { LoadingState } from "../../components/StateViews";
 import { ScreenContainer } from "../../components/ScreenContainer";
@@ -40,6 +43,7 @@ export function TransactionFormScreen({ navigation, route }: Props) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [notes, setNotes] = useState("");
+  const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -122,13 +126,66 @@ export function TransactionFormScreen({ navigation, route }: Props) {
     }
   }
 
+  async function scanFrom(source: "camera" | "library") {
+    const permission =
+      source === "camera"
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Permission needed", "Please allow access so we can scan the receipt.");
+      return;
+    }
+
+    const result =
+      source === "camera"
+        ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], base64: true, quality: 0.7 })
+        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], base64: true, quality: 0.7 });
+
+    if (result.canceled || !result.assets?.[0]?.base64) return;
+
+    setScanning(true);
+    try {
+      const scanned = await ocrApi.scanImage(result.assets[0].base64, "receipt");
+      if (scanned.amount) setAmount(String(scanned.amount));
+      if (scanned.category) setCategory(scanned.category);
+      if (scanned.merchant) setDescription(scanned.merchant);
+      if (scanned.date) {
+        const parsed = new Date(`${scanned.date}T00:00:00`);
+        if (!Number.isNaN(parsed.getTime())) setDate(parsed);
+      }
+    } catch (err) {
+      Alert.alert("Couldn't read that image", getApiErrorMessage(err, "Please try again or enter the details manually."));
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  function handleScanPress() {
+    Alert.alert("Scan a receipt", "Choose a photo source.", [
+      { text: "Take Photo", onPress: () => scanFrom("camera") },
+      { text: "Choose from Library", onPress: () => scanFrom("library") },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }
+
   if (loading) return <LoadingState label="Loading…" />;
 
   return (
     <ScreenContainer>
-      <Text accessibilityRole="header" style={[typography.h1, { color: colors.text, marginBottom: spacing.lg }]}>
-        {isEditing ? "Edit entry" : type === "IN" ? "Money received" : "Add expense"}
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.lg }}>
+        <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
+          {isEditing ? "Edit entry" : type === "IN" ? "Money received" : "Add expense"}
+        </Text>
+        <Pressable
+          onPress={handleScanPress}
+          disabled={scanning}
+          accessibilityRole="button"
+          accessibilityLabel="Scan a receipt"
+          hitSlop={8}
+        >
+          {scanning ? <ActivityIndicator color={colors.primary} /> : <Ionicons name="camera-outline" size={26} color={colors.primary} />}
+        </Pressable>
+      </View>
 
       {!route.params?.accountId && accounts.length > 1 ? (
         <View style={{ marginBottom: spacing.lg }}>

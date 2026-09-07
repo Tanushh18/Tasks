@@ -4,11 +4,12 @@ import { useAuth } from "../auth/AuthContext";
 import { LoadingState } from "../components/StateViews";
 import { useTheme } from "../theme/useTheme";
 import { AuthNavigator } from "./AuthNavigator";
+import { ForceMpinChangeNavigator } from "./ForceMpinChangeNavigator";
 import { MainTabs } from "./MainTabs";
 import { navigationRef } from "./navigationRef";
 
 export function RootNavigator() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, needsMpinChange } = useAuth();
   const { isDark, colors } = useTheme();
 
   if (isLoading) {
@@ -36,7 +37,15 @@ export function RootNavigator() {
         },
       }}
     >
-      {isAuthenticated ? <MainTabs /> : <AuthNavigator />}
+      {isAuthenticated ? (
+        needsMpinChange ? (
+          <ForceMpinChangeNavigator />
+        ) : (
+          <MainTabs />
+        )
+      ) : (
+        <AuthNavigator />
+      )}
     </NavigationContainer>
   );
 }

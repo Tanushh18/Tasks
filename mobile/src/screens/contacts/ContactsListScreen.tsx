@@ -13,6 +13,9 @@ import { ConfirmationSheet } from "../../components/ConfirmationSheet";
 import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import type { ContactsStackParamList } from "../../navigation/types";
+import { isNetworkFailure } from "../../offline/offlineQueue";
+import { loadCache, saveCache } from "../../offline/readCache";
+import { subscribeToReconnect } from "../../offline/useOfflineSync";
 import { useTheme } from "../../theme/useTheme";
 import type { Contact } from "../../types/models";
 
@@ -31,6 +34,7 @@ export function ContactsListScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [contactPendingDelete, setContactPendingDelete] = useState<Contact | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showingOfflineData, setShowingOfflineData] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
@@ -42,7 +46,18 @@ export function ContactsListScreen({ navigation }: Props) {
     try {
       const result = await contactsApi.listContacts();
       setContacts(result);
+      setShowingOfflineData(false);
+      void saveCache("contacts", result);
     } catch (err) {
+      if (isNetworkFailure(err)) {
+        const cached = await loadCache<Contact[]>("contacts");
+        if (cached) {
+          setContacts(cached);
+          setShowingOfflineData(true);
+          setLoading(false);
+          return;
+        }
+      }
       setError(getApiErrorMessage(err, "We couldn't load your contacts."));
     } finally {
       setLoading(false);
@@ -55,6 +70,8 @@ export function ContactsListScreen({ navigation }: Props) {
       load();
     }, [load])
   );
+
+  useEffect(() => subscribeToReconnect(load), [load]);
 
   const filtered = useMemo(() => {
     const term = debouncedSearch.trim().toLowerCase();
@@ -114,6 +131,23 @@ export function ContactsListScreen({ navigation }: Props) {
           ) : null}
         </View>
       </View>
+
+      {showingOfflineData ? (
+        <Text
+          style={[
+            typography.caption,
+            {
+              color: colors.textMuted,
+              backgroundColor: colors.surfaceAlt,
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.lg,
+              textAlign: "center",
+            },
+          ]}
+        >
+          Showing offline data — will refresh when you're back online
+        </Text>
+      ) : null}
 
       {loading ? (
         <View style={{ padding: spacing.lg }}>

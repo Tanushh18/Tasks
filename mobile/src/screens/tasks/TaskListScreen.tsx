@@ -15,6 +15,8 @@ import { TaskListItem } from "../../components/TaskListItem";
 import type { TasksStackParamList } from "../../navigation/types";
 import { cancelTaskReminder } from "../../notifications/notificationService";
 import { enqueueTaskComplete, enqueueTaskDelete, isNetworkFailure } from "../../offline/offlineQueue";
+import { loadCache, saveCache } from "../../offline/readCache";
+import { subscribeToReconnect } from "../../offline/useOfflineSync";
 import { useTheme } from "../../theme/useTheme";
 import type { Task } from "../../types/models";
 import { formatDateLabel, formatTimeLabel, toIsoDate, todayIso } from "../../utils/date";
@@ -70,6 +72,7 @@ export function TaskListScreen({ navigation }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [taskPendingShare, setTaskPendingShare] = useState<Task | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [showingOfflineData, setShowingOfflineData] = useState(false);
 
   // Debounce typing, and tag each request so a slow earlier response can never overwrite a newer
   // one when the user keeps typing (spec §91).
@@ -87,8 +90,19 @@ export function TaskListScreen({ navigation }: Props) {
       const result = await tasksApi.listTasks(filtersFor(key, searchTerm));
       if (seq !== requestSeq.current) return;
       setTasks(result);
+      setShowingOfflineData(false);
+      void saveCache("tasks", result);
     } catch (err) {
       if (seq !== requestSeq.current) return;
+      if (isNetworkFailure(err)) {
+        const cached = await loadCache<Task[]>("tasks");
+        if (cached) {
+          setTasks(cached);
+          setShowingOfflineData(true);
+          if (seq === requestSeq.current) setLoading(false);
+          return;
+        }
+      }
       setError(getApiErrorMessage(err, "We couldn't load your tasks."));
     } finally {
       if (seq === requestSeq.current) setLoading(false);
@@ -101,6 +115,11 @@ export function TaskListScreen({ navigation }: Props) {
       load(filter, debouncedSearch);
     }, [filter, debouncedSearch, load])
   );
+
+  useEffect(() => {
+    return subscribeToReconnect(() => load(filter, debouncedSearch));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, debouncedSearch]);
 
   const handleToggleComplete = useCallback(async (task: Task) => {
     const nextCompleted = !task.completed;
@@ -266,6 +285,23 @@ export function TaskListScreen({ navigation }: Props) {
           })}
         </View>
       </View>
+
+      {showingOfflineData ? (
+        <Text
+          style={[
+            typography.caption,
+            {
+              color: colors.textMuted,
+              backgroundColor: colors.surfaceAlt,
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.lg,
+              textAlign: "center",
+            },
+          ]}
+        >
+          Showing offline data — will refresh when you're back online
+        </Text>
+      ) : null}
 
       {loading ? (
         <View style={{ padding: spacing.lg }}>

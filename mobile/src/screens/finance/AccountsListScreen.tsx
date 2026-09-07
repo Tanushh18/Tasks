@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiErrorMessage } from "../../api/client";
@@ -11,8 +11,11 @@ import { SectionHeader } from "../../components/SectionHeader";
 import { Skeleton, SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import type { FinanceStackParamList } from "../../navigation/types";
+import { isNetworkFailure } from "../../offline/offlineQueue";
+import { loadCache, saveCache } from "../../offline/readCache";
+import { subscribeToReconnect } from "../../offline/useOfflineSync";
 import { useTheme } from "../../theme/useTheme";
-import type { AccountSummary } from "../../types/models";
+import type { AccountSummary, FinancialSummary } from "../../types/models";
 import { formatCurrency } from "../../utils/currency";
 
 type Props = NativeStackScreenProps<FinanceStackParamList, "AccountsList">;
@@ -36,19 +39,35 @@ export function AccountsListScreen({ navigation }: Props) {
   const [totals, setTotals] = useState<{ cashIn: number; cashOut: number; netFlow: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showingOfflineData, setShowingOfflineData] = useState(false);
+
+  const applySummary = useCallback((summary: FinancialSummary) => {
+    setAccounts(summary.accounts);
+    setTotals({ cashIn: summary.cashIn, cashOut: summary.cashOut, netFlow: summary.netFlow });
+  }, []);
 
   const load = useCallback(async () => {
     setError(null);
     try {
       const summary = await financeApi.getFinancialSummary();
-      setAccounts(summary.accounts);
-      setTotals({ cashIn: summary.cashIn, cashOut: summary.cashOut, netFlow: summary.netFlow });
+      applySummary(summary);
+      setShowingOfflineData(false);
+      void saveCache("finance-summary", summary);
     } catch (err) {
+      if (isNetworkFailure(err)) {
+        const cached = await loadCache<FinancialSummary>("finance-summary");
+        if (cached) {
+          applySummary(cached);
+          setShowingOfflineData(true);
+          setLoading(false);
+          return;
+        }
+      }
       setError(getApiErrorMessage(err, "We couldn't load your money information."));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [applySummary]);
 
   useFocusEffect(
     useCallback(() => {
@@ -56,6 +75,8 @@ export function AccountsListScreen({ navigation }: Props) {
       load();
     }, [load])
   );
+
+  useEffect(() => subscribeToReconnect(load), [load]);
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["top", "left", "right"]}>
@@ -139,6 +160,23 @@ export function AccountsListScreen({ navigation }: Props) {
           <SectionHeader title="Your accounts" subtitle={accounts.length > 0 ? `${accounts.length} in total` : undefined} />
         </View>
       </View>
+
+      {showingOfflineData ? (
+        <Text
+          style={[
+            typography.caption,
+            {
+              color: colors.textMuted,
+              backgroundColor: colors.surfaceAlt,
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.lg,
+              textAlign: "center",
+            },
+          ]}
+        >
+          Showing offline data — will refresh when you're back online
+        </Text>
+      ) : null}
 
       {loading ? (
         <View style={{ paddingHorizontal: spacing.lg }}>

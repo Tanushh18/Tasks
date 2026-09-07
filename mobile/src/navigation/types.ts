@@ -34,11 +34,28 @@ export type ContactsStackParamList = {
   ContactForm: { contactId?: string } | undefined;
 };
 
+export type ChatStackParamList = {
+  ChatList: undefined;
+  ChatThread: { userId: string; name: string };
+};
+
+export type AdminStackParamList = {
+  AdminUsers: undefined;
+};
+
+export type MoreStackParamList = {
+  MoreMain: undefined;
+  Assistant: { autoListen?: boolean } | undefined;
+  Settings: NavigatorScreenParams<SettingsStackParamList>;
+  LocationSharing: undefined;
+  AdminUsers: undefined;
+};
+
 export type MainTabParamList = {
   HomeTab: NavigatorScreenParams<HomeStackParamList>;
   TasksTab: NavigatorScreenParams<TasksStackParamList>;
   FinanceTab: NavigatorScreenParams<FinanceStackParamList>;
   ContactsTab: NavigatorScreenParams<ContactsStackParamList>;
-  AssistantTab: { autoListen?: boolean } | undefined;
-  SettingsTab: NavigatorScreenParams<SettingsStackParamList>;
+  ChatTab: NavigatorScreenParams<ChatStackParamList>;
+  MoreTab: NavigatorScreenParams<MoreStackParamList>;
 };

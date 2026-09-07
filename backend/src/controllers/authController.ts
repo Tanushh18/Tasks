@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { User } from "../models/User";
+import { env } from "../config/env";
 import { Task } from "../models/Task";
 import { FinanceAccount } from "../models/FinanceAccount";
 import { Transaction } from "../models/Transaction";
@@ -29,6 +30,8 @@ function toPublicUser(user: {
   notificationsEnabled: boolean;
   confirmFinancialActions: boolean;
   speakAssistantReplies: boolean;
+  isAdmin: boolean;
+  mustChangeMpin: boolean;
   createdAt?: Date;
 }) {
   return {
@@ -40,6 +43,8 @@ function toPublicUser(user: {
     notificationsEnabled: user.notificationsEnabled,
     confirmFinancialActions: user.confirmFinancialActions,
     speakAssistantReplies: user.speakAssistantReplies,
+    isAdmin: user.isAdmin,
+    mustChangeMpin: user.mustChangeMpin,
     createdAt: user.createdAt,
   };
 }
@@ -56,7 +61,8 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const mpinHash = await hashMpin(mpin);
-  const user = await User.create({ name, mobileNumber, mpinHash, lastLoginAt: new Date() });
+  const isAdmin = env.adminMobileNumbers.includes(mobileNumber);
+  const user = await User.create({ name, mobileNumber, mpinHash, lastLoginAt: new Date(), isAdmin });
   const tokens = await issueTokenPair(String(user._id));
 
   res.status(201).json({ user: toPublicUser(user), ...tokens });
@@ -68,6 +74,10 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   const user = await User.findOne({ mobileNumber });
   if (!user) {
     throw ApiError.unauthorized("Invalid mobile number or MPIN");
+  }
+
+  if (user.blocked) {
+    throw ApiError.forbidden("This account has been blocked");
   }
 
   if (isLocked(user)) {

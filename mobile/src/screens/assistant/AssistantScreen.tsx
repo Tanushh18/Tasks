@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,7 +20,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ChatBubble } from "../../components/ChatBubble";
-import type { MainTabParamList } from "../../navigation/types";
+import type { MoreStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/useTheme";
 import { onSpeakingChange, speak, stopSpeaking } from "../../voice/tts";
 import { openDeviceSettings, useVoiceInput } from "../../voice/useVoiceInput";
@@ -48,7 +48,7 @@ function nextId(): string {
   return `m${messageIdCounter}`;
 }
 
-type Props = BottomTabScreenProps<MainTabParamList, "AssistantTab">;
+type Props = NativeStackScreenProps<MoreStackParamList, "Assistant">;
 
 const VOICE_LANGUAGES = [
   { code: "en-US", label: "EN" },

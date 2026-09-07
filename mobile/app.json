@@ -10,7 +10,11 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Used so you can speak task, reminder and finance commands to the assistant.",
-        "NSSpeechRecognitionUsageDescription": "Used to convert your spoken commands into text for the assistant."
+        "NSSpeechRecognitionUsageDescription": "Used to convert your spoken commands into text for the assistant.",
+        "NSCameraUsageDescription": "Used to scan business cards and receipts to fill in forms for you.",
+        "NSPhotoLibraryUsageDescription": "Used to pick a business card or receipt photo to fill in forms for you.",
+        "NSLocationWhenInUseUsageDescription": "Used to share your location with family members while the app is open.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Used to keep sharing your location with family members while sharing is turned on, even when the app is in the background."
       }
     },
     "android": {
@@ -26,7 +30,13 @@
         "USE_EXACT_ALARM",
         "POST_NOTIFICATIONS",
         "RECORD_AUDIO",
-        "android.permission.USE_FULL_SCREEN_INTENT"
+        "android.permission.USE_FULL_SCREEN_INTENT",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "CAMERA"
       ],
       "package": "com.anonymous.dailytasksreminder"
     },
@@ -41,6 +51,22 @@
         {
           "microphonePermission": "Used so you can speak task, reminder and finance commands to the assistant.",
           "speechRecognitionPermission": "Used to convert your spoken commands into text for the assistant."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Used to scan business cards and receipts to fill in forms for you.",
+          "photosPermission": "Used to pick a business card or receipt photo to fill in forms for you."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Used to keep sharing your location with family members while sharing is turned on, even when the app is in the background.",
+          "locationWhenInUsePermission": "Used to share your location with family members while the app is open.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

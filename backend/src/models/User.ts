@@ -14,6 +14,9 @@ const userSchema = new Schema(
     notificationsEnabled: { type: Boolean, default: true },
     confirmFinancialActions: { type: Boolean, default: true },
     speakAssistantReplies: { type: Boolean, default: true },
+    isAdmin: { type: Boolean, default: false },
+    blocked: { type: Boolean, default: false },
+    mustChangeMpin: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

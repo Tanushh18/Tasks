@@ -27,6 +27,7 @@ export const env = {
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "30d",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.6-flash",
+  adminMobileNumbers: (process.env.ADMIN_MOBILE_NUMBERS ?? "8130483894").split(",").map((s) => s.trim()),
 };
 
 export const isProduction = env.nodeEnv === "production";

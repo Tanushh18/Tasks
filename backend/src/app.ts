@@ -5,10 +5,14 @@ import morgan from "morgan";
 import { env } from "./config/env";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { apiRateLimiter } from "./middleware/rateLimiter";
+import adminRoutes from "./routes/adminRoutes";
 import assistantRoutes from "./routes/assistantRoutes";
 import authRoutes from "./routes/authRoutes";
+import chatRoutes from "./routes/chatRoutes";
 import contactRoutes from "./routes/contactRoutes";
 import financeRoutes from "./routes/financeRoutes";
+import locationRoutes from "./routes/locationRoutes";
+import ocrRoutes from "./routes/ocrRoutes";
 import reminderRoutes from "./routes/reminderRoutes";
 import searchRoutes from "./routes/searchRoutes";
 import taskRoutes from "./routes/taskRoutes";
@@ -45,6 +49,10 @@ export function createApp(): Express {
   app.use("/api/search", searchRoutes);
   app.use("/api/contacts", contactRoutes);
   app.use("/api/users", userRoutes);
+  app.use("/api/admin", adminRoutes);
+  app.use("/api/ocr", ocrRoutes);
+  app.use("/api/location", locationRoutes);
+  app.use("/api/chat", chatRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

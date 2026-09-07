@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React from "react";
-import { AssistantScreen } from "../screens/assistant/AssistantScreen";
 import { useTheme } from "../theme/useTheme";
+import { ChatNavigator } from "./ChatNavigator";
 import { ContactsNavigator } from "./ContactsNavigator";
 import { FinanceNavigator } from "./FinanceNavigator";
 import { HomeNavigator } from "./HomeNavigator";
-import { SettingsNavigator } from "./SettingsNavigator";
+import { MoreNavigator } from "./MoreNavigator";
 import { TasksNavigator } from "./TasksNavigator";
 import type { MainTabParamList } from "./types";
 
@@ -17,8 +17,8 @@ const ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof Ionicons
   TasksTab: "checkbox",
   FinanceTab: "wallet",
   ContactsTab: "people",
-  AssistantTab: "mic",
-  SettingsTab: "settings",
+  ChatTab: "chatbubbles",
+  MoreTab: "ellipsis-horizontal-circle",
 };
 
 const OUTLINE_ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof Ionicons>["name"]> = {
@@ -26,8 +26,8 @@ const OUTLINE_ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof 
   TasksTab: "checkbox-outline",
   FinanceTab: "wallet-outline",
   ContactsTab: "people-outline",
-  AssistantTab: "mic-outline",
-  SettingsTab: "settings-outline",
+  ChatTab: "chatbubbles-outline",
+  MoreTab: "ellipsis-horizontal-circle-outline",
 };
 
 export function MainTabs() {
@@ -53,8 +53,8 @@ export function MainTabs() {
       <Tab.Screen name="TasksTab" component={TasksNavigator} options={{ title: "Tasks" }} />
       <Tab.Screen name="FinanceTab" component={FinanceNavigator} options={{ title: "Finance" }} />
       <Tab.Screen name="ContactsTab" component={ContactsNavigator} options={{ title: "Contacts" }} />
-      <Tab.Screen name="AssistantTab" component={AssistantScreen} options={{ title: "Assistant" }} />
-      <Tab.Screen name="SettingsTab" component={SettingsNavigator} options={{ title: "Settings" }} />
+      <Tab.Screen name="ChatTab" component={ChatNavigator} options={{ title: "Chat" }} />
+      <Tab.Screen name="MoreTab" component={MoreNavigator} options={{ title: "More" }} />
     </Tab.Navigator>
   );
 }

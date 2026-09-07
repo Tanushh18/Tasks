@@ -7,6 +7,9 @@ export interface User {
   notificationsEnabled: boolean;
   confirmFinancialActions: boolean;
   speakAssistantReplies: boolean;
+  isAdmin: boolean;
+  blocked: boolean;
+  mustChangeMpin: boolean;
   createdAt: string;
 }
 
