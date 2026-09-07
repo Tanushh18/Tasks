@@ -1,0 +1,14 @@
+{
+  "name": "we-three-local-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local OCR/voice processing server for We Three, run on a family member's own machine and exposed via a dev tunnel.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}

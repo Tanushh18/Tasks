@@ -1,16 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import * as Crypto from "expo-crypto";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import * as financeApi from "../../api/finance";
 import { getApiErrorMessage } from "../../api/client";
-import * as ocrApi from "../../api/ocr";
 import { Button } from "../../components/Button";
 import { LoadingState } from "../../components/StateViews";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { TextField } from "../../components/TextField";
+import { addPendingScan } from "../../localServer/pendingScans";
+import { scanImageWithFallback } from "../../localServer/ocrWithFallback";
 import { enqueueTransactionCreate, enqueueTransactionUpdate, isNetworkFailure } from "../../offline/offlineQueue";
 import { useTheme } from "../../theme/useTheme";
 import { formatDateLabel, formatTimeLabel, toHm, toIsoDate } from "../../utils/date";
@@ -145,7 +148,7 @@ export function TransactionFormScreen({ navigation, route }: Props) {
 
     setScanning(true);
     try {
-      const scanned = await ocrApi.scanImage(result.assets[0].base64, "receipt");
+      const scanned = await scanImageWithFallback(result.assets[0].base64, "receipt");
       if (scanned.amount) setAmount(String(scanned.amount));
       if (scanned.category) setCategory(scanned.category);
       if (scanned.merchant) setDescription(scanned.merchant);
@@ -154,9 +157,32 @@ export function TransactionFormScreen({ navigation, route }: Props) {
         if (!Number.isNaN(parsed.getTime())) setDate(parsed);
       }
     } catch (err) {
+      if (isNetworkFailure(err)) {
+        // Neither the local server nor the cloud was reachable — genuinely offline. Save the
+        // photo so nothing is lost; it can be processed later from Settings → Pending scans.
+        await savePendingScan(result.assets[0].base64);
+        return;
+      }
       Alert.alert("Couldn't read that image", getApiErrorMessage(err, "Please try again or enter the details manually."));
     } finally {
       setScanning(false);
+    }
+  }
+
+  async function savePendingScan(base64: string) {
+    try {
+      const id = Crypto.randomUUID();
+      const dir = `${FileSystem.documentDirectory}pending-scans/`;
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => undefined);
+      const uri = `${dir}${id}.jpg`;
+      await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await addPendingScan(uri, "receipt");
+      Alert.alert(
+        "Saved for later",
+        "You're offline, so this receipt couldn't be scanned yet. It's saved and will process automatically once you're back online — you can also fill this in manually for now."
+      );
+    } catch {
+      Alert.alert("Couldn't read that image", "Please try again or enter the details manually.");
     }
   }
 

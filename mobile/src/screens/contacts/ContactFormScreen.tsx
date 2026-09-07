@@ -3,9 +3,10 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import * as Crypto from "expo-crypto";
+import * as FileSystem from "expo-file-system/legacy";
 import * as contactsApi from "../../api/contacts";
 import { getApiErrorMessage } from "../../api/client";
-import * as ocrApi from "../../api/ocr";
 import type { UserSearchResult } from "../../api/users";
 import { Button } from "../../components/Button";
 import { ScreenContainer } from "../../components/ScreenContainer";
@@ -13,6 +14,9 @@ import { LoadingState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
 import { UserPicker } from "../../components/UserPicker";
 import { useAuth } from "../../auth/AuthContext";
+import { isNetworkFailure } from "../../offline/offlineQueue";
+import { addPendingScan } from "../../localServer/pendingScans";
+import { scanImageWithFallback } from "../../localServer/ocrWithFallback";
 import type { ContactsStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/useTheme";
 
@@ -103,13 +107,37 @@ export function ContactFormScreen({ navigation, route }: Props) {
 
     setScanning(true);
     try {
-      const scanned = await ocrApi.scanImage(result.assets[0].base64, "contact");
+      const scanned = await scanImageWithFallback(result.assets[0].base64, "contact");
       if (scanned.name) setName(scanned.name);
       if (scanned.number) setNumber(scanned.number);
     } catch (err) {
+      if (isNetworkFailure(err)) {
+        // Neither the local server nor the cloud was reachable at all — genuinely offline, not
+        // just "server said no". Save the photo so nothing is lost; it can be processed later
+        // from Settings → Pending scans once the phone is back online.
+        await savePendingScan(result.assets[0].base64);
+        return;
+      }
       Alert.alert("Couldn't read that image", getApiErrorMessage(err, "Please try again or enter the details manually."));
     } finally {
       setScanning(false);
+    }
+  }
+
+  async function savePendingScan(base64: string) {
+    try {
+      const id = Crypto.randomUUID();
+      const dir = `${FileSystem.documentDirectory}pending-scans/`;
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => undefined);
+      const uri = `${dir}${id}.jpg`;
+      await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+      await addPendingScan(uri, "contact");
+      Alert.alert(
+        "Saved for later",
+        "You're offline, so this photo couldn't be scanned yet. It's saved and will process automatically once you're back online — you can also fill this in manually for now."
+      );
+    } catch {
+      Alert.alert("Couldn't read that image", "Please try again or enter the details manually.");
     }
   }
 

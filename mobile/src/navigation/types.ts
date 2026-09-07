@@ -27,6 +27,7 @@ export type FinanceStackParamList = {
 export type SettingsStackParamList = {
   SettingsMain: undefined;
   ChangeMpin: undefined;
+  PendingScans: undefined;
 };
 
 export type ContactsStackParamList = {

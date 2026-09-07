@@ -20,6 +20,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ChatBubble } from "../../components/ChatBubble";
+import { processVoiceLocal } from "../../localServer/client";
 import type { MoreStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/useTheme";
 import { onSpeakingChange, speak, stopSpeaking } from "../../voice/tts";
@@ -46,6 +47,15 @@ let messageIdCounter = 0;
 function nextId(): string {
   messageIdCounter += 1;
   return `m${messageIdCounter}`;
+}
+
+/** The local /voice/process endpoint is still a stub (always resolves to `null`), but once a
+ * real local engine is wired in it's expected to return the same shape as the cloud assistant's
+ * turn result — this narrows to that shape rather than trusting an arbitrary `unknown`. */
+function isUsableAssistantResult(value: unknown): value is assistantApi.AssistantTurnResult {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<assistantApi.AssistantTurnResult>;
+  return typeof candidate.reply === "string" && typeof candidate.speech === "string" && typeof candidate.interactionId === "string";
 }
 
 type Props = NativeStackScreenProps<MoreStackParamList, "Assistant">;
@@ -110,7 +120,12 @@ export function AssistantScreen({ route }: Props) {
       const controller = new AbortController();
       abortControllerRef.current = controller;
       try {
-        const result = await assistantApi.sendAssistantMessage(trimmed, interactionId, controller.signal);
+        // Voice requests only (typed messages always go straight to cloud): try the family's
+        // local server first. It's a 501 stub today, so `local` is always null in practice — this
+        // just wires the call site so it activates automatically once local-server.js's
+        // /voice/process is actually implemented.
+        const local = fromVoice ? await processVoiceLocal(trimmed) : null;
+        const result = isUsableAssistantResult(local) ? local : await assistantApi.sendAssistantMessage(trimmed, interactionId, controller.signal);
         appendMessage("assistant", result.reply);
         setInteractionId(result.interactionId);
         setPendingAction(result.pendingAction);

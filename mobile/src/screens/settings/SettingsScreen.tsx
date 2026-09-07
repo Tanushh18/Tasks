@@ -1,14 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as authApi from "../../api/auth";
 import { useAuth } from "../../auth/AuthContext";
+import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ConfirmationSheet } from "../../components/ConfirmationSheet";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeader } from "../../components/SectionHeader";
+import { TextField } from "../../components/TextField";
+import { pingLocalServer, type LocalHealth } from "../../localServer/client";
+import { DEFAULT_LOCAL_SERVER_URL, getLocalServerUrl, setLocalServerUrl } from "../../localServer/config";
+import { listPendingScans } from "../../localServer/pendingScans";
 import type { SettingsStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/useTheme";
 
@@ -30,6 +35,42 @@ export function SettingsScreen({ navigation }: Props) {
   const [busy, setBusy] = useState(false);
   const [deleteStage, setDeleteStage] = useState<DeleteStage>(null);
   const [confirmingLogout, setConfirmingLogout] = useState(false);
+
+  const [localServerUrl, setLocalServerUrlState] = useState("");
+  const [testingLocalServer, setTestingLocalServer] = useState(false);
+  const [localServerStatus, setLocalServerStatus] = useState<"idle" | "checking" | LocalHealth | "unreachable">(
+    "idle"
+  );
+  const [pendingScansCount, setPendingScansCount] = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      setLocalServerUrlState(await getLocalServerUrl());
+      setPendingScansCount((await listPendingScans()).length);
+    })();
+  }, []);
+
+  async function handleSaveLocalServerUrl() {
+    await setLocalServerUrl(localServerUrl || DEFAULT_LOCAL_SERVER_URL);
+  }
+
+  async function handleTestLocalServer() {
+    await handleSaveLocalServerUrl();
+    setTestingLocalServer(true);
+    setLocalServerStatus("checking");
+    const health = await pingLocalServer(localServerUrl || DEFAULT_LOCAL_SERVER_URL);
+    setLocalServerStatus(health ?? "unreachable");
+    setTestingLocalServer(false);
+  }
+
+  function localServerStatusLabel(): string {
+    if (localServerStatus === "idle") return "";
+    if (localServerStatus === "checking") return "Checking…";
+    if (localServerStatus === "unreachable") return "Not reachable";
+    return `Connected — OCR: ${localServerStatus.ocrReady ? "ready" : "not installed"}, Voice: ${
+      localServerStatus.voiceReady ? "ready" : "not installed"
+    }`;
+  }
 
   async function updateSetting(patch: Parameters<typeof authApi.updateSettings>[0], revert: () => void) {
     try {
@@ -157,6 +198,42 @@ export function SettingsScreen({ navigation }: Props) {
           })}
         </View>
       </Card>
+
+      <View style={{ marginTop: spacing.xl }}>
+        <SectionHeader title="Local AI server" subtitle="Process scans and voice on your family's own computer first" />
+      </View>
+      <Card style={{ marginBottom: spacing.md }}>
+        <TextField
+          label="Server URL"
+          value={localServerUrl}
+          onChangeText={setLocalServerUrlState}
+          placeholder={DEFAULT_LOCAL_SERVER_URL}
+          autoCapitalize="none"
+          keyboardType="url"
+        />
+        <Button label="Test connection" variant="secondary" onPress={handleTestLocalServer} loading={testingLocalServer} />
+        {localServerStatusLabel() ? (
+          <Text
+            style={[
+              typography.caption,
+              {
+                color: localServerStatus === "unreachable" ? colors.danger : colors.textMuted,
+                marginTop: spacing.md,
+              },
+            ]}
+          >
+            {localServerStatusLabel()}
+          </Text>
+        ) : null}
+      </Card>
+
+      {pendingScansCount > 0 ? (
+        <SettingRow
+          label="Pending scans"
+          detail={`${pendingScansCount} waiting`}
+          onPress={() => navigation.navigate("PendingScans")}
+        />
+      ) : null}
 
       <View style={{ marginTop: spacing.xl }}>
         <SectionHeader title="Sign in" />
