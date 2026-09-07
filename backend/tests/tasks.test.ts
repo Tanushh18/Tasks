@@ -120,4 +120,42 @@ describe("tasks", () => {
     const listB = await apiB.get("/api/tasks");
     expect(listB.body.tasks).toHaveLength(0);
   });
+
+  it("assigns a copy of a task to another user, leaving the original untouched", async () => {
+    const { token: tokenA, userId: userIdA } = await registerUser(app, "9876533444", "4821", "Alice");
+    const { token: tokenB, userId: userIdB } = await registerUser(app, "9876533445", "4821", "Bob");
+    const apiA = authed(app, tokenA);
+    const apiB = authed(app, tokenB);
+
+    const created = await apiA.post("/api/tasks").send({ title: "Shared errand", date: "2099-01-01", time: "09:00" });
+    const taskId = created.body.task.id;
+
+    const assignRes = await apiA.post(`/api/tasks/${taskId}/assign`).send({ toUserId: userIdB });
+    expect(assignRes.status).toBe(201);
+    expect(assignRes.body.task.title).toBe("Shared errand");
+    expect(assignRes.body.task.assignedBy).toBe(userIdA);
+    expect(assignRes.body.task.completed).toBe(false);
+
+    const listB = await apiB.get("/api/tasks");
+    expect(listB.body.tasks).toHaveLength(1);
+    expect(listB.body.tasks[0].title).toBe("Shared errand");
+
+    const original = await apiA.get(`/api/tasks/${taskId}`);
+    expect(original.body.task.assignedBy).toBeNull();
+  });
+
+  it("rejects assigning a task to yourself or to a nonexistent user", async () => {
+    const { token: tokenA, userId: userIdA } = await registerUser(app, "9876533446", "4821", "Carol");
+    const apiA = authed(app, tokenA);
+    const created = await apiA.post("/api/tasks").send({ title: "Self errand", date: "2099-01-01", time: "09:00" });
+    const taskId = created.body.task.id;
+
+    const selfAssign = await apiA.post(`/api/tasks/${taskId}/assign`).send({ toUserId: userIdA });
+    expect(selfAssign.status).toBe(400);
+
+    const bogusAssign = await apiA
+      .post(`/api/tasks/${taskId}/assign`)
+      .send({ toUserId: "000000000000000000000000" });
+    expect(bogusAssign.status).toBe(404);
+  });
 });

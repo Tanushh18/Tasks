@@ -3,6 +3,7 @@ import * as financeController from "../controllers/financeController";
 import { requireAuth } from "../middleware/auth";
 import { validateRequest } from "../middleware/validateRequest";
 import {
+  assignTransactionSchema,
   createAccountSchema,
   createTransactionSchema,
   idParamSchema,
@@ -50,6 +51,11 @@ router.delete(
   "/transactions/:id",
   validateRequest({ params: idParamSchema }),
   financeController.deleteTransaction
+);
+router.post(
+  "/transactions/:id/assign",
+  validateRequest({ params: idParamSchema, body: assignTransactionSchema }),
+  financeController.assignTransaction
 );
 
 router.get("/summary", validateRequest({ query: summaryQuerySchema }), financeController.getSummary);

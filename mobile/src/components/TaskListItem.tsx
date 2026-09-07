@@ -12,6 +12,7 @@ interface Props {
   onToggleComplete: () => void;
   onPress: () => void;
   onDelete: () => void;
+  onShare?: () => void;
 }
 
 const priorityTone: Record<Task["priority"], "danger" | "warning" | "neutral"> = {
@@ -20,7 +21,7 @@ const priorityTone: Record<Task["priority"], "danger" | "warning" | "neutral"> =
   low: "neutral",
 };
 
-export function TaskListItem({ task, onToggleComplete, onPress, onDelete }: Props) {
+export function TaskListItem({ task, onToggleComplete, onPress, onDelete, onShare }: Props) {
   const { colors, spacing, typography } = useTheme();
 
   return (
@@ -49,8 +50,15 @@ export function TaskListItem({ task, onToggleComplete, onPress, onDelete }: Prop
           {task.overdue ? <Badge label="Overdue" tone="danger" /> : null}
           <Badge label={task.priority} tone={priorityTone[task.priority]} />
           <Badge label={task.category} tone="neutral" />
+          {task.assignedBy ? <Badge label={`Shared by ${task.assignedBy.name}`} tone="primary" /> : null}
         </View>
       </Pressable>
+
+      {onShare ? (
+        <Pressable onPress={onShare} hitSlop={8} style={{ marginLeft: spacing.sm }}>
+          <Ionicons name="share-outline" size={20} color={colors.textFaint} />
+        </Pressable>
+      ) : null}
 
       <Pressable onPress={onDelete} hitSlop={8} style={{ marginLeft: spacing.sm }}>
         <Ionicons name="trash-outline" size={20} color={colors.textFaint} />

@@ -68,7 +68,7 @@ export function SearchScreen({ navigation }: Props) {
 
   const totalResults = useMemo(() => {
     if (!results) return 0;
-    return results.tasks.length + results.transactions.length + results.accounts.length;
+    return results.tasks.length + results.transactions.length + results.accounts.length + results.contacts.length;
   }, [results]);
 
   return (
@@ -158,6 +158,22 @@ export function SearchScreen({ navigation }: Props) {
                   subtitle={account.type}
                   onPress={() =>
                     navigation.navigate("FinanceTab", { screen: "AccountDetail", params: { accountId: account.id } })
+                  }
+                />
+              ))}
+            </ResultGroup>
+          ) : null}
+
+          {results!.contacts.length > 0 ? (
+            <ResultGroup title="Contacts" count={results!.contacts.length}>
+              {results!.contacts.map((contact) => (
+                <ResultRow
+                  key={contact.id}
+                  icon="person-outline"
+                  title={contact.name}
+                  subtitle={contact.number}
+                  onPress={() =>
+                    navigation.navigate("ContactsTab", { screen: "ContactForm", params: { contactId: contact.id } })
                   }
                 />
               ))}

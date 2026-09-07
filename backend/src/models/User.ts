@@ -2,6 +2,7 @@ import { Schema, model, type InferSchemaType, type HydratedDocument } from "mong
 
 const userSchema = new Schema(
   {
+    name: { type: String, required: true, trim: true, maxlength: 80 },
     mobileNumber: { type: String, required: true, unique: true, index: true, trim: true },
     mpinHash: { type: String, required: true },
     refreshTokenHash: { type: String, default: null },

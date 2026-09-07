@@ -1,6 +1,6 @@
-# Daily Tasks — Smart Tasks, Reminder & Finance App
+# We Three — Smart Tasks, Reminder, Finance & Contacts App
 
-A task/reminder manager and personal finance tracker with mobile-number + MPIN auth and MongoDB sync.
+A family task/reminder manager, personal finance tracker, and shared contacts book with mobile-number + MPIN auth and MongoDB sync.
 See `/Users/t/.claude/plans/merry-wandering-allen.md` for the full phased plan.
 
 **Phase 1: done and verified.** Auth, tasks, reminders/local notifications, finance accounts &

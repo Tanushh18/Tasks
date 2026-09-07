@@ -3,6 +3,7 @@ import * as taskController from "../controllers/taskController";
 import { requireAuth } from "../middleware/auth";
 import { validateRequest } from "../middleware/validateRequest";
 import {
+  assignTaskSchema,
   createTaskSchema,
   listTasksQuerySchema,
   taskIdParamSchema,
@@ -29,5 +30,10 @@ router.patch(
   taskController.setTaskLocalNotificationId
 );
 router.delete("/:id", validateRequest({ params: taskIdParamSchema }), taskController.deleteTask);
+router.post(
+  "/:id/assign",
+  validateRequest({ params: taskIdParamSchema, body: assignTaskSchema }),
+  taskController.assignTask
+);
 
 export default router;

@@ -17,6 +17,7 @@ function serializeTask(task: Awaited<ReturnType<typeof taskService.getTask>>) {
     reminder: task.reminder,
     recurrence: task.recurrence,
     notes: task.notes,
+    assignedBy: task.assignedBy ? String(task.assignedBy) : null,
     overdue: taskService.isOverdue(task),
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
@@ -62,6 +63,11 @@ export const completeTask = asyncHandler(async (req: Request, res: Response) => 
 export const deleteTask = asyncHandler(async (req: Request, res: Response) => {
   await taskService.deleteTask(req.userId!, req.params.id);
   res.status(204).send();
+});
+
+export const assignTask = asyncHandler(async (req: Request, res: Response) => {
+  const task = await taskService.assignTask(req.params.id, req.userId!, req.body.toUserId);
+  res.status(201).json({ task: serializeTask(task) });
 });
 
 export const getUpcomingReminders = asyncHandler(async (req: Request, res: Response) => {

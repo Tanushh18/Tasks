@@ -54,3 +54,7 @@ export const monthlyTrendQuerySchema = z.object({
   accountId: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
   months: z.coerce.number().int().min(1).max(24).optional(),
 });
+
+export const assignTransactionSchema = z.object({
+  toUserId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid user id"),
+});

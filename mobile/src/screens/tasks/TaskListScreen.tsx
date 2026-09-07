@@ -6,6 +6,8 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "r
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiErrorMessage } from "../../api/client";
 import * as tasksApi from "../../api/tasks";
+import type { UserSearchResult } from "../../api/users";
+import { AssignSheet } from "../../components/AssignSheet";
 import { ConfirmationSheet } from "../../components/ConfirmationSheet";
 import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
@@ -66,6 +68,8 @@ export function TaskListScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [taskPendingDelete, setTaskPendingDelete] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [taskPendingShare, setTaskPendingShare] = useState<Task | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   // Debounce typing, and tag each request so a slow earlier response can never overwrite a newer
   // one when the user keeps typing (spec §91).
@@ -140,6 +144,24 @@ export function TaskListScreen({ navigation }: Props) {
       setDeleting(false);
     }
   }, [taskPendingDelete]);
+
+  const handleShare = useCallback(
+    async (user: UserSearchResult) => {
+      const task = taskPendingShare;
+      if (!task) return;
+      setSharing(true);
+      try {
+        await tasksApi.assignTask(task.id, user.id);
+        setTaskPendingShare(null);
+        Alert.alert("Shared", `Shared a copy with ${user.name}`);
+      } catch (err) {
+        Alert.alert("We couldn't share that task", getApiErrorMessage(err));
+      } finally {
+        setSharing(false);
+      }
+    },
+    [taskPendingShare]
+  );
 
   const summary = useMemo(() => {
     if (tasks.length === 0) return undefined;
@@ -269,6 +291,7 @@ export function TaskListScreen({ navigation }: Props) {
               onToggleComplete={() => handleToggleComplete(item)}
               onPress={() => navigation.navigate("TaskForm", { taskId: item.id })}
               onDelete={() => setTaskPendingDelete(item)}
+              onShare={() => setTaskPendingShare(item)}
             />
           )}
           ListEmptyComponent={
@@ -332,6 +355,14 @@ export function TaskListScreen({ navigation }: Props) {
         busy={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setTaskPendingDelete(null)}
+      />
+
+      <AssignSheet
+        visible={taskPendingShare !== null}
+        title={taskPendingShare ? `Share "${taskPendingShare.title}"` : "Share task"}
+        busy={sharing}
+        onShare={handleShare}
+        onCancel={() => setTaskPendingShare(null)}
       />
     </SafeAreaView>
   );

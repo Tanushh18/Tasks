@@ -7,8 +7,13 @@ interface AuthResponse {
   refreshToken: string;
 }
 
-export async function register(mobileNumber: string, mpin: string, confirmMpin: string): Promise<AuthResponse> {
-  const { data } = await apiClient.post<AuthResponse>("/auth/register", { mobileNumber, mpin, confirmMpin });
+export async function register(
+  name: string,
+  mobileNumber: string,
+  mpin: string,
+  confirmMpin: string
+): Promise<AuthResponse> {
+  const { data } = await apiClient.post<AuthResponse>("/auth/register", { name, mobileNumber, mpin, confirmMpin });
   return data;
 }
 

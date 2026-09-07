@@ -15,6 +15,7 @@ const transactionSchema = new Schema(
     // No default: the field must be entirely absent (not null) for docs without one, or the sparse
     // unique index below would treat every such doc as colliding on the same null value.
     idempotencyKey: { type: String },
+    assignedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true }
 );

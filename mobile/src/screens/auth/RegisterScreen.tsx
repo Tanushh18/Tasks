@@ -16,23 +16,29 @@ export function RegisterScreen({ navigation }: Props) {
   const { colors, spacing, typography } = useTheme();
   const { register } = useAuth();
 
+  const [name, setName] = useState("");
   const [mobileNumber, setMobileNumber] = useState("");
   const [mpin, setMpin] = useState("");
   const [confirmMpin, setConfirmMpin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = mobileNumber.trim().length >= 10 && mpin.length >= 4 && confirmMpin.length >= 4;
+  const canSubmit =
+    name.trim().length > 0 && mobileNumber.trim().length >= 10 && mpin.length >= 4 && confirmMpin.length >= 4;
 
   async function handleSubmit() {
     setError(null);
+    if (!name.trim()) {
+      setError("Enter your name");
+      return;
+    }
     if (mpin !== confirmMpin) {
       setError("MPIN and confirmation do not match");
       return;
     }
     setSubmitting(true);
     try {
-      await register(mobileNumber.trim(), mpin, confirmMpin);
+      await register(name.trim(), mobileNumber.trim(), mpin, confirmMpin);
     } catch (err) {
       setError(getApiErrorMessage(err, "Could not create account. Please try again."));
     } finally {
@@ -48,6 +54,8 @@ export function RegisterScreen({ navigation }: Props) {
           Manage tasks, reminders and finances in one place.
         </Text>
       </View>
+
+      <TextField label="Your name" value={name} onChangeText={setName} placeholder="e.g. Priya Sharma" />
 
       <TextField
         label="Mobile number"

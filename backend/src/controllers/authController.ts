@@ -22,6 +22,7 @@ import {
 
 function toPublicUser(user: {
   _id: unknown;
+  name: string;
   mobileNumber: string;
   currency: string;
   timezone: string;
@@ -32,6 +33,7 @@ function toPublicUser(user: {
 }) {
   return {
     id: String(user._id),
+    name: user.name,
     mobileNumber: user.mobileNumber,
     currency: user.currency,
     timezone: user.timezone,
@@ -43,7 +45,7 @@ function toPublicUser(user: {
 }
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
-  const { mobileNumber, mpin } = req.body as { mobileNumber: string; mpin: string };
+  const { name, mobileNumber, mpin } = req.body as { name: string; mobileNumber: string; mpin: string };
 
   assertValidMobileNumber(mobileNumber);
   assertValidMpin(mpin);
@@ -54,7 +56,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const mpinHash = await hashMpin(mpin);
-  const user = await User.create({ mobileNumber, mpinHash, lastLoginAt: new Date() });
+  const user = await User.create({ name, mobileNumber, mpinHash, lastLoginAt: new Date() });
   const tokens = await issueTokenPair(String(user._id));
 
   res.status(201).json({ user: toPublicUser(user), ...tokens });

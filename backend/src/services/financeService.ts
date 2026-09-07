@@ -2,6 +2,7 @@ import { DateTime } from "luxon";
 import { Types, type FilterQuery } from "mongoose";
 import { FinanceAccount, type FinanceAccountDocument } from "../models/FinanceAccount";
 import { Transaction, type TransactionDocument } from "../models/Transaction";
+import { User } from "../models/User";
 import { ApiError } from "../utils/ApiError";
 
 interface AccountInput {
@@ -125,6 +126,51 @@ export async function getTransaction(userId: string, transactionId: string): Pro
   const transaction = await Transaction.findOne({ _id: transactionId, userId });
   if (!transaction) throw ApiError.notFound("Transaction not found");
   return transaction;
+}
+
+export async function assignTransaction(
+  transactionId: string,
+  fromUserId: string,
+  toUserId: string
+): Promise<TransactionDocument> {
+  if (toUserId === fromUserId) {
+    throw ApiError.badRequest("You cannot assign a transaction to yourself");
+  }
+
+  const source = await Transaction.findOne({ _id: transactionId, userId: fromUserId });
+  if (!source) throw ApiError.notFound("Transaction not found");
+
+  const recipient = await User.findById(toUserId);
+  if (!recipient) throw ApiError.notFound("Recipient user not found");
+
+  const sourceAccount = await FinanceAccount.findOne({ _id: source.accountId, userId: fromUserId });
+  if (!sourceAccount) throw ApiError.notFound("Finance account not found");
+
+  // Transaction.accountId is required, and the recipient has no account of their own matching the
+  // source. Reuse a same-named account of theirs if one exists, otherwise create one on their behalf
+  // so the copy always lands in a valid, owned account.
+  let recipientAccount = await FinanceAccount.findOne({ userId: toUserId, name: sourceAccount.name });
+  if (!recipientAccount) {
+    recipientAccount = await FinanceAccount.create({
+      userId: toUserId,
+      name: sourceAccount.name,
+      description: sourceAccount.description,
+      type: sourceAccount.type,
+    });
+  }
+
+  return Transaction.create({
+    userId: toUserId,
+    assignedBy: fromUserId,
+    accountId: recipientAccount._id,
+    type: source.type,
+    amount: source.amount,
+    category: source.category,
+    description: source.description,
+    date: source.date,
+    time: source.time,
+    notes: source.notes,
+  });
 }
 
 interface ListFilters {

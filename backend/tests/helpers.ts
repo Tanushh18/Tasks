@@ -1,10 +1,10 @@
 import request from "supertest";
 import type { Express } from "express";
 
-export async function registerUser(app: Express, mobileNumber = "9876500001", mpin = "4821") {
+export async function registerUser(app: Express, mobileNumber = "9876500001", mpin = "4821", name = "Test User") {
   const res = await request(app)
     .post("/api/auth/register")
-    .send({ mobileNumber, mpin, confirmMpin: mpin });
+    .send({ name, mobileNumber, mpin, confirmMpin: mpin });
   return {
     token: res.body.accessToken as string | undefined,
     refreshToken: res.body.refreshToken as string | undefined,

@@ -79,6 +79,13 @@ export async function deleteTransaction(id: string): Promise<void> {
   await apiClient.delete(`/finance/transactions/${id}`);
 }
 
+export async function assignTransaction(id: string, toUserId: string): Promise<Transaction> {
+  const { data } = await apiClient.post<{ transaction: Transaction }>(`/finance/transactions/${id}/assign`, {
+    toUserId,
+  });
+  return data.transaction;
+}
+
 export async function getFinancialSummary(filters: {
   from?: string;
   to?: string;

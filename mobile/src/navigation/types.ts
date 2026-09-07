@@ -29,10 +29,16 @@ export type SettingsStackParamList = {
   ChangeMpin: undefined;
 };
 
+export type ContactsStackParamList = {
+  ContactsList: undefined;
+  ContactForm: { contactId?: string } | undefined;
+};
+
 export type MainTabParamList = {
   HomeTab: NavigatorScreenParams<HomeStackParamList>;
   TasksTab: NavigatorScreenParams<TasksStackParamList>;
   FinanceTab: NavigatorScreenParams<FinanceStackParamList>;
+  ContactsTab: NavigatorScreenParams<ContactsStackParamList>;
   AssistantTab: { autoListen?: boolean } | undefined;
   SettingsTab: NavigatorScreenParams<SettingsStackParamList>;
 };

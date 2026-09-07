@@ -24,10 +24,17 @@ export interface SearchAccountResult {
   type: string;
 }
 
+export interface SearchContactResult {
+  id: string;
+  name: string;
+  number: string;
+}
+
 export interface SearchResults {
   tasks: SearchTaskResult[];
   transactions: SearchTransactionResult[];
   accounts: SearchAccountResult[];
+  contacts: SearchContactResult[];
 }
 
 export async function globalSearch(query: string): Promise<SearchResults> {

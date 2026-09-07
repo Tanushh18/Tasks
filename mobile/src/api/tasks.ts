@@ -64,6 +64,11 @@ export async function deleteTask(id: string): Promise<void> {
   await apiClient.delete(`/tasks/${id}`);
 }
 
+export async function assignTask(id: string, toUserId: string): Promise<Task> {
+  const { data } = await apiClient.post<{ task: Task }>(`/tasks/${id}/assign`, { toUserId });
+  return data.task;
+}
+
 export async function getUpcomingReminders(): Promise<Task[]> {
   const { data } = await apiClient.get<{ reminders: Task[] }>("/reminders/upcoming");
   return data.reminders;

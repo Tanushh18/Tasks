@@ -1,5 +1,6 @@
 export interface User {
   id: string;
+  name: string;
   mobileNumber: string;
   currency: string;
   timezone: string;
@@ -41,6 +42,7 @@ export interface Task {
   recurrence: Recurrence;
   notes: string;
   overdue: boolean;
+  assignedBy?: { id: string; name: string } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -85,6 +87,18 @@ export interface Transaction {
   date: string;
   time: string;
   notes: string;
+  assignedBy?: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  number: string;
+  description: string;
+  addedBy: { id: string; name: string };
+  sharedWith: { id: string; name: string }[];
   createdAt: string;
   updatedAt: string;
 }

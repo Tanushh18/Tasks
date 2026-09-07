@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
 import type { FilterQuery } from "mongoose";
 import { Task, type TaskDocument } from "../models/Task";
+import { User } from "../models/User";
 import { ApiError } from "../utils/ApiError";
 import { toZonedDateTime } from "../utils/dateTime";
 
@@ -204,6 +205,37 @@ export async function getTaskCounts(userId: string) {
     total: totalCount,
     dueToday: dueTodayCount,
   };
+}
+
+export async function assignTask(taskId: string, fromUserId: string, toUserId: string): Promise<TaskDocument> {
+  if (toUserId === fromUserId) {
+    throw ApiError.badRequest("You cannot assign a task to yourself");
+  }
+
+  const source = await Task.findOne({ _id: taskId, userId: fromUserId });
+  if (!source) throw ApiError.notFound("Task not found");
+
+  const recipient = await User.findById(toUserId);
+  if (!recipient) throw ApiError.notFound("Recipient user not found");
+
+  const copy = await Task.create({
+    userId: toUserId,
+    assignedBy: fromUserId,
+    title: source.title,
+    description: source.description,
+    date: source.date,
+    time: source.time,
+    timezone: source.timezone,
+    priority: source.priority,
+    category: source.category,
+    completed: false,
+    completedAt: null,
+    reminder: { enabled: false, alarmEnabled: false, notifyAt: null, localNotificationId: null },
+    recurrence: source.recurrence,
+    notes: source.notes,
+  });
+
+  return copy;
 }
 
 export async function getUpcomingReminders(userId: string, limit = 10): Promise<TaskDocument[]> {

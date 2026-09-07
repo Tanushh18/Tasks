@@ -9,7 +9,7 @@ interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  register: (mobileNumber: string, mpin: string, confirmMpin: string) => Promise<void>;
+  register: (name: string, mobileNumber: string, mpin: string, confirmMpin: string) => Promise<void>;
   login: (mobileNumber: string, mpin: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -52,8 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [applyUser]);
 
   const register = useCallback(
-    async (mobileNumber: string, mpin: string, confirmMpin: string) => {
-      const result = await authApi.register(mobileNumber, mpin, confirmMpin);
+    async (name: string, mobileNumber: string, mpin: string, confirmMpin: string) => {
+      const result = await authApi.register(name, mobileNumber, mpin, confirmMpin);
       await setSessionTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
       applyUser(result.user);
     },

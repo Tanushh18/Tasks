@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React from "react";
 import { AssistantScreen } from "../screens/assistant/AssistantScreen";
 import { useTheme } from "../theme/useTheme";
+import { ContactsNavigator } from "./ContactsNavigator";
 import { FinanceNavigator } from "./FinanceNavigator";
 import { HomeNavigator } from "./HomeNavigator";
 import { SettingsNavigator } from "./SettingsNavigator";
@@ -15,6 +16,7 @@ const ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof Ionicons
   HomeTab: "home",
   TasksTab: "checkbox",
   FinanceTab: "wallet",
+  ContactsTab: "people",
   AssistantTab: "mic",
   SettingsTab: "settings",
 };
@@ -23,6 +25,7 @@ const OUTLINE_ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof 
   HomeTab: "home-outline",
   TasksTab: "checkbox-outline",
   FinanceTab: "wallet-outline",
+  ContactsTab: "people-outline",
   AssistantTab: "mic-outline",
   SettingsTab: "settings-outline",
 };
@@ -49,6 +52,7 @@ export function MainTabs() {
       <Tab.Screen name="HomeTab" component={HomeNavigator} options={{ title: "Home" }} />
       <Tab.Screen name="TasksTab" component={TasksNavigator} options={{ title: "Tasks" }} />
       <Tab.Screen name="FinanceTab" component={FinanceNavigator} options={{ title: "Finance" }} />
+      <Tab.Screen name="ContactsTab" component={ContactsNavigator} options={{ title: "Contacts" }} />
       <Tab.Screen name="AssistantTab" component={AssistantScreen} options={{ title: "Assistant" }} />
       <Tab.Screen name="SettingsTab" component={SettingsNavigator} options={{ title: "Settings" }} />
     </Tab.Navigator>

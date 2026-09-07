@@ -1,3 +1,4 @@
+import { Contact } from "../models/Contact";
 import { FinanceAccount } from "../models/FinanceAccount";
 import * as financeService from "./financeService";
 import * as taskService from "./taskService";
@@ -5,10 +6,14 @@ import * as taskService from "./taskService";
 const RESULT_LIMIT = 10;
 
 export async function globalSearch(userId: string, query: string) {
-  const [tasks, transactions, accounts] = await Promise.all([
+  const [tasks, transactions, accounts, contacts] = await Promise.all([
     taskService.listTasks(userId, { status: "all", search: query, sort: "date_asc" }),
     financeService.listTransactions(userId, { search: query, limit: RESULT_LIMIT }),
     FinanceAccount.find({ userId, archived: false, name: { $regex: query, $options: "i" } }).limit(RESULT_LIMIT),
+    Contact.find({
+      $or: [{ addedBy: userId }, { sharedWith: userId }],
+      $and: [{ $or: [{ name: { $regex: query, $options: "i" } }, { number: { $regex: query, $options: "i" } }] }],
+    }).limit(RESULT_LIMIT),
   ]);
 
   return {
@@ -29,5 +34,6 @@ export async function globalSearch(userId: string, query: string) {
       date: t.date,
     })),
     accounts: accounts.map((a) => ({ id: String(a._id), name: a.name, type: a.type })),
+    contacts: contacts.map((c) => ({ id: String(c._id), name: c.name, number: c.number })),
   };
 }

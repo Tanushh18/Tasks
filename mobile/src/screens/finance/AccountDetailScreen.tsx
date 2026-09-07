@@ -5,7 +5,9 @@ import React, { useCallback, useLayoutEffect, useState } from "react";
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import * as financeApi from "../../api/finance";
 import { getApiErrorMessage } from "../../api/client";
+import type { UserSearchResult } from "../../api/users";
 import { enqueueTransactionDelete, isNetworkFailure } from "../../offline/offlineQueue";
+import { AssignSheet } from "../../components/AssignSheet";
 import { Badge } from "../../components/Badge";
 import { Card } from "../../components/Card";
 import { EmptyState, ErrorState, LoadingState } from "../../components/StateViews";
@@ -26,6 +28,8 @@ export function AccountDetailScreen({ navigation, route }: Props) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [transactionPendingShare, setTransactionPendingShare] = useState<Transaction | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -86,6 +90,21 @@ export function AccountDetailScreen({ navigation, route }: Props) {
     ]);
   }
 
+  async function handleShare(user: UserSearchResult) {
+    const transaction = transactionPendingShare;
+    if (!transaction) return;
+    setSharing(true);
+    try {
+      await financeApi.assignTransaction(transaction.id, user.id);
+      setTransactionPendingShare(null);
+      Alert.alert("Shared", `Shared a copy with ${user.name}`);
+    } catch (err) {
+      Alert.alert("We couldn't share that transaction", getApiErrorMessage(err));
+    } finally {
+      setSharing(false);
+    }
+  }
+
   if (loading) return <LoadingState label="Loading account…" />;
   if (error) return <ErrorState message={error} onRetry={() => { setLoading(true); load(); }} />;
   if (!account) return <EmptyState title="Account not found" />;
@@ -132,6 +151,9 @@ export function AccountDetailScreen({ navigation, route }: Props) {
                 <Text style={[typography.caption, { color: colors.textFaint, marginTop: 2 }]}>
                   {formatDateLabel(item.date)} · {formatTimeLabel(item.time)}
                 </Text>
+                {item.assignedBy ? (
+                  <Badge label={`Shared by ${item.assignedBy.name}`} tone="primary" />
+                ) : null}
               </View>
               <View style={{ alignItems: "flex-end" }}>
                 <Text style={[typography.bodyStrong, { color: item.type === "IN" ? colors.success : colors.danger }]}>
@@ -139,6 +161,15 @@ export function AccountDetailScreen({ navigation, route }: Props) {
                   {formatCurrency(item.amount)}
                 </Text>
                 <Badge label={item.type} tone={item.type === "IN" ? "success" : "danger"} />
+                <Pressable
+                  onPress={() => setTransactionPendingShare(item)}
+                  hitSlop={8}
+                  style={{ marginTop: spacing.xs }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share this transaction"
+                >
+                  <Ionicons name="share-outline" size={18} color={colors.textFaint} />
+                </Pressable>
               </View>
             </Card>
           </Pressable>
@@ -164,6 +195,14 @@ export function AccountDetailScreen({ navigation, route }: Props) {
           <Text style={[typography.bodyStrong, { color: colors.danger, marginLeft: spacing.xs }]}>Cash Out</Text>
         </Pressable>
       </View>
+
+      <AssignSheet
+        visible={transactionPendingShare !== null}
+        title={transactionPendingShare ? `Share "${transactionPendingShare.category}"` : "Share transaction"}
+        busy={sharing}
+        onShare={handleShare}
+        onCancel={() => setTransactionPendingShare(null)}
+      />
     </View>
   );
 }

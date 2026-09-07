@@ -5,6 +5,7 @@ const mpin = z.string().regex(/^\d{4,6}$/, "MPIN must be 4 to 6 digits");
 
 export const registerSchema = z
   .object({
+    name: z.string().trim().min(1, "Name is required").max(80),
     mobileNumber,
     mpin,
     confirmMpin: z.string(),

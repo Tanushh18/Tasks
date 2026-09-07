@@ -27,6 +27,7 @@ function serializeTransaction(transaction: TransactionDocument) {
     date: transaction.date,
     time: transaction.time,
     notes: transaction.notes,
+    assignedBy: transaction.assignedBy ? String(transaction.assignedBy) : null,
     createdAt: transaction.createdAt,
     updatedAt: transaction.updatedAt,
   };
@@ -76,6 +77,11 @@ export const updateTransaction = asyncHandler(async (req: Request, res: Response
 export const deleteTransaction = asyncHandler(async (req: Request, res: Response) => {
   await financeService.deleteTransaction(req.userId!, req.params.id);
   res.status(204).send();
+});
+
+export const assignTransaction = asyncHandler(async (req: Request, res: Response) => {
+  const transaction = await financeService.assignTransaction(req.params.id, req.userId!, req.body.toUserId);
+  res.status(201).json({ transaction: serializeTransaction(transaction) });
 });
 
 export const getSummary = asyncHandler(async (req: Request, res: Response) => {

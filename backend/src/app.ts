@@ -7,10 +7,12 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { apiRateLimiter } from "./middleware/rateLimiter";
 import assistantRoutes from "./routes/assistantRoutes";
 import authRoutes from "./routes/authRoutes";
+import contactRoutes from "./routes/contactRoutes";
 import financeRoutes from "./routes/financeRoutes";
 import reminderRoutes from "./routes/reminderRoutes";
 import searchRoutes from "./routes/searchRoutes";
 import taskRoutes from "./routes/taskRoutes";
+import userRoutes from "./routes/userRoutes";
 
 export function createApp(): Express {
   const app = express();
@@ -41,6 +43,8 @@ export function createApp(): Express {
   app.use("/api/finance", financeRoutes);
   app.use("/api/assistant", assistantRoutes);
   app.use("/api/search", searchRoutes);
+  app.use("/api/contacts", contactRoutes);
+  app.use("/api/users", userRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

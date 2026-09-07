@@ -50,3 +50,7 @@ export const listTasksQuerySchema = z.object({
 export const taskIdParamSchema = z.object({
   id: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid task id"),
 });
+
+export const assignTaskSchema = z.object({
+  toUserId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid user id"),
+});
