@@ -83,7 +83,7 @@ export function UserPicker(props: Props) {
   }
 
   return (
-    <View>
+    <View style={{ position: "relative", zIndex: 20, overflow: "visible" }}>
       {selected.length > 0 ? (
         <View style={[styles.chipRow, { marginBottom: spacing.sm }]}>
           {selected.map((user) => (
@@ -163,6 +163,14 @@ const styles = StyleSheet.create({
   chip: { flexDirection: "row", alignItems: "center", height: 32 },
   searchBar: { flexDirection: "row", alignItems: "center", borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, fontSize: 16 },
-  dropdown: { borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  dropdown: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    elevation: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   dropdownRow: {},
 });

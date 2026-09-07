@@ -10,8 +10,10 @@ import assistantRoutes from "./routes/assistantRoutes";
 import authRoutes from "./routes/authRoutes";
 import chatRoutes from "./routes/chatRoutes";
 import contactRoutes from "./routes/contactRoutes";
+import featureRoutes from "./routes/featureRoutes";
 import financeRoutes from "./routes/financeRoutes";
 import locationRoutes from "./routes/locationRoutes";
+import noteRoutes from "./routes/noteRoutes";
 import ocrRoutes from "./routes/ocrRoutes";
 import reminderRoutes from "./routes/reminderRoutes";
 import searchRoutes from "./routes/searchRoutes";
@@ -53,6 +55,8 @@ export function createApp(): Express {
   app.use("/api/ocr", ocrRoutes);
   app.use("/api/location", locationRoutes);
   app.use("/api/chat", chatRoutes);
+  app.use("/api/features", featureRoutes);
+  app.use("/api/notes", noteRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

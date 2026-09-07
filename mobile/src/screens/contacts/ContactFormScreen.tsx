@@ -14,6 +14,7 @@ import { LoadingState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
 import { UserPicker } from "../../components/UserPicker";
 import { useAuth } from "../../auth/AuthContext";
+import { useFeatureFlags } from "../../features/FeatureFlagsContext";
 import { isNetworkFailure } from "../../offline/offlineQueue";
 import { addPendingScan } from "../../localServer/pendingScans";
 import { scanImageWithFallback } from "../../localServer/ocrWithFallback";
@@ -25,6 +26,7 @@ type Props = NativeStackScreenProps<ContactsStackParamList, "ContactForm">;
 export function ContactFormScreen({ navigation, route }: Props) {
   const { colors, spacing, typography } = useTheme();
   const { user } = useAuth();
+  const { flags } = useFeatureFlags();
   const { contactId } = route.params ?? {};
   const isEditing = Boolean(contactId);
 
@@ -157,15 +159,17 @@ export function ContactFormScreen({ navigation, route }: Props) {
         <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
           {isEditing ? "Edit contact" : "Add contact"}
         </Text>
-        <Pressable
-          onPress={handleScanPress}
-          disabled={scanning}
-          accessibilityRole="button"
-          accessibilityLabel="Scan a contact card"
-          hitSlop={8}
-        >
-          {scanning ? <ActivityIndicator color={colors.primary} /> : <Ionicons name="camera-outline" size={26} color={colors.primary} />}
-        </Pressable>
+        {flags.ocr ? (
+          <Pressable
+            onPress={handleScanPress}
+            disabled={scanning}
+            accessibilityRole="button"
+            accessibilityLabel="Scan a contact card"
+            hitSlop={8}
+          >
+            {scanning ? <ActivityIndicator color={colors.primary} /> : <Ionicons name="camera-outline" size={26} color={colors.primary} />}
+          </Pressable>
+        ) : null}
       </View>
 
       <TextField label="Name" value={name} onChangeText={setName} placeholder="e.g. Priya Sharma" />

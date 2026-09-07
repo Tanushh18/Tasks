@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
 import { Card } from "../../components/Card";
 import { ScreenContainer } from "../../components/ScreenContainer";
+import { useFeatureFlags } from "../../features/FeatureFlagsContext";
 import type { MoreStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/useTheme";
 
@@ -13,6 +14,7 @@ type Props = NativeStackScreenProps<MoreStackParamList, "MoreMain">;
 export function MoreScreen({ navigation }: Props) {
   const { colors, spacing, typography } = useTheme();
   const { user } = useAuth();
+  const { flags } = useFeatureFlags();
 
   return (
     <ScreenContainer>
@@ -20,7 +22,23 @@ export function MoreScreen({ navigation }: Props) {
         More
       </Text>
 
-      <MoreRow icon="mic-outline" label="Assistant" onPress={() => navigation.navigate("Assistant", undefined)} />
+      {flags.assistant ? (
+        <MoreRow icon="mic-outline" label="Assistant" onPress={() => navigation.navigate("Assistant", undefined)} />
+      ) : null}
+      {flags.notes ? (
+        <MoreRow
+          icon="document-text-outline"
+          label="Notes"
+          onPress={() => navigation.navigate("Notes", { screen: "NotesList", params: undefined })}
+        />
+      ) : null}
+      {flags.location ? (
+        <MoreRow
+          icon="location-outline"
+          label="Location Sharing"
+          onPress={() => navigation.navigate("LocationSharing")}
+        />
+      ) : null}
       <MoreRow
         icon="settings-outline"
         label="Settings"
@@ -28,6 +46,9 @@ export function MoreScreen({ navigation }: Props) {
       />
       {user?.isAdmin ? (
         <MoreRow icon="shield-checkmark-outline" label="Admin" onPress={() => navigation.navigate("AdminUsers")} />
+      ) : null}
+      {user?.isAdmin ? (
+        <MoreRow icon="flag-outline" label="Feature Flags" onPress={() => navigation.navigate("FeatureFlags")} />
       ) : null}
     </ScreenContainer>
   );

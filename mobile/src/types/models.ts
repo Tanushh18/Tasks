@@ -106,6 +106,28 @@ export interface Contact {
   updatedAt: string;
 }
 
+export type NoteType = "text" | "checklist";
+export type NoteColor = "default" | "peach" | "sage" | "sky" | "lavender" | "sand";
+
+export interface NoteChecklistItem {
+  text: string;
+  done: boolean;
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  type: NoteType;
+  body: string;
+  items: NoteChecklistItem[];
+  color: NoteColor;
+  pinned: boolean;
+  ownerId: { id: string; name: string };
+  sharedWith: { id: string; name: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AccountSummary {
   accountId: string;
   name: string;

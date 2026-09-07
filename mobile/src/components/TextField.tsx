@@ -13,6 +13,7 @@ interface Props {
   maxLength?: number;
   multiline?: boolean;
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  editable?: boolean;
 }
 
 export function TextField({
@@ -26,6 +27,7 @@ export function TextField({
   maxLength,
   multiline,
   autoCapitalize = "sentences",
+  editable = true,
 }: Props) {
   const { colors, radius, spacing, typography } = useTheme();
 
@@ -42,6 +44,7 @@ export function TextField({
         maxLength={maxLength}
         multiline={multiline}
         autoCapitalize={autoCapitalize}
+        editable={editable}
         style={[
           styles.input,
           {

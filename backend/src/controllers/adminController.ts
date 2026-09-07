@@ -39,3 +39,24 @@ export const resetMpin = asyncHandler(async (req: Request, res: Response) => {
   const { mpin, user } = await adminService.resetMpin(req.params.id);
   res.json({ mpin, user: serializeUser(user) });
 });
+
+function serializeFlags(flags: { contacts: boolean; chat: boolean; ocr: boolean; location: boolean; assistant: boolean; notes: boolean }) {
+  return {
+    contacts: flags.contacts,
+    chat: flags.chat,
+    ocr: flags.ocr,
+    location: flags.location,
+    assistant: flags.assistant,
+    notes: flags.notes,
+  };
+}
+
+export const getFeatures = asyncHandler(async (_req: Request, res: Response) => {
+  const flags = await adminService.getFeatureFlags();
+  res.json({ features: serializeFlags(flags) });
+});
+
+export const updateFeatures = asyncHandler(async (req: Request, res: Response) => {
+  const flags = await adminService.updateFeatureFlags(req.body);
+  res.json({ features: serializeFlags(flags) });
+});

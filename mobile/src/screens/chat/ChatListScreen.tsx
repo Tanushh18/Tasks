@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as chatApi from "../../api/chat";
 import { getApiErrorMessage } from "../../api/client";
@@ -62,10 +62,30 @@ export function ChatListScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["top", "left", "right"]}>
-      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+      <View
+        style={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.md,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
         <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
           Chat
         </Text>
+        <Pressable
+          onPress={() => navigation.navigate("BluetoothChat")}
+          accessibilityRole="button"
+          accessibilityLabel="Bluetooth chat, works fully offline"
+          style={({ pressed }) => [
+            styles.bluetoothButton,
+            { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, opacity: pressed ? 0.85 : 1 },
+          ]}
+        >
+          <Ionicons name="bluetooth" size={16} color={colors.primary} />
+          <Text style={[typography.captionStrong, { color: colors.primary, marginLeft: 4 }]}>Offline chat</Text>
+        </Pressable>
       </View>
 
       {loading ? (
@@ -153,39 +173,40 @@ export function ChatListScreen({ navigation }: Props) {
           accessibilityLabel="Dismiss"
           accessibilityRole="button"
         >
-          <Pressable
-            onPress={(event) => event.stopPropagation()}
-            style={[
-              styles.sheet,
-              shadow.raised,
-              {
-                backgroundColor: colors.surface,
-                borderTopLeftRadius: radius.xl,
-                borderTopRightRadius: radius.xl,
-                padding: spacing.xl,
-              },
-            ]}
-          >
-            <Text accessibilityRole="header" style={[typography.h2, { color: colors.text, marginBottom: spacing.md }]}>
-              New chat
-            </Text>
-            <View style={{ marginBottom: spacing.lg }}>
-              <UserPicker mode="single" value={newChatUser} onChange={setNewChatUser} placeholder="Search people by name" />
-            </View>
-            <Button
-              label="Start chat"
-              size="large"
-              disabled={!newChatUser}
-              onPress={() => {
-                if (!newChatUser) return;
-                setNewChatVisible(false);
-                const user = newChatUser;
-                setNewChatUser(null);
-                openThread(user.id, user.name);
-              }}
-            />
-            <Button label="Cancel" variant="ghost" onPress={() => setNewChatVisible(false)} style={{ marginTop: spacing.sm }} />
-          </Pressable>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.sheet}>
+            <Pressable
+              onPress={(event) => event.stopPropagation()}
+              style={[
+                shadow.raised,
+                {
+                  backgroundColor: colors.surface,
+                  borderTopLeftRadius: radius.xl,
+                  borderTopRightRadius: radius.xl,
+                  padding: spacing.xl,
+                },
+              ]}
+            >
+              <Text accessibilityRole="header" style={[typography.h2, { color: colors.text, marginBottom: spacing.md }]}>
+                New chat
+              </Text>
+              <View style={{ marginBottom: spacing.lg }}>
+                <UserPicker mode="single" value={newChatUser} onChange={setNewChatUser} placeholder="Search people by name" />
+              </View>
+              <Button
+                label="Start chat"
+                size="large"
+                disabled={!newChatUser}
+                onPress={() => {
+                  if (!newChatUser) return;
+                  setNewChatVisible(false);
+                  const user = newChatUser;
+                  setNewChatUser(null);
+                  openThread(user.id, user.name);
+                }}
+              />
+              <Button label="Cancel" variant="ghost" onPress={() => setNewChatVisible(false)} style={{ marginTop: spacing.sm }} />
+            </Pressable>
+          </KeyboardAvoidingView>
         </Pressable>
       </Modal>
     </SafeAreaView>
@@ -197,6 +218,12 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   fab: { position: "absolute", right: 20, bottom: 20, flexDirection: "row", alignItems: "center", justifyContent: "center" },
+  bluetoothButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
   backdrop: { flex: 1, justifyContent: "flex-end" },
   sheet: { width: "100%" },
 });

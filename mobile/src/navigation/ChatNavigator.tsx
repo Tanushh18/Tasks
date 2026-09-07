@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import { ChatListScreen } from "../screens/chat/ChatListScreen";
 import { ChatThreadScreen } from "../screens/chat/ChatThreadScreen";
+import { BluetoothChatScreen } from "../screens/chat/BluetoothChatScreen";
 import type { ChatStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<ChatStackParamList>();
@@ -11,6 +12,11 @@ export function ChatNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="ChatList" component={ChatListScreen} />
       <Stack.Screen name="ChatThread" component={ChatThreadScreen} options={{ headerShown: true, title: "" }} />
+      <Stack.Screen
+        name="BluetoothChat"
+        component={BluetoothChatScreen}
+        options={{ headerShown: true, title: "Bluetooth Chat" }}
+      />
     </Stack.Navigator>
   );
 }

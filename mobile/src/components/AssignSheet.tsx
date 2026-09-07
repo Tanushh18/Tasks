@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import type { UserSearchResult } from "../api/users";
 import { useTheme } from "../theme/useTheme";
 import { Button } from "./Button";
@@ -31,42 +31,43 @@ export function AssignSheet({ visible, title, busy = false, onShare, onCancel }:
         accessibilityLabel="Dismiss"
         accessibilityRole="button"
       >
-        <Pressable
-          onPress={(event) => event.stopPropagation()}
-          style={[
-            styles.sheet,
-            shadow.raised,
-            {
-              backgroundColor: colors.surface,
-              borderTopLeftRadius: radius.xl,
-              borderTopRightRadius: radius.xl,
-              padding: spacing.xl,
-            },
-          ]}
-        >
-          <View style={[styles.grabber, { backgroundColor: colors.border, marginBottom: spacing.lg }]} accessibilityElementsHidden />
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.sheet}>
+          <Pressable
+            onPress={(event) => event.stopPropagation()}
+            style={[
+              shadow.raised,
+              {
+                backgroundColor: colors.surface,
+                borderTopLeftRadius: radius.xl,
+                borderTopRightRadius: radius.xl,
+                padding: spacing.xl,
+              },
+            ]}
+          >
+            <View style={[styles.grabber, { backgroundColor: colors.border, marginBottom: spacing.lg }]} accessibilityElementsHidden />
 
-          <Text accessibilityRole="header" style={[typography.h2, { color: colors.text, marginBottom: spacing.md }]}>
-            {title}
-          </Text>
+            <Text accessibilityRole="header" style={[typography.h2, { color: colors.text, marginBottom: spacing.md }]}>
+              {title}
+            </Text>
 
-          <View style={{ marginBottom: spacing.lg }}>
-            <UserPicker mode="single" value={selected} onChange={setSelected} placeholder="Search people by name" />
-          </View>
+            <View style={{ marginBottom: spacing.lg }}>
+              <UserPicker mode="single" value={selected} onChange={setSelected} placeholder="Search people by name" />
+            </View>
 
-          <Button
-            label="Share"
-            size="large"
-            loading={busy}
-            disabled={!selected}
-            onPress={async () => {
-              if (!selected) return;
-              await onShare(selected);
-              setSelected(null);
-            }}
-          />
-          <Button label="Cancel" variant="ghost" onPress={handleClose} disabled={busy} style={{ marginTop: spacing.sm }} />
-        </Pressable>
+            <Button
+              label="Share"
+              size="large"
+              loading={busy}
+              disabled={!selected}
+              onPress={async () => {
+                if (!selected) return;
+                await onShare(selected);
+                setSelected(null);
+              }}
+            />
+            <Button label="Cancel" variant="ghost" onPress={handleClose} disabled={busy} style={{ marginTop: spacing.sm }} />
+          </Pressable>
+        </KeyboardAvoidingView>
       </Pressable>
     </Modal>
   );

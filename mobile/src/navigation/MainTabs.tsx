@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React from "react";
+import { useFeatureFlags } from "../features/FeatureFlagsContext";
 import { useTheme } from "../theme/useTheme";
 import { ChatNavigator } from "./ChatNavigator";
 import { ContactsNavigator } from "./ContactsNavigator";
@@ -32,6 +33,7 @@ const OUTLINE_ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof 
 
 export function MainTabs() {
   const { colors } = useTheme();
+  const { flags } = useFeatureFlags();
 
   return (
     <Tab.Navigator
@@ -52,8 +54,10 @@ export function MainTabs() {
       <Tab.Screen name="HomeTab" component={HomeNavigator} options={{ title: "Home" }} />
       <Tab.Screen name="TasksTab" component={TasksNavigator} options={{ title: "Tasks" }} />
       <Tab.Screen name="FinanceTab" component={FinanceNavigator} options={{ title: "Finance" }} />
-      <Tab.Screen name="ContactsTab" component={ContactsNavigator} options={{ title: "Contacts" }} />
-      <Tab.Screen name="ChatTab" component={ChatNavigator} options={{ title: "Chat" }} />
+      {flags.contacts ? (
+        <Tab.Screen name="ContactsTab" component={ContactsNavigator} options={{ title: "Contacts" }} />
+      ) : null}
+      {flags.chat ? <Tab.Screen name="ChatTab" component={ChatNavigator} options={{ title: "Chat" }} /> : null}
       <Tab.Screen name="MoreTab" component={MoreNavigator} options={{ title: "More" }} />
     </Tab.Navigator>
   );

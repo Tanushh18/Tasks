@@ -15,6 +15,7 @@ import { TextField } from "../../components/TextField";
 import { addPendingScan } from "../../localServer/pendingScans";
 import { scanImageWithFallback } from "../../localServer/ocrWithFallback";
 import { enqueueTransactionCreate, enqueueTransactionUpdate, isNetworkFailure } from "../../offline/offlineQueue";
+import { useFeatureFlags } from "../../features/FeatureFlagsContext";
 import { useTheme } from "../../theme/useTheme";
 import { formatDateLabel, formatTimeLabel, toHm, toIsoDate } from "../../utils/date";
 import type { FinanceAccount, TransactionType } from "../../types/models";
@@ -28,6 +29,7 @@ const INCOME_CATEGORIES = ["Salary", "Refund", "Gift", "Interest"];
 
 export function TransactionFormScreen({ navigation, route }: Props) {
   const { colors, spacing, radius, typography, touchTarget } = useTheme();
+  const { flags } = useFeatureFlags();
   const { transactionId } = route.params ?? {};
   const isEditing = Boolean(transactionId);
 
@@ -202,15 +204,17 @@ export function TransactionFormScreen({ navigation, route }: Props) {
         <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
           {isEditing ? "Edit entry" : type === "IN" ? "Money received" : "Add expense"}
         </Text>
-        <Pressable
-          onPress={handleScanPress}
-          disabled={scanning}
-          accessibilityRole="button"
-          accessibilityLabel="Scan a receipt"
-          hitSlop={8}
-        >
-          {scanning ? <ActivityIndicator color={colors.primary} /> : <Ionicons name="camera-outline" size={26} color={colors.primary} />}
-        </Pressable>
+        {flags.ocr ? (
+          <Pressable
+            onPress={handleScanPress}
+            disabled={scanning}
+            accessibilityRole="button"
+            accessibilityLabel="Scan a receipt"
+            hitSlop={8}
+          >
+            {scanning ? <ActivityIndicator color={colors.primary} /> : <Ionicons name="camera-outline" size={26} color={colors.primary} />}
+          </Pressable>
+        ) : null}
       </View>
 
       {!route.params?.accountId && accounts.length > 1 ? (

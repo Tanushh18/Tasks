@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import type { FeatureFlags } from "./features";
 
 export interface AdminUser {
   id: string;
@@ -27,4 +28,14 @@ export async function unblockUser(id: string): Promise<AdminUser> {
 export async function resetMpin(id: string): Promise<{ mpin: string; user: AdminUser }> {
   const { data } = await apiClient.post<{ mpin: string; user: AdminUser }>(`/admin/users/${id}/reset-mpin`);
   return data;
+}
+
+export async function getFeatureFlags(): Promise<FeatureFlags> {
+  const { data } = await apiClient.get<{ features: FeatureFlags }>("/admin/features");
+  return data.features;
+}
+
+export async function updateFeatureFlags(patch: Partial<FeatureFlags>): Promise<FeatureFlags> {
+  const { data } = await apiClient.patch<{ features: FeatureFlags }>("/admin/features", patch);
+  return data.features;
 }

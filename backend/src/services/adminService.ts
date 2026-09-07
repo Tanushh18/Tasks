@@ -1,7 +1,27 @@
 import crypto from "node:crypto";
 import { User, type UserDocument } from "../models/User";
+import { getFlags, FeatureFlags, type FeatureFlagsDocument } from "../models/FeatureFlags";
 import { ApiError } from "../utils/ApiError";
 import { hashMpin } from "./authService";
+
+interface FeatureFlagsPatch {
+  contacts?: boolean;
+  chat?: boolean;
+  ocr?: boolean;
+  location?: boolean;
+  assistant?: boolean;
+  notes?: boolean;
+}
+
+export async function getFeatureFlags(): Promise<FeatureFlagsDocument> {
+  return getFlags();
+}
+
+export async function updateFeatureFlags(patch: FeatureFlagsPatch): Promise<FeatureFlagsDocument> {
+  await getFlags();
+  const flags = await FeatureFlags.findByIdAndUpdate("global", patch, { new: true });
+  return flags as FeatureFlagsDocument;
+}
 
 export async function listUsers(callerId: string) {
   return User.find({ _id: { $ne: callerId } })

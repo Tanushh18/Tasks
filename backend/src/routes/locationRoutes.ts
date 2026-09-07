@@ -1,12 +1,13 @@
 import { Router } from "express";
 import * as locationController from "../controllers/locationController";
 import { requireAuth } from "../middleware/auth";
+import { requireFeature } from "../middleware/requireFeature";
 import { validateRequest } from "../middleware/validateRequest";
 import { pingSchema, startSharingSchema, toUserIdParamSchema } from "../validators/locationValidators";
 
 const router = Router();
 
-router.use(requireAuth);
+router.use(requireAuth, requireFeature("location"));
 
 router.post("/ping", validateRequest({ body: pingSchema }), locationController.ping);
 router.get("/shares", locationController.getShares);

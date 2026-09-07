@@ -38,10 +38,16 @@ export type ContactsStackParamList = {
 export type ChatStackParamList = {
   ChatList: undefined;
   ChatThread: { userId: string; name: string };
+  BluetoothChat: undefined;
 };
 
 export type AdminStackParamList = {
   AdminUsers: undefined;
+};
+
+export type NotesStackParamList = {
+  NotesList: undefined;
+  NoteForm: { noteId?: string; type?: "text" | "checklist" } | undefined;
 };
 
 export type MoreStackParamList = {
@@ -49,7 +55,9 @@ export type MoreStackParamList = {
   Assistant: { autoListen?: boolean } | undefined;
   Settings: NavigatorScreenParams<SettingsStackParamList>;
   LocationSharing: undefined;
+  Notes: NavigatorScreenParams<NotesStackParamList>;
   AdminUsers: undefined;
+  FeatureFlags: undefined;
 };
 
 export type MainTabParamList = {

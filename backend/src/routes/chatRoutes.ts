@@ -1,12 +1,13 @@
 import { Router } from "express";
 import * as chatController from "../controllers/chatController";
 import { requireAuth } from "../middleware/auth";
+import { requireFeature } from "../middleware/requireFeature";
 import { validateRequest } from "../middleware/validateRequest";
 import { listMessagesQuerySchema, sendMessageSchema, withUserIdParamSchema } from "../validators/chatValidators";
 
 const router = Router();
 
-router.use(requireAuth);
+router.use(requireAuth, requireFeature("chat"));
 
 router.get("/conversations", chatController.listConversations);
 router.get(
