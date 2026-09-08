@@ -32,13 +32,8 @@ export function MoreScreen({ navigation }: Props) {
           onPress={() => navigation.navigate("Notes", { screen: "NotesList", params: undefined })}
         />
       ) : null}
-      {flags.location ? (
-        <MoreRow
-          icon="location-outline"
-          label="Location Sharing"
-          onPress={() => navigation.navigate("LocationSharing")}
-        />
-      ) : null}
+      {/* Location Sharing now lives under the Family tab, alongside the other
+          people-shaped features, rather than being buried in More. */}
       <MoreRow
         icon="settings-outline"
         label="Settings"

@@ -47,6 +47,23 @@ export type ChatStackParamList = {
   BluetoothChat: undefined;
 };
 
+/**
+ * Contacts, chat and location live in one "Family" stack — the bottom bar is
+ * organised around people and purpose, not around one tab per module (§3).
+ * The older ContactsStackParamList / ChatStackParamList remain as the shape
+ * those individual screens still expect for their own params.
+ */
+export type FamilyStackParamList = {
+  FamilyHub: undefined;
+  ContactsList: undefined;
+  ContactForm: { contactId?: string } | undefined;
+  ContactImport: undefined;
+  ChatList: undefined;
+  ChatThread: { userId: string; name: string };
+  BluetoothChat: undefined;
+  LocationSharing: undefined;
+};
+
 export type AdminStackParamList = {
   AdminUsers: undefined;
 };
@@ -60,7 +77,6 @@ export type MoreStackParamList = {
   MoreMain: undefined;
   Assistant: { autoListen?: boolean } | undefined;
   Settings: NavigatorScreenParams<SettingsStackParamList>;
-  LocationSharing: undefined;
   Notes: NavigatorScreenParams<NotesStackParamList>;
   AdminUsers: undefined;
   FeatureFlags: undefined;
@@ -70,7 +86,6 @@ export type MainTabParamList = {
   HomeTab: NavigatorScreenParams<HomeStackParamList>;
   TasksTab: NavigatorScreenParams<TasksStackParamList>;
   FinanceTab: NavigatorScreenParams<FinanceStackParamList>;
-  ContactsTab: NavigatorScreenParams<ContactsStackParamList>;
-  ChatTab: NavigatorScreenParams<ChatStackParamList>;
+  FamilyTab: NavigatorScreenParams<FamilyStackParamList>;
   MoreTab: NavigatorScreenParams<MoreStackParamList>;
 };

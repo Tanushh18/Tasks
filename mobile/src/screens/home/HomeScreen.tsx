@@ -9,21 +9,25 @@ import { getApiErrorMessage } from "../../api/client";
 import * as financeApi from "../../api/finance";
 import * as tasksApi from "../../api/tasks";
 import { useAuth } from "../../auth/AuthContext";
+import { AppHeader } from "../../components/AppHeader";
 import { Card } from "../../components/Card";
 import { ConfirmationSheet } from "../../components/ConfirmationSheet";
-import { OfflineBanner } from "../../components/OfflineBanner";
+import { QuickActions, type QuickAction } from "../../components/QuickActions";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeader } from "../../components/SectionHeader";
-import { Skeleton } from "../../components/Skeleton";
-import { EmptyState, ErrorState, LoadingState } from "../../components/StateViews";
-import { TaskListItem } from "../../components/TaskListItem";
+import { SkeletonCard, SkeletonLines } from "../../components/Skeleton";
+import { StatCard } from "../../components/StatCard";
+import { EmptyState, ErrorState } from "../../components/StateViews";
+import { SyncBanner } from "../../components/SyncIndicator";
+import { buildTimeline, TodayTimeline, type TimelineEntry } from "../../components/TodayTimeline";
+import { useFeatureFlags } from "../../features/FeatureFlagsContext";
 import type { HomeStackParamList, MainTabParamList } from "../../navigation/types";
 import { cancelTaskReminder } from "../../notifications/notificationService";
-import { enqueueTaskComplete, enqueueTaskDelete, getPendingCount, isNetworkFailure } from "../../offline/offlineQueue";
+import { enqueueTaskComplete, enqueueTaskDelete, isNetworkFailure } from "../../offline/offlineQueue";
 import { scopedKey } from "../../offline/scope";
 import { getJson, setJson } from "../../offline/storage";
 import { useTheme } from "../../theme/useTheme";
-import type { FinancialSummary, Task, TaskCounts } from "../../types/models";
+import type { FinancialSummary, Task, TaskCounts, Transaction } from "../../types/models";
 import { formatCurrency } from "../../utils/currency";
 import { formatDateLabel, formatTimeLabel, todayIso } from "../../utils/date";
 
@@ -36,8 +40,6 @@ type Props = CompositeScreenProps<
  * which must never be shown to a different account that signs in on the same device. */
 const DASHBOARD_CACHE_KEY_BASE = "dt_cache_home_dashboard";
 
-/** Enough to see what today looks like without turning Home into the full task list. */
-const TODAY_PREVIEW_LIMIT = 4;
 const REMINDER_PREVIEW_LIMIT = 3;
 
 interface DashboardCache {
@@ -45,6 +47,7 @@ interface DashboardCache {
   todaysTasks: Task[];
   reminders: Task[];
   summary: FinancialSummary;
+  todaysTransactions: Transaction[];
   cachedAt: string;
 }
 
@@ -61,35 +64,36 @@ function reminderWhen(task: Task): string {
 }
 
 export function HomeScreen({ navigation }: Props) {
-  const { colors, spacing, radius, typography, touchTarget, shadow } = useTheme();
+  const { colors, spacing, radius, typography, touchTarget, shadow, feature } = useTheme();
   const { user } = useAuth();
+  const { flags } = useFeatureFlags();
 
   const [counts, setCounts] = useState<TaskCounts | null>(null);
   const [todaysTasks, setTodaysTasks] = useState<Task[]>([]);
   const [reminders, setReminders] = useState<Task[]>([]);
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
+  const [todaysTransactions, setTodaysTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [offlineCachedAt, setOfflineCachedAt] = useState<string | null>(null);
-  const [pendingCount, setPendingCount] = useState(0);
   const [taskPendingDelete, setTaskPendingDelete] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
-    setPendingCount(await getPendingCount());
     try {
-      const [taskCounts, todayList, upcomingReminders, financeSummary] = await Promise.all([
+      const today = todayIso();
+      const [taskCounts, todayList, upcomingReminders, financeSummary, todayTx] = await Promise.all([
         tasksApi.getTaskCounts(),
-        tasksApi.listTasks({ date: todayIso(), sort: "date_asc" }),
+        tasksApi.listTasks({ date: today, sort: "date_asc" }),
         tasksApi.getUpcomingReminders(),
         financeApi.getFinancialSummary(),
+        financeApi.listTransactions({ from: today, to: today }),
       ]);
       setCounts(taskCounts);
       setTodaysTasks(todayList);
       setReminders(upcomingReminders);
       setSummary(financeSummary);
-      setOfflineCachedAt(null);
+      setTodaysTransactions(todayTx);
       const cacheKey = scopedKey(DASHBOARD_CACHE_KEY_BASE);
       if (cacheKey) {
         await setJson(cacheKey, {
@@ -97,6 +101,7 @@ export function HomeScreen({ navigation }: Props) {
           todaysTasks: todayList,
           reminders: upcomingReminders,
           summary: financeSummary,
+          todaysTransactions: todayTx,
           cachedAt: new Date().toISOString(),
         });
       }
@@ -109,7 +114,7 @@ export function HomeScreen({ navigation }: Props) {
           setTodaysTasks(cached.todaysTasks);
           setReminders(cached.reminders);
           setSummary(cached.summary);
-          setOfflineCachedAt(cached.cachedAt);
+          setTodaysTransactions(cached.todaysTransactions ?? []);
         } else {
           setError("You're offline and we don't have saved information for this screen yet.");
         }
@@ -127,7 +132,102 @@ export function HomeScreen({ navigation }: Props) {
     }, [load])
   );
 
+  const editTask = useCallback(
+    (taskId: string) => navigation.navigate("TasksTab", { screen: "TaskForm", params: { taskId } }),
+    [navigation]
+  );
+
+  /** Tasks and money for today, interleaved into the one column the brief asks for. */
+  const timeline = useMemo<TimelineEntry[]>(() => {
+    const taskEntries: TimelineEntry[] = todaysTasks.map((task) => ({
+      id: `task-${task.id}`,
+      kind: task.reminder?.enabled ? "reminder" : "task",
+      time: task.time,
+      title: task.title,
+      detail: task.category,
+      done: task.completed,
+      onPress: () => editTask(task.id),
+    }));
+
+    const moneyEntries: TimelineEntry[] = todaysTransactions.map((tx) => ({
+      id: `tx-${tx.id}`,
+      kind: tx.type === "IN" ? "income" : "expense",
+      time: tx.time,
+      title: tx.description || tx.category,
+      detail: tx.category,
+      amount: formatCurrency(tx.amount),
+      onPress: () =>
+        navigation.navigate("FinanceTab", { screen: "TransactionForm", params: { transactionId: tx.id } }),
+    }));
+
+    return buildTimeline([...taskEntries, ...moneyEntries]);
+  }, [todaysTasks, todaysTransactions, editTask, navigation]);
+
   const remainingToday = useMemo(() => todaysTasks.filter((task) => !task.completed).length, [todaysTasks]);
+
+  const quickActions = useMemo<QuickAction[]>(() => {
+    const actions: QuickAction[] = [
+      {
+        key: "add-task",
+        label: "Add Task",
+        icon: "add-circle",
+        tone: feature.tasks.solid,
+        toneMuted: feature.tasks.muted,
+        onPress: () => navigation.navigate("TasksTab", { screen: "TaskForm", params: undefined }),
+      },
+      {
+        key: "add-expense",
+        label: "Add Expense",
+        icon: "wallet",
+        tone: feature.finance.solid,
+        toneMuted: feature.finance.muted,
+        onPress: () => navigation.navigate("FinanceTab", { screen: "TransactionForm", params: { type: "OUT" } }),
+      },
+    ];
+
+    if (flags.ocr) {
+      actions.push({
+        key: "scan",
+        label: "Scan Receipt",
+        icon: "camera",
+        tone: feature.finance.solid,
+        toneMuted: feature.finance.muted,
+        onPress: () => navigation.navigate("FinanceTab", { screen: "TransactionForm", params: { type: "OUT" } }),
+      });
+    }
+    if (flags.notes) {
+      actions.push({
+        key: "add-note",
+        label: "Add Note",
+        icon: "document-text",
+        tone: feature.notes.solid,
+        toneMuted: feature.notes.muted,
+        onPress: () => navigation.navigate("MoreTab", { screen: "Notes", params: { screen: "NoteForm" } }),
+      });
+    }
+    if (flags.chat) {
+      actions.push({
+        key: "message",
+        label: "Message Family",
+        icon: "chatbubbles",
+        tone: feature.chat.solid,
+        toneMuted: feature.chat.muted,
+        onPress: () => navigation.navigate("FamilyTab", { screen: "ChatList" }),
+      });
+    }
+    if (flags.location) {
+      actions.push({
+        key: "location",
+        label: "Share Location",
+        icon: "location",
+        tone: feature.location.solid,
+        toneMuted: feature.location.muted,
+        onPress: () => navigation.navigate("FamilyTab", { screen: "LocationSharing" }),
+      });
+    }
+
+    return actions;
+  }, [flags, feature, navigation]);
 
   const handleToggleComplete = useCallback(async (task: Task) => {
     const nextCompleted = !task.completed;
@@ -143,7 +243,6 @@ export function HomeScreen({ navigation }: Props) {
       if (isNetworkFailure(err)) {
         if (nextCompleted) await cancelTaskReminder(task.reminder.localNotificationId);
         await enqueueTaskComplete(task.id, nextCompleted);
-        setPendingCount(await getPendingCount());
         return;
       }
       setTodaysTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
@@ -167,7 +266,6 @@ export function HomeScreen({ navigation }: Props) {
         await enqueueTaskDelete(task.id);
         setTodaysTasks((prev) => prev.filter((t) => t.id !== task.id));
         setReminders((prev) => prev.filter((t) => t.id !== task.id));
-        setPendingCount(await getPendingCount());
         setTaskPendingDelete(null);
         return;
       }
@@ -177,12 +275,6 @@ export function HomeScreen({ navigation }: Props) {
     }
   }, [taskPendingDelete]);
 
-  const editTask = useCallback(
-    (taskId: string) => navigation.navigate("TasksTab", { screen: "TaskForm", params: { taskId } }),
-    [navigation]
-  );
-
-  if (loading) return <LoadingState label="Getting your day ready…" />;
   if (error) {
     return (
       <ErrorState
@@ -199,50 +291,28 @@ export function HomeScreen({ navigation }: Props) {
 
   return (
     <View style={styles.flex}>
+      <AppHeader
+        title={`${greeting()}${user?.name ? `, ${user.name.split(" ")[0]}` : ""}`}
+        subtitle="Here's what's happening today"
+        actions={[
+          {
+            icon: "search",
+            label: "Search your tasks and money",
+            onPress: () => navigation.navigate("Search"),
+          },
+        ]}
+      />
+
       <ScreenContainer onRefresh={load} refreshing={false}>
-        {/* 1 — Who and where. */}
-        <View style={styles.headerRow}>
-          <View style={styles.flex}>
-            <Text style={[typography.h1, { color: colors.text }]}>{greeting()}</Text>
-            {user?.mobileNumber ? (
-              <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
-                {user.mobileNumber}
-              </Text>
-            ) : null}
-          </View>
-          <Pressable
-            onPress={() => navigation.navigate("Search")}
-            accessibilityRole="button"
-            accessibilityLabel="Search your tasks and money"
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.headerAction,
-              {
-                minWidth: touchTarget.min,
-                minHeight: touchTarget.min,
-                borderRadius: radius.pill,
-                backgroundColor: colors.surfaceAlt,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Ionicons name="search" size={22} color={colors.text} />
-          </Pressable>
-        </View>
+        <SyncBanner />
 
-        {offlineCachedAt || pendingCount > 0 ? (
-          <View style={{ marginTop: spacing.lg }}>
-            <OfflineBanner cachedAt={offlineCachedAt} pendingCount={pendingCount} />
-          </View>
-        ) : null}
-
-        {/* 2 — Anything that slipped. Stated as a fact with a way to act, never as a scolding. */}
+        {/* Anything that slipped. Stated as a fact with a way to act, never as a scolding. */}
         {overdueCount > 0 ? (
           <Pressable
             onPress={() => navigation.navigate("TasksTab", { screen: "TaskList", params: undefined })}
             accessibilityRole="button"
             accessibilityLabel={`Needs attention. ${overdueCount} ${overdueCount === 1 ? "task is" : "tasks are"} overdue. Opens your tasks.`}
-            style={({ pressed }) => [{ marginTop: spacing.lg, opacity: pressed ? 0.85 : 1 }]}
+            style={({ pressed }) => [{ marginBottom: spacing.lg, opacity: pressed ? 0.85 : 1 }]}
           >
             <Card style={{ backgroundColor: colors.warningMuted, borderColor: colors.warning }}>
               <View style={styles.rowCentered}>
@@ -259,87 +329,94 @@ export function HomeScreen({ navigation }: Props) {
           </Pressable>
         ) : null}
 
-        {/* 3 — What do I need to do? */}
+        {/* Quick actions sit above the fold — these are what people open the app for. */}
+        <QuickActions actions={quickActions} />
+
+        {/* The day as one story: tasks, reminders and money interleaved. */}
         <View style={{ marginTop: spacing.xl }}>
           <SectionHeader
-            title="Today's tasks"
+            title="Today"
             subtitle={
-              todaysTasks.length === 0
-                ? "Nothing planned"
-                : `${remainingToday} of ${todaysTasks.length} still to do`
+              todaysTasks.length === 0 && todaysTransactions.length === 0
+                ? "Nothing yet"
+                : `${remainingToday} task${remainingToday === 1 ? "" : "s"} left${todaysTransactions.length > 0 ? ` · ${todaysTransactions.length} money entr${todaysTransactions.length === 1 ? "y" : "ies"}` : ""}`
             }
-            actionLabel={todaysTasks.length > 0 ? "View all" : undefined}
+            actionLabel={todaysTasks.length > 0 ? "All tasks" : undefined}
             onActionPress={() => navigation.navigate("TasksTab", { screen: "TaskList", params: undefined })}
           />
 
-          {todaysTasks.length === 0 ? (
+          {loading ? (
+            <SkeletonLines count={5} />
+          ) : timeline.length === 0 ? (
             <Card>
               <EmptyState
+                icon="sunny-outline"
+                tone={feature.tasks.solid}
+                toneMuted={feature.tasks.muted}
                 title="Nothing planned yet"
-                subtitle="Add something you don't want to forget."
+                subtitle="Add something your family needs to remember."
                 actionLabel="Add Task"
                 onAction={() => navigation.navigate("TasksTab", { screen: "TaskForm", params: undefined })}
               />
             </Card>
           ) : (
-            <>
-              {todaysTasks.slice(0, TODAY_PREVIEW_LIMIT).map((task) => (
-                <TaskListItem
-                  key={task.id}
-                  task={task}
-                  onToggleComplete={() => handleToggleComplete(task)}
-                  onPress={() => editTask(task.id)}
-                  onDelete={() => setTaskPendingDelete(task)}
-                />
-              ))}
-              {todaysTasks.length > TODAY_PREVIEW_LIMIT ? (
-                <Pressable
-                  onPress={() => navigation.navigate("TasksTab", { screen: "TaskList", params: undefined })}
-                  accessibilityRole="button"
-                  style={{ paddingVertical: spacing.md, minHeight: touchTarget.min }}
-                >
-                  <Text style={[typography.captionStrong, { color: colors.primary }]}>
-                    {`Show ${todaysTasks.length - TODAY_PREVIEW_LIMIT} more`}
-                  </Text>
-                </Pressable>
-              ) : null}
-            </>
+            <Card>
+              <TodayTimeline entries={timeline} />
+            </Card>
           )}
         </View>
 
-        {/* 4 — The four things people come here to do. */}
+        {/* Money, as context rather than the headline. */}
         <View style={{ marginTop: spacing.xl }}>
-          <SectionHeader title="Quick actions" />
-          <View style={styles.quickGrid}>
-            <QuickAction
-              icon="add-circle"
-              label="Add Task"
-              onPress={() => navigation.navigate("TasksTab", { screen: "TaskForm", params: undefined })}
+          <SectionHeader
+            title="Money this month"
+            actionLabel="Open"
+            onActionPress={() => navigation.navigate("FinanceTab", { screen: "AccountsList", params: undefined })}
+          />
+          <View style={[styles.statRow, { gap: spacing.md }]}>
+            <StatCard
+              label="Money in"
+              value={summary ? formatCurrency(summary.cashIn) : undefined}
+              icon="arrow-down-circle"
+              tone={colors.success}
+              toneMuted={colors.successMuted}
+              style={styles.flex}
             />
-            <QuickAction
-              icon="wallet"
-              label="Add Expense"
-              onPress={() => navigation.navigate("FinanceTab", { screen: "TransactionForm", params: { type: "OUT" } })}
-            />
-            <QuickAction
-              icon="chatbubble-ellipses"
-              label="Ask Assistant"
-              onPress={() => navigation.navigate("MoreTab", { screen: "Assistant", params: undefined })}
-            />
-            <QuickAction
-              icon="calendar"
-              label="View Calendar"
-              onPress={() => navigation.navigate("TasksTab", { screen: "Calendar", params: undefined })}
+            <StatCard
+              label="Money out"
+              value={summary ? formatCurrency(summary.cashOut) : undefined}
+              icon="arrow-up-circle"
+              tone={colors.danger}
+              toneMuted={colors.dangerMuted}
+              style={styles.flex}
             />
           </View>
+          <StatCard
+            label="Net"
+            value={summary ? formatCurrency(summary.netFlow) : undefined}
+            detail="Money in minus money out, this month"
+            icon="wallet"
+            tone={feature.finance.solid}
+            toneMuted={feature.finance.muted}
+            style={{ marginTop: spacing.md }}
+            onPress={() => navigation.navigate("FinanceTab", { screen: "Insights", params: undefined })}
+          />
         </View>
 
-        {/* 5 — What's coming up. */}
+        {/* What's coming up next, beyond today. */}
         <View style={{ marginTop: spacing.xl }}>
           <SectionHeader title="Coming up" />
-          {reminders.length === 0 ? (
+          {loading ? (
+            <SkeletonCard lines={1} />
+          ) : reminders.length === 0 ? (
             <Card>
-              <EmptyState title="No reminders set" subtitle="You'll see upcoming reminders here." />
+              <EmptyState
+                icon="notifications-outline"
+                tone={feature.tasks.solid}
+                toneMuted={feature.tasks.muted}
+                title="No reminders set"
+                subtitle="You'll see upcoming reminders here."
+              />
             </Card>
           ) : (
             reminders.slice(0, REMINDER_PREVIEW_LIMIT).map((task) => (
@@ -355,10 +432,10 @@ export function HomeScreen({ navigation }: Props) {
                     <View
                       style={[
                         styles.reminderIcon,
-                        { backgroundColor: colors.primaryMuted, borderRadius: radius.md },
+                        { backgroundColor: feature.tasks.muted, borderRadius: radius.md },
                       ]}
                     >
-                      <Ionicons name="notifications" size={20} color={colors.primary} />
+                      <Ionicons name="notifications" size={20} color={feature.tasks.solid} />
                     </View>
                     <View style={{ flex: 1, marginLeft: spacing.md }}>
                       <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
@@ -374,66 +451,30 @@ export function HomeScreen({ navigation }: Props) {
             ))
           )}
         </View>
-
-        {/* 6 — Money, last: useful context rather than the headline. */}
-        <View style={{ marginTop: spacing.xl }}>
-          <SectionHeader
-            title="Money this month"
-            actionLabel="Open"
-            onActionPress={() => navigation.navigate("FinanceTab", { screen: "AccountsList", params: undefined })}
-          />
-          <Card>
-            {/* A real ₹0 is meaningful, so nothing is rendered until the totals actually arrive. */}
-            {summary === null ? (
-              <View accessibilityRole="progressbar" accessibilityLabel="Loading your money summary">
-                <Skeleton height={28} width="55%" />
-                <Skeleton height={16} width="80%" style={{ marginTop: spacing.md }} />
-              </View>
-            ) : (
-              <>
-                <Text style={[typography.caption, { color: colors.textMuted }]}>Balance</Text>
-                <Text style={[typography.amount, { color: colors.text, marginTop: 2 }]}>
-                  {formatCurrency(summary.netFlow)}
-                </Text>
-                <View style={[styles.moneyRow, { marginTop: spacing.lg }]}>
-                  <View style={styles.flex}>
-                    <Text style={[typography.caption, { color: colors.textMuted }]}>Money in</Text>
-                    <Text style={[typography.h3, { color: colors.success, marginTop: 2 }]}>
-                      {formatCurrency(summary.cashIn)}
-                    </Text>
-                  </View>
-                  <View style={styles.flex}>
-                    <Text style={[typography.caption, { color: colors.textMuted }]}>Money out</Text>
-                    <Text style={[typography.h3, { color: colors.danger, marginTop: 2 }]}>
-                      {formatCurrency(summary.cashOut)}
-                    </Text>
-                  </View>
-                </View>
-              </>
-            )}
-          </Card>
-        </View>
       </ScreenContainer>
 
-      <Pressable
-        onPress={() => navigation.navigate("MoreTab", { screen: "Assistant", params: { autoListen: true } })}
-        accessibilityRole="button"
-        accessibilityLabel="Speak to your assistant"
-        accessibilityHint="Opens the assistant and starts listening"
-        style={({ pressed }) => [
-          styles.assistantFab,
-          shadow.raised,
-          {
-            backgroundColor: colors.primary,
-            borderRadius: radius.pill,
-            width: touchTarget.large,
-            height: touchTarget.large,
-            opacity: pressed ? 0.9 : 1,
-          },
-        ]}
-      >
-        <Ionicons name="mic" size={26} color={colors.onPrimary} />
-      </Pressable>
+      {flags.assistant ? (
+        <Pressable
+          onPress={() => navigation.navigate("MoreTab", { screen: "Assistant", params: { autoListen: true } })}
+          accessibilityRole="button"
+          accessibilityLabel="Speak to your assistant"
+          accessibilityHint="Opens the assistant and starts listening"
+          style={({ pressed }) => [
+            styles.assistantFab,
+            shadow.raised,
+            {
+              backgroundColor: colors.primary,
+              borderRadius: radius.pill,
+              width: touchTarget.large,
+              height: touchTarget.large,
+              opacity: pressed ? 0.9 : 1,
+              transform: [{ scale: pressed ? 0.95 : 1 }],
+            },
+          ]}
+        >
+          <Ionicons name="mic" size={26} color={colors.onPrimary} />
+        </Pressable>
+      ) : null}
 
       <ConfirmationSheet
         visible={taskPendingDelete !== null}
@@ -457,58 +498,10 @@ export function HomeScreen({ navigation }: Props) {
   );
 }
 
-function QuickAction({
-  icon,
-  label,
-  onPress,
-}: {
-  icon: React.ComponentProps<typeof Ionicons>["name"];
-  label: string;
-  onPress: () => void;
-}) {
-  const { colors, radius, spacing, typography, touchTarget } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={({ pressed }) => [
-        styles.quickAction,
-        {
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          borderRadius: radius.lg,
-          padding: spacing.lg,
-          minHeight: touchTarget.large + spacing.lg,
-          opacity: pressed ? 0.85 : 1,
-        },
-      ]}
-    >
-      <View
-        style={[
-          styles.quickActionIcon,
-          { backgroundColor: colors.primaryMuted, borderRadius: radius.md, marginBottom: spacing.sm },
-        ]}
-      >
-        <Ionicons name={icon} size={24} color={colors.primary} />
-      </View>
-      <Text style={[typography.captionStrong, { color: colors.text }]} numberOfLines={2}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  headerAction: { alignItems: "center", justifyContent: "center" },
   rowCentered: { flexDirection: "row", alignItems: "center" },
+  statRow: { flexDirection: "row" },
   reminderIcon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  moneyRow: { flexDirection: "row", gap: 16 },
-  // Two per row so each target stays large and the labels never truncate on a 320pt screen.
-  quickGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  quickAction: { flexGrow: 1, flexBasis: "47%", borderWidth: StyleSheet.hairlineWidth, justifyContent: "center" },
-  quickActionIcon: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   assistantFab: { position: "absolute", right: 20, bottom: 20, alignItems: "center", justifyContent: "center" },
 });

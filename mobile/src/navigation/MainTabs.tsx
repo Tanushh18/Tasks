@@ -3,8 +3,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import React from "react";
 import { useFeatureFlags } from "../features/FeatureFlagsContext";
 import { useTheme } from "../theme/useTheme";
-import { ChatNavigator } from "./ChatNavigator";
-import { ContactsNavigator } from "./ContactsNavigator";
+import { FamilyNavigator } from "./FamilyNavigator";
 import { FinanceNavigator } from "./FinanceNavigator";
 import { HomeNavigator } from "./HomeNavigator";
 import { MoreNavigator } from "./MoreNavigator";
@@ -17,8 +16,7 @@ const ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof Ionicons
   HomeTab: "home",
   TasksTab: "checkbox",
   FinanceTab: "wallet",
-  ContactsTab: "people",
-  ChatTab: "chatbubbles",
+  FamilyTab: "people",
   MoreTab: "ellipsis-horizontal-circle",
 };
 
@@ -26,14 +24,18 @@ const OUTLINE_ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof 
   HomeTab: "home-outline",
   TasksTab: "checkbox-outline",
   FinanceTab: "wallet-outline",
-  ContactsTab: "people-outline",
-  ChatTab: "chatbubbles-outline",
+  FamilyTab: "people-outline",
   MoreTab: "ellipsis-horizontal-circle-outline",
 };
 
 export function MainTabs() {
-  const { colors } = useTheme();
+  const { colors, spacing } = useTheme();
   const { flags } = useFeatureFlags();
+
+  // The Family tab is the way into contacts, chat and location — if an admin
+  // has turned all three off there's nothing behind it, so it disappears
+  // rather than opening an empty screen (spec §3).
+  const showFamilyTab = flags.contacts || flags.chat || flags.location;
 
   return (
     <Tab.Navigator
@@ -41,7 +43,14 @@ export function MainTabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textFaint,
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          height: 62,
+          paddingBottom: spacing.sm,
+          paddingTop: spacing.sm,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
         tabBarIcon: ({ color, size, focused }) => (
           <Ionicons
             name={focused ? ICONS[route.name as keyof MainTabParamList] : OUTLINE_ICONS[route.name as keyof MainTabParamList]}
@@ -53,11 +62,10 @@ export function MainTabs() {
     >
       <Tab.Screen name="HomeTab" component={HomeNavigator} options={{ title: "Home" }} />
       <Tab.Screen name="TasksTab" component={TasksNavigator} options={{ title: "Tasks" }} />
-      <Tab.Screen name="FinanceTab" component={FinanceNavigator} options={{ title: "Finance" }} />
-      {flags.contacts ? (
-        <Tab.Screen name="ContactsTab" component={ContactsNavigator} options={{ title: "Contacts" }} />
+      <Tab.Screen name="FinanceTab" component={FinanceNavigator} options={{ title: "Money" }} />
+      {showFamilyTab ? (
+        <Tab.Screen name="FamilyTab" component={FamilyNavigator} options={{ title: "Family" }} />
       ) : null}
-      {flags.chat ? <Tab.Screen name="ChatTab" component={ChatNavigator} options={{ title: "Chat" }} /> : null}
       <Tab.Screen name="MoreTab" component={MoreNavigator} options={{ title: "More" }} />
     </Tab.Navigator>
   );
