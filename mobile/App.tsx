@@ -1,5 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useRef } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as locationApi from "./src/api/location";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
@@ -38,13 +39,15 @@ function AppContent() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <FeatureFlagsProvider>
-          <AppContent />
-        </FeatureFlagsProvider>
-      </AuthProvider>
-      <StatusBar style="auto" />
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <FeatureFlagsProvider>
+            <AppContent />
+          </FeatureFlagsProvider>
+        </AuthProvider>
+        <StatusBar style="auto" />
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

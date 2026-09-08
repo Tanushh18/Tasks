@@ -6,15 +6,16 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "r
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiErrorMessage } from "../../api/client";
 import * as tasksApi from "../../api/tasks";
-import type { UserSearchResult } from "../../api/users";
+import { listFamilyMembers, type UserSearchResult } from "../../api/users";
 import { AssignSheet } from "../../components/AssignSheet";
 import { ConfirmationSheet } from "../../components/ConfirmationSheet";
+import { SegmentedControl } from "../../components/SegmentedControl";
 import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
-import { TaskListItem } from "../../components/TaskListItem";
+import { nextPriority, TaskListItem } from "../../components/TaskListItem";
 import type { TasksStackParamList } from "../../navigation/types";
 import { cancelTaskReminder } from "../../notifications/notificationService";
-import { enqueueTaskComplete, enqueueTaskDelete, isNetworkFailure } from "../../offline/offlineQueue";
+import { enqueueTaskComplete, enqueueTaskDelete, enqueueTaskUpdate, isNetworkFailure } from "../../offline/offlineQueue";
 import { loadCache, saveCache } from "../../offline/readCache";
 import { subscribeToReconnect } from "../../offline/useOfflineSync";
 import { useTheme } from "../../theme/useTheme";
@@ -73,6 +74,15 @@ export function TaskListScreen({ navigation }: Props) {
   const [taskPendingShare, setTaskPendingShare] = useState<Task | null>(null);
   const [sharing, setSharing] = useState(false);
   const [showingOfflineData, setShowingOfflineData] = useState(false);
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    // Best-effort: the roster is only used to turn assignedTo/sharedWith ids into names on
+    // badges, so a failure here just means those badges stay hidden, not a broken screen.
+    listFamilyMembers()
+      .then((members) => setUserNames(Object.fromEntries(members.map((m) => [m.id, m.name]))))
+      .catch(() => {});
+  }, []);
 
   // Debounce typing, and tag each request so a slow earlier response can never overwrite a newer
   // one when the user keeps typing (spec §91).
@@ -135,6 +145,23 @@ export function TaskListScreen({ navigation }: Props) {
       if (isNetworkFailure(err)) {
         if (nextCompleted) await cancelTaskReminder(task.reminder.localNotificationId);
         await enqueueTaskComplete(task.id, nextCompleted);
+        return;
+      }
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+      Alert.alert("We couldn't update that task", getApiErrorMessage(err));
+    }
+  }, []);
+
+  const handleChangePriority = useCallback(async (task: Task, direction: "up" | "down") => {
+    const priority = nextPriority(task.priority, direction);
+    if (priority === task.priority) return;
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, priority } : t)));
+    try {
+      const updated = await tasksApi.updateTask(task.id, { priority });
+      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    } catch (err) {
+      if (isNetworkFailure(err)) {
+        await enqueueTaskUpdate(task.id, { priority });
         return;
       }
       setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
@@ -254,35 +281,15 @@ export function TaskListScreen({ navigation }: Props) {
           ) : null}
         </View>
 
-        <View style={[styles.filterRow, { marginTop: spacing.md }]}>
-          {FILTERS.map(({ key, label }) => {
-            const active = key === filter;
-            return (
-              <Pressable
-                key={key}
-                onPress={() => {
-                  setLoading(true);
-                  setFilter(key);
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: active ? colors.primary : colors.surfaceAlt,
-                    borderRadius: radius.pill,
-                    paddingHorizontal: spacing.lg,
-                  },
-                ]}
-              >
-                <Text
-                  style={[typography.captionStrong, { color: active ? colors.onPrimary : colors.textMuted }]}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
+        <View style={{ marginTop: spacing.md }}>
+          <SegmentedControl
+            segments={FILTERS.map(({ key, label }) => ({ value: key, label }))}
+            value={filter}
+            onChange={(key) => {
+              setLoading(true);
+              setFilter(key);
+            }}
+          />
         </View>
       </View>
 
@@ -328,6 +335,8 @@ export function TaskListScreen({ navigation }: Props) {
               onPress={() => navigation.navigate("TaskForm", { taskId: item.id })}
               onDelete={() => setTaskPendingDelete(item)}
               onShare={() => setTaskPendingShare(item)}
+              onChangePriority={(direction) => handleChangePriority(item, direction)}
+              userNames={userNames}
             />
           )}
           ListEmptyComponent={
@@ -410,7 +419,5 @@ const styles = StyleSheet.create({
   headerAction: { alignItems: "center", justifyContent: "center" },
   searchBar: { flexDirection: "row", alignItems: "center", borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, fontSize: 16 },
-  filterRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  filterChip: { height: 40, alignItems: "center", justifyContent: "center" },
   fab: { position: "absolute", right: 20, bottom: 20, flexDirection: "row", alignItems: "center", justifyContent: "center" },
 });

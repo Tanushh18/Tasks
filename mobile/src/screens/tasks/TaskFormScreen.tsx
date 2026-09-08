@@ -1,18 +1,22 @@
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import * as tasksApi from "../../api/tasks";
 import { getApiErrorMessage } from "../../api/client";
+import { listTasks } from "../../api/tasks";
+import { listFamilyMembers, type UserSearchResult } from "../../api/users";
 import { Button } from "../../components/Button";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { LoadingState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
+import { UserPicker } from "../../components/UserPicker";
 import { cancelTaskReminder, ensureNotificationSetup, scheduleTaskReminder } from "../../notifications/notificationService";
 import { enqueueTaskCreate, enqueueTaskDelete, enqueueTaskUpdate, isNetworkFailure } from "../../offline/offlineQueue";
 import { useTheme } from "../../theme/useTheme";
 import { formatDateLabel, formatTimeLabel, toHm, toIsoDate, todayIso } from "../../utils/date";
-import type { Priority, RecurrenceType, Task } from "../../types/models";
+import type { ChecklistItem, Priority, RecurrenceType, Task } from "../../types/models";
 import type { TasksStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<TasksStackParamList, "TaskForm">;
@@ -52,12 +56,17 @@ export function TaskFormScreen({ navigation, route }: Props) {
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [recurrence, setRecurrence] = useState<RecurrenceType>("none");
   const [notes, setNotes] = useState("");
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [newChecklistText, setNewChecklistText] = useState("");
+  const [assignedTo, setAssignedTo] = useState<UserSearchResult | null>(null);
+  const [sharedWith, setSharedWith] = useState<UserSearchResult[]>([]);
+  const [recurrenceSuggestionDismissed, setRecurrenceSuggestionDismissed] = useState(false);
 
   useEffect(() => {
     if (!taskId) return;
     (async () => {
       try {
-        const task = await tasksApi.getTask(taskId);
+        const [task, members] = await Promise.all([tasksApi.getTask(taskId), listFamilyMembers().catch(() => [])]);
         setExistingTask(task);
         setTitle(task.title);
         setDescription(task.description);
@@ -68,6 +77,10 @@ export function TaskFormScreen({ navigation, route }: Props) {
         setReminderEnabled(task.reminder.enabled);
         setRecurrence(task.recurrence.type);
         setNotes(task.notes);
+        setChecklist(task.checklist ?? []);
+        const byId = new Map(members.map((m) => [m.id, m]));
+        setAssignedTo(task.assignedTo ? (byId.get(task.assignedTo) ?? null) : null);
+        setSharedWith((task.sharedWith ?? []).map((id) => byId.get(id)).filter(Boolean) as UserSearchResult[]);
       } catch (err) {
         setError(getApiErrorMessage(err, "Could not load this task."));
       } finally {
@@ -75,6 +88,52 @@ export function TaskFormScreen({ navigation, route }: Props) {
       }
     })();
   }, [taskId]);
+
+  // Simple client-side nudge: no new backend endpoint, just a heuristic on the title text and
+  // on how often the same title has been used before. Never auto-applies — only suggests.
+  const [priorTitleCount, setPriorTitleCount] = useState(0);
+  useEffect(() => {
+    const trimmed = title.trim();
+    if (!trimmed || isEditing) {
+      setPriorTitleCount(0);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      listTasks({ search: trimmed, status: "all" })
+        .then((found) => {
+          if (cancelled) return;
+          setPriorTitleCount(found.filter((t) => t.title.trim().toLowerCase() === trimmed.toLowerCase()).length);
+        })
+        .catch(() => {});
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [title, isEditing]);
+
+  const suggestsRecurrence = useMemo(() => {
+    if (recurrence !== "none" || recurrenceSuggestionDismissed) return false;
+    const lower = title.toLowerCase();
+    const mentionsRecurrence = /\b(weekly|every week|every day|daily|every month|monthly|every)\b/.test(lower);
+    return mentionsRecurrence || priorTitleCount >= 3;
+  }, [title, recurrence, recurrenceSuggestionDismissed, priorTitleCount]);
+
+  function addChecklistItem() {
+    const text = newChecklistText.trim();
+    if (!text) return;
+    setChecklist((prev) => [...prev, { text, done: false }]);
+    setNewChecklistText("");
+  }
+
+  function toggleChecklistItem(index: number) {
+    setChecklist((prev) => prev.map((item, i) => (i === index ? { ...item, done: !item.done } : item)));
+  }
+
+  function removeChecklistItem(index: number) {
+    setChecklist((prev) => prev.filter((_, i) => i !== index));
+  }
 
   async function handleReminderToggle(next: boolean) {
     if (next) {
@@ -108,6 +167,9 @@ export function TaskFormScreen({ navigation, route }: Props) {
       reminder: { enabled: reminderEnabled },
       recurrence: { type: recurrence },
       notes,
+      checklist,
+      assignedTo: assignedTo?.id ?? null,
+      sharedWith: sharedWith.map((u) => u.id),
     };
 
     try {
@@ -171,6 +233,41 @@ export function TaskFormScreen({ navigation, route }: Props) {
       </Text>
 
       <TextField label="Title" value={title} onChangeText={setTitle} placeholder="e.g. Pay electricity bill" />
+
+      {suggestsRecurrence ? (
+        <View
+          style={[
+            styles.suggestionCard,
+            { backgroundColor: colors.primaryMuted, borderRadius: radius.md, marginBottom: spacing.lg, padding: spacing.md },
+          ]}
+        >
+          <Ionicons name="repeat" size={18} color={colors.primary} style={{ marginRight: spacing.sm }} />
+          <View style={{ flex: 1 }}>
+            <Text style={[typography.captionStrong, { color: colors.primary }]}>
+              This looks like a recurring task. Make it repeat weekly?
+            </Text>
+            <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.sm }}>
+              <Pressable
+                onPress={() => {
+                  setRecurrence("weekly");
+                  setRecurrenceSuggestionDismissed(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Make this task repeat weekly"
+              >
+                <Text style={[typography.captionStrong, { color: colors.primary, textDecorationLine: "underline" }]}>Yes</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setRecurrenceSuggestionDismissed(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss recurring task suggestion"
+              >
+                <Text style={[typography.caption, { color: colors.textMuted }]}>Dismiss</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
       <TextField
         label="Description"
         value={description}
@@ -265,6 +362,84 @@ export function TaskFormScreen({ navigation, route }: Props) {
         <Switch value={reminderEnabled} onValueChange={handleReminderToggle} />
       </View>
 
+      <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>Checklist</Text>
+      <View style={{ marginBottom: spacing.lg }}>
+        {checklist.map((item, index) => (
+          <View key={index} style={[styles.checklistRow, { marginBottom: spacing.sm }]}>
+            <Pressable
+              onPress={() => toggleChecklistItem(index)}
+              accessibilityRole="button"
+              accessibilityLabel={item.done ? `Mark "${item.text}" not done` : `Mark "${item.text}" done`}
+              hitSlop={8}
+            >
+              <Ionicons
+                name={item.done ? "checkbox" : "square-outline"}
+                size={22}
+                color={item.done ? colors.primary : colors.textFaint}
+              />
+            </Pressable>
+            <Text
+              style={[
+                typography.body,
+                {
+                  flex: 1,
+                  marginLeft: spacing.sm,
+                  color: item.done ? colors.textFaint : colors.text,
+                  textDecorationLine: item.done ? "line-through" : "none",
+                },
+              ]}
+            >
+              {item.text}
+            </Text>
+            <Pressable
+              onPress={() => removeChecklistItem(index)}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove "${item.text}" from checklist`}
+              hitSlop={8}
+            >
+              <Ionicons name="close-circle-outline" size={20} color={colors.textFaint} />
+            </Pressable>
+          </View>
+        ))}
+        <View style={[styles.checklistRow, { gap: spacing.sm }]}>
+          <View style={{ flex: 1 }}>
+            <TextField
+              label=""
+              value={newChecklistText}
+              onChangeText={setNewChecklistText}
+              placeholder="Add a checklist item"
+            />
+          </View>
+          <Pressable
+            onPress={addChecklistItem}
+            accessibilityRole="button"
+            accessibilityLabel="Add checklist item"
+            style={[
+              styles.addChecklistButton,
+              { backgroundColor: colors.primary, borderRadius: radius.md, marginBottom: spacing.lg },
+            ]}
+          >
+            <Ionicons name="add" size={20} color={colors.onPrimary} />
+          </Pressable>
+        </View>
+      </View>
+
+      <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>Assign to</Text>
+      <View style={{ marginBottom: spacing.lg }}>
+        <UserPicker mode="single" value={assignedTo} onChange={setAssignedTo} placeholder="Who is this task for?" />
+      </View>
+
+      <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>Share with</Text>
+      <View style={{ marginBottom: spacing.lg }}>
+        <UserPicker
+          mode="multi"
+          value={sharedWith}
+          onChange={setSharedWith}
+          placeholder="Let others see this task"
+          excludeIds={assignedTo ? [assignedTo.id] : undefined}
+        />
+      </View>
+
       <TextField label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional notes" multiline />
 
       {error ? <Text style={[typography.caption, { color: colors.danger, marginBottom: spacing.md }]}>{error}</Text> : null}
@@ -282,4 +457,7 @@ const styles = StyleSheet.create({
   pickerChip: { flex: 1, borderWidth: 1, padding: 12 },
   chip: { paddingHorizontal: 16, height: 36, alignItems: "center", justifyContent: "center" },
   row: { flexDirection: "row", alignItems: "center" },
+  suggestionCard: { flexDirection: "row", alignItems: "flex-start" },
+  checklistRow: { flexDirection: "row", alignItems: "center" },
+  addChecklistButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
 });
