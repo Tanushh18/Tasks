@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { CompositeScreenProps } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as searchApi from "../../api/search";
@@ -11,6 +11,7 @@ import { ScreenContainer } from "../../components/ScreenContainer";
 import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import type { HomeStackParamList, MainTabParamList } from "../../navigation/types";
+import { getJson, setJson } from "../../offline/storage";
 import { useTheme } from "../../theme/useTheme";
 import { formatCurrency } from "../../utils/currency";
 import { formatDateLabel, formatTimeLabel } from "../../utils/date";
@@ -21,6 +22,8 @@ type Props = CompositeScreenProps<
 >;
 
 const DEBOUNCE_MS = 300;
+const RECENT_SEARCHES_KEY = "search.recentQueries";
+const MAX_RECENT_SEARCHES = 8;
 
 export function SearchScreen({ navigation }: Props) {
   const { colors, spacing, radius, typography, touchTarget } = useTheme();
@@ -29,6 +32,25 @@ export function SearchScreen({ navigation }: Props) {
   const [results, setResults] = useState<searchApi.SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getJson<string[]>(RECENT_SEARCHES_KEY).then((stored) => {
+      if (!cancelled && stored) setRecentSearches(stored);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const recordSearch = useCallback((term: string) => {
+    setRecentSearches((prev) => {
+      const next = [term, ...prev.filter((entry) => entry !== term)].slice(0, MAX_RECENT_SEARCHES);
+      void setJson(RECENT_SEARCHES_KEY, next);
+      return next;
+    });
+  }, []);
 
   /**
    * Debouncing alone does not prevent out-of-order results: two requests can still be in flight
@@ -55,6 +77,7 @@ export function SearchScreen({ navigation }: Props) {
         if (seq !== requestSeq.current) return;
         setResults(res);
         setError(null);
+        recordSearch(trimmed);
       } catch (err) {
         if (seq !== requestSeq.current) return;
         setError(getApiErrorMessage(err, "We couldn't search just now."));
@@ -119,10 +142,56 @@ export function SearchScreen({ navigation }: Props) {
       ) : error ? (
         <ErrorState message={error} onRetry={() => setQuery((current) => `${current} `.trim())} />
       ) : !query.trim() ? (
-        <EmptyState
-          title="Search everything"
-          subtitle="Find a task, a money entry or an account by name."
-        />
+        recentSearches.length > 0 ? (
+          <View>
+            <View style={[styles.recentHeaderRow, { marginBottom: spacing.sm }]}>
+              <Text accessibilityRole="header" style={[typography.captionStrong, { color: colors.textMuted }]}>
+                RECENT SEARCHES
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setRecentSearches([]);
+                  void setJson(RECENT_SEARCHES_KEY, []);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear recent searches"
+                hitSlop={8}
+              >
+                <Text style={[typography.caption, { color: colors.primary }]}>Clear</Text>
+              </Pressable>
+            </View>
+            {recentSearches.map((term) => (
+              <Pressable
+                key={term}
+                onPress={() => setQuery(term)}
+                accessibilityRole="button"
+                accessibilityLabel={`Search again for ${term}`}
+                style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+              >
+                <Card style={{ marginBottom: spacing.sm, minHeight: touchTarget.large }}>
+                  <View style={styles.resultRow}>
+                    <View
+                      style={[
+                        styles.resultIcon,
+                        { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, marginRight: spacing.md },
+                      ]}
+                    >
+                      <Ionicons name="time-outline" size={18} color={colors.textMuted} />
+                    </View>
+                    <Text style={[typography.body, { color: colors.text }]} numberOfLines={1}>
+                      {term}
+                    </Text>
+                  </View>
+                </Card>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <EmptyState
+            title="Search everything"
+            subtitle="Find a task, a money entry or an account by name."
+          />
+        )
       ) : totalResults === 0 ? (
         <EmptyState
           title="Nothing matched that"
@@ -277,4 +346,5 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 16 },
   resultRow: { flexDirection: "row", alignItems: "center" },
   resultIcon: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  recentHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
 });
