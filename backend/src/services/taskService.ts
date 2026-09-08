@@ -5,14 +5,29 @@ import { User } from "../models/User";
 import { ApiError } from "../utils/ApiError";
 import { toZonedDateTime } from "../utils/dateTime";
 
+export type TaskPriority = "low" | "normal" | "important" | "urgent";
+
+/** Explicit ordering — the stored value is a string, so sorting on the field
+ * itself would order alphabetically ("important" before "low") rather than by
+ * how much the task matters. */
+const PRIORITY_RANK: Record<TaskPriority, number> = {
+  urgent: 3,
+  important: 2,
+  normal: 1,
+  low: 0,
+};
+
 interface TaskInput {
   title: string;
   description?: string;
   date: string;
   time: string;
   timezone?: string;
-  priority?: "low" | "medium" | "high";
+  priority?: TaskPriority;
   category?: string;
+  checklist?: { text: string; done?: boolean }[];
+  assignedTo?: string | null;
+  sharedWith?: string[];
   reminder?: { enabled?: boolean; alarmEnabled?: boolean };
   recurrence?: {
     type?: "none" | "daily" | "weekly" | "monthly" | "custom";
@@ -49,8 +64,11 @@ export async function createTask(userId: string, input: TaskInput): Promise<Task
     date: input.date,
     time: input.time,
     timezone: input.timezone ?? "Asia/Kolkata",
-    priority: input.priority ?? "medium",
+    priority: input.priority ?? "normal",
     category: input.category ?? "General",
+    checklist: input.checklist ?? [],
+    assignedTo: input.assignedTo ?? null,
+    sharedWith: input.sharedWith ?? [],
     reminder: buildReminder(input),
     recurrence: input.recurrence ?? { type: "none" },
     notes: input.notes ?? "",
@@ -75,6 +93,18 @@ export async function updateTask(
   if (input.priority !== undefined) task.priority = input.priority;
   if (input.category !== undefined) task.category = input.category;
   if (input.notes !== undefined) task.notes = input.notes;
+  if (input.checklist !== undefined) {
+    task.checklist = input.checklist.map((item) => ({
+      text: item.text,
+      done: item.done ?? false,
+    })) as unknown as TaskDocument["checklist"];
+  }
+  if (input.assignedTo !== undefined) {
+    task.assignedTo = input.assignedTo as unknown as TaskDocument["assignedTo"];
+  }
+  if (input.sharedWith !== undefined) {
+    task.sharedWith = input.sharedWith as unknown as TaskDocument["sharedWith"];
+  }
   if (input.recurrence !== undefined) {
     const current = task.recurrence;
     task.recurrence = {
@@ -172,14 +202,23 @@ export async function listTasks(userId: string, filters: ListFilters): Promise<T
     ];
   }
 
-  const sortMap: Record<ListFilters["sort"], Record<string, 1 | -1>> = {
+  const sortMap: Record<Exclude<ListFilters["sort"], "priority">, Record<string, 1 | -1>> = {
     date_asc: { date: 1, time: 1 },
     date_desc: { date: -1, time: -1 },
-    priority: { priority: -1, date: 1 },
     created_desc: { createdAt: -1 },
   };
 
-  let tasks = await Task.find(query).sort(sortMap[filters.sort]);
+  // Priority is sorted in memory against an explicit rank: a Mongo sort on the
+  // field would order the stored strings alphabetically, which has nothing to
+  // do with how much a task matters. Task lists here are family-sized, so the
+  // in-memory pass costs nothing worth optimising away.
+  let tasks =
+    filters.sort === "priority"
+      ? (await Task.find(query).sort({ date: 1, time: 1 })).sort(
+          (a, b) =>
+            (PRIORITY_RANK[b.priority as TaskPriority] ?? 0) - (PRIORITY_RANK[a.priority as TaskPriority] ?? 0)
+        )
+      : await Task.find(query).sort(sortMap[filters.sort]);
 
   if (filters.status === "overdue") {
     tasks = tasks.filter((task) => isOverdue(task));

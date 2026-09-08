@@ -17,7 +17,7 @@ import type { TasksStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<TasksStackParamList, "TaskForm">;
 
-const PRIORITIES: Priority[] = ["low", "medium", "high"];
+const PRIORITIES: Priority[] = ["low", "normal", "important", "urgent"];
 const RECURRENCES: { key: RecurrenceType; label: string }[] = [
   { key: "none", label: "One-time" },
   { key: "daily", label: "Daily" },
@@ -47,7 +47,7 @@ export function TaskFormScreen({ navigation, route }: Props) {
   const [time, setTime] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [priority, setPriority] = useState<Priority>("medium");
+  const [priority, setPriority] = useState<Priority>("normal");
   const [category, setCategory] = useState("General");
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [recurrence, setRecurrence] = useState<RecurrenceType>("none");

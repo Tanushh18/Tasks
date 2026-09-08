@@ -13,7 +13,12 @@ export interface User {
   createdAt: string;
 }
 
-export type Priority = "low" | "medium" | "high";
+export type Priority = "low" | "normal" | "important" | "urgent";
+
+export interface ChecklistItem {
+  text: string;
+  done: boolean;
+}
 export type RecurrenceType = "none" | "daily" | "weekly" | "monthly" | "custom";
 
 export interface Reminder {
@@ -44,8 +49,12 @@ export interface Task {
   reminder: Reminder;
   recurrence: Recurrence;
   notes: string;
+  checklist: ChecklistItem[];
   overdue: boolean;
   assignedBy?: { id: string; name: string } | null;
+  /** Who the task is *for* — `userId` remains whose list it lives in. */
+  assignedTo?: string | null;
+  sharedWith?: string[];
   createdAt: string;
   updatedAt: string;
 }

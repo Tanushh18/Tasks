@@ -29,6 +29,13 @@ export async function connectDatabase(): Promise<void> {
 
   await mongoose.connect(uri);
   logger.info(`Connected to MongoDB (${memoryServer ? "in-memory dev instance" : "configured URI"})`);
+
+  // Idempotent, and cheap once there's nothing left to convert.
+  const { migrateTaskPriorities } = await import("../models/Task");
+  const migrated = await migrateTaskPriorities();
+  if (migrated > 0) {
+    logger.info(`Migrated ${migrated} task(s) to the four-level priority scale`);
+  }
 }
 
 export async function disconnectDatabase(): Promise<void> {

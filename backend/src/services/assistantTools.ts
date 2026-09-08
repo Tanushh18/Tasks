@@ -1,5 +1,6 @@
 import * as financeService from "./financeService";
 import * as taskService from "./taskService";
+import type { TaskPriority } from "./taskService";
 import { ApiError } from "../utils/ApiError";
 import type { ToolDeclaration } from "./geminiService";
 
@@ -20,7 +21,7 @@ export const assistantTools: ToolDeclaration[] = [
         description: { type: "string" },
         date: dateProp,
         time: timeProp,
-        priority: { type: "string", enum: ["low", "medium", "high"] },
+        priority: { type: "string", enum: ["low", "normal", "important", "urgent"] },
         category: { type: "string" },
         reminderEnabled: { type: "boolean", description: "Whether to notify the user at date/time" },
         recurrenceType: { type: "string", enum: ["none", "daily", "weekly", "monthly"] },
@@ -40,7 +41,7 @@ export const assistantTools: ToolDeclaration[] = [
         description: { type: "string" },
         date: dateProp,
         time: timeProp,
-        priority: { type: "string", enum: ["low", "medium", "high"] },
+        priority: { type: "string", enum: ["low", "normal", "important", "urgent"] },
         category: { type: "string" },
         reminderEnabled: { type: "boolean" },
         recurrenceType: { type: "string", enum: ["none", "daily", "weekly", "monthly"] },
@@ -214,7 +215,7 @@ export async function executeAssistantTool(
         description: str(args, "description"),
         date: str(args, "date", true)!,
         time: str(args, "time", true)!,
-        priority: str(args, "priority") as "low" | "medium" | "high" | undefined,
+        priority: str(args, "priority") as TaskPriority | undefined,
         category: str(args, "category"),
         reminder: { enabled: bool(args, "reminderEnabled") ?? false },
         recurrence: { type: str(args, "recurrenceType") as never },
@@ -229,7 +230,7 @@ export async function executeAssistantTool(
         description: str(args, "description"),
         date: str(args, "date"),
         time: str(args, "time"),
-        priority: str(args, "priority") as "low" | "medium" | "high" | undefined,
+        priority: str(args, "priority") as TaskPriority | undefined,
         category: str(args, "category"),
         reminder: bool(args, "reminderEnabled") !== undefined ? { enabled: bool(args, "reminderEnabled") } : undefined,
         recurrence: str(args, "recurrenceType") ? { type: str(args, "recurrenceType") as never } : undefined,

@@ -20,18 +20,35 @@ const reminderInput = z
   })
   .optional();
 
+const objectId = (message: string) => z.string().regex(/^[0-9a-fA-F]{24}$/, message);
+
+const priorityEnum = z.enum(["low", "normal", "important", "urgent"]);
+
+const checklistInput = z
+  .array(
+    z.object({
+      text: z.string().trim().min(1).max(200),
+      done: z.boolean().optional().default(false),
+    })
+  )
+  .max(50, "That's a lot of checklist items")
+  .optional();
+
 export const createTaskSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(200),
   description: z.string().max(2000).optional().default(""),
   date: dateStr,
   time: timeStr,
   timezone: z.string().optional().default("Asia/Kolkata"),
-  priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
+  priority: priorityEnum.optional().default("normal"),
   category: z.string().trim().max(60).optional().default("General"),
+  checklist: checklistInput,
   reminder: reminderInput,
   recurrence: recurrenceInput,
   notes: z.string().max(2000).optional().default(""),
   idempotencyKey: z.string().min(1).max(100).optional(),
+  assignedTo: objectId("Invalid user id").nullable().optional(),
+  sharedWith: z.array(objectId("Invalid user id")).max(20).optional(),
 });
 
 export const updateTaskSchema = createTaskSchema.partial();
@@ -42,7 +59,7 @@ export const listTasksQuerySchema = z.object({
   from: dateStr.optional(),
   to: dateStr.optional(),
   category: z.string().optional(),
-  priority: z.enum(["low", "medium", "high"]).optional(),
+  priority: priorityEnum.optional(),
   search: z.string().optional(),
   sort: z.enum(["date_asc", "date_desc", "priority", "created_desc"]).optional().default("date_asc"),
 });

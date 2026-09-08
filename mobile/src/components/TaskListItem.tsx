@@ -15,9 +15,12 @@ interface Props {
   onShare?: () => void;
 }
 
+/** "normal" gets no badge at all — most tasks are normal, and badging every
+ * one of them turns the list into noise rather than signal. */
 const priorityTone: Record<Task["priority"], "danger" | "warning" | "neutral"> = {
-  high: "danger",
-  medium: "warning",
+  urgent: "danger",
+  important: "warning",
+  normal: "neutral",
   low: "neutral",
 };
 
