@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { Task, TaskCounts } from "../types/models";
+import type { ChecklistItem, Task, TaskCounts } from "../types/models";
 
 export interface TaskInput {
   title: string;
@@ -9,6 +9,10 @@ export interface TaskInput {
   timezone?: string;
   priority?: Task["priority"];
   category?: string;
+  checklist?: ChecklistItem[];
+  /** Who the task is for — pass null to clear. */
+  assignedTo?: string | null;
+  sharedWith?: string[];
   reminder?: { enabled: boolean; alarmEnabled?: boolean };
   recurrence?: Partial<Task["recurrence"]>;
   notes?: string;
