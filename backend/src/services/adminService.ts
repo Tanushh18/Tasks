@@ -11,6 +11,7 @@ interface FeatureFlagsPatch {
   location?: boolean;
   assistant?: boolean;
   notes?: boolean;
+  groupExpenses?: boolean;
 }
 
 export async function getFeatureFlags(): Promise<FeatureFlagsDocument> {

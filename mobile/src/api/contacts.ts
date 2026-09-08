@@ -31,3 +31,19 @@ export async function updateContact(id: string, input: Partial<ContactInput>): P
 export async function deleteContact(id: string): Promise<void> {
   await apiClient.delete(`/contacts/${id}`);
 }
+
+export interface BulkContactInput {
+  name: string;
+  number: string;
+  description?: string;
+}
+
+export interface BulkImportResult {
+  imported: Contact[];
+  skipped: { name: string; number: string; reason: "duplicate" }[];
+}
+
+export async function bulkCreateContacts(contacts: BulkContactInput[]): Promise<BulkImportResult> {
+  const { data } = await apiClient.post<BulkImportResult>("/contacts/bulk", { contacts });
+  return data;
+}

@@ -9,6 +9,7 @@ const featureFlagsSchema = new Schema(
     location: { type: Boolean, default: true },
     assistant: { type: Boolean, default: true },
     notes: { type: Boolean, default: true },
+    groupExpenses: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

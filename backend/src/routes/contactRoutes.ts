@@ -3,7 +3,12 @@ import * as contactController from "../controllers/contactController";
 import { requireAuth } from "../middleware/auth";
 import { requireFeature } from "../middleware/requireFeature";
 import { validateRequest } from "../middleware/validateRequest";
-import { createContactSchema, idParamSchema, updateContactSchema } from "../validators/contactValidators";
+import {
+  bulkCreateContactsSchema,
+  createContactSchema,
+  idParamSchema,
+  updateContactSchema,
+} from "../validators/contactValidators";
 
 const router = Router();
 
@@ -11,6 +16,11 @@ router.use(requireAuth, requireFeature("contacts"));
 
 router.get("/", contactController.listContacts);
 router.post("/", validateRequest({ body: createContactSchema }), contactController.createContact);
+router.post(
+  "/bulk",
+  validateRequest({ body: bulkCreateContactsSchema }),
+  contactController.bulkCreateContacts
+);
 router.get("/:id", validateRequest({ params: idParamSchema }), contactController.getContact);
 router.put(
   "/:id",

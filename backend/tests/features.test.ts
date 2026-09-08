@@ -19,6 +19,7 @@ describe("feature flags", () => {
       location: true,
       assistant: true,
       notes: true,
+      groupExpenses: true,
     });
   });
 

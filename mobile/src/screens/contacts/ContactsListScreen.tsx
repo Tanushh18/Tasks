@@ -99,9 +99,23 @@ export function ContactsListScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["top", "left", "right"]}>
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
-        <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
-          Contacts
-        </Text>
+        <View style={styles.rowBetween}>
+          <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
+            Contacts
+          </Text>
+          <Pressable
+            onPress={() => navigation.navigate("ContactImport")}
+            accessibilityRole="button"
+            accessibilityLabel="Import contacts from your phone"
+            style={({ pressed }) => [
+              styles.importButton,
+              { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, opacity: pressed ? 0.85 : 1 },
+            ]}
+          >
+            <Ionicons name="download-outline" size={16} color={colors.primary} />
+            <Text style={[typography.captionStrong, { color: colors.primary, marginLeft: 4 }]}>Import</Text>
+          </Pressable>
+        </View>
 
         <View
           style={[
@@ -262,4 +276,5 @@ const styles = StyleSheet.create({
   card: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   fab: { position: "absolute", right: 20, bottom: 20, flexDirection: "row", alignItems: "center", justifyContent: "center" },
+  importButton: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6 },
 });

@@ -22,6 +22,11 @@ export type FinanceStackParamList = {
   AccountForm: { accountId?: string } | undefined;
   TransactionForm: { accountId?: string; transactionId?: string; type?: "IN" | "OUT" } | undefined;
   Insights: undefined;
+  GroupsList: undefined;
+  GroupForm: { groupId?: string } | undefined;
+  GroupDetail: { groupId: string; name: string };
+  GroupExpenseForm: { groupId: string; expenseId?: string };
+  GroupSettleForm: { groupId: string; fromUserId?: string; toUserId?: string; amount?: number };
 };
 
 export type SettingsStackParamList = {
@@ -33,6 +38,7 @@ export type SettingsStackParamList = {
 export type ContactsStackParamList = {
   ContactsList: undefined;
   ContactForm: { contactId?: string } | undefined;
+  ContactImport: undefined;
 };
 
 export type ChatStackParamList = {

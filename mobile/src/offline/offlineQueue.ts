@@ -85,6 +85,33 @@ async function getQueue(): Promise<QueuedItem[]> {
 
 async function saveQueue(queue: QueuedItem[]): Promise<void> {
   await setJson(requireScopedKey(QUEUE_KEY_BASE), queue);
+  notifyQueueChanged();
+}
+
+// --- Observable queue state -------------------------------------------------
+//
+// The sync indicator has to show what is actually true right now — how many
+// changes are waiting, and whether a flush is running. Every mutation funnels
+// through `saveQueue`, so that plus a flag around `flushQueue` is the whole
+// truth; nothing has to poll.
+
+const queueSubscribers = new Set<() => void>();
+let syncing = false;
+
+function notifyQueueChanged(): void {
+  queueSubscribers.forEach((cb) => cb());
+}
+
+/** Fires whenever the queue is written to, or a flush starts or finishes. */
+export function subscribeToQueueChanges(cb: () => void): () => void {
+  queueSubscribers.add(cb);
+  return () => {
+    queueSubscribers.delete(cb);
+  };
+}
+
+export function isSyncing(): boolean {
+  return syncing;
 }
 
 /**
@@ -234,26 +261,34 @@ export async function flushQueue(): Promise<{ synced: number; failed: number; st
   const queue = await getQueue();
   if (queue.length === 0) return { synced: 0, failed: 0, stillOffline: false };
 
+  syncing = true;
+  notifyQueueChanged();
+
   let synced = 0;
   let failed = 0;
   const remaining: QueuedItem[] = [];
 
-  for (let i = 0; i < queue.length; i++) {
-    const item = queue[i];
-    try {
-      await syncItem(item);
-      synced++;
-    } catch (err) {
-      if (isNetworkFailure(err)) {
-        // Still offline (or the server is unreachable) — keep this and every later item for next time.
-        remaining.push(item, ...queue.slice(i + 1));
-        await saveQueue(remaining);
-        return { synced, failed, stillOffline: true };
+  try {
+    for (let i = 0; i < queue.length; i++) {
+      const item = queue[i];
+      try {
+        await syncItem(item);
+        synced++;
+      } catch (err) {
+        if (isNetworkFailure(err)) {
+          // Still offline (or the server is unreachable) — keep this and every later item for next time.
+          remaining.push(item, ...queue.slice(i + 1));
+          await saveQueue(remaining);
+          return { synced, failed, stillOffline: true };
+        }
+        failed++;
       }
-      failed++;
     }
-  }
 
-  await saveQueue(remaining);
-  return { synced, failed, stillOffline: false };
+    await saveQueue(remaining);
+    return { synced, failed, stillOffline: false };
+  } finally {
+    syncing = false;
+    notifyQueueChanged();
+  }
 }

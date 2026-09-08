@@ -33,6 +33,14 @@ export const createContact = asyncHandler(async (req: Request, res: Response) =>
   res.status(201).json({ contact: serializeContact(contact) });
 });
 
+export const bulkCreateContacts = asyncHandler(async (req: Request, res: Response) => {
+  const result = await contactService.bulkCreateContacts(req.userId!, req.body.contacts);
+  res.status(201).json({
+    imported: result.imported.map(serializeContact),
+    skipped: result.skipped,
+  });
+});
+
 export const getContact = asyncHandler(async (req: Request, res: Response) => {
   const contact = await contactService.getContact(req.userId!, req.params.id);
   res.json({ contact: serializeContact(contact) });

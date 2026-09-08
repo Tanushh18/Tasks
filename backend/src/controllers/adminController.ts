@@ -40,7 +40,15 @@ export const resetMpin = asyncHandler(async (req: Request, res: Response) => {
   res.json({ mpin, user: serializeUser(user) });
 });
 
-function serializeFlags(flags: { contacts: boolean; chat: boolean; ocr: boolean; location: boolean; assistant: boolean; notes: boolean }) {
+function serializeFlags(flags: {
+  contacts: boolean;
+  chat: boolean;
+  ocr: boolean;
+  location: boolean;
+  assistant: boolean;
+  notes: boolean;
+  groupExpenses: boolean;
+}) {
   return {
     contacts: flags.contacts,
     chat: flags.chat,
@@ -48,6 +56,7 @@ function serializeFlags(flags: { contacts: boolean; chat: boolean; ocr: boolean;
     location: flags.location,
     assistant: flags.assistant,
     notes: flags.notes,
+    groupExpenses: flags.groupExpenses,
   };
 }
 

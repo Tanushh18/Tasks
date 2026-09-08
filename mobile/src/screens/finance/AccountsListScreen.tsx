@@ -85,24 +85,44 @@ export function AccountsListScreen({ navigation }: Props) {
           <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
             Money
           </Text>
-          <Pressable
-            onPress={() => navigation.navigate("Insights")}
-            accessibilityRole="button"
-            accessibilityLabel="See where your money went"
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.headerAction,
-              {
-                minWidth: touchTarget.min,
-                minHeight: touchTarget.min,
-                borderRadius: radius.pill,
-                backgroundColor: colors.surfaceAlt,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Ionicons name="stats-chart" size={22} color={colors.text} />
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <Pressable
+              onPress={() => navigation.navigate("GroupsList")}
+              accessibilityRole="button"
+              accessibilityLabel="Group expenses — split trip or shared spending"
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.headerAction,
+                {
+                  minWidth: touchTarget.min,
+                  minHeight: touchTarget.min,
+                  borderRadius: radius.pill,
+                  backgroundColor: colors.surfaceAlt,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Ionicons name="people" size={22} color={colors.text} />
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate("Insights")}
+              accessibilityRole="button"
+              accessibilityLabel="See where your money went"
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.headerAction,
+                {
+                  minWidth: touchTarget.min,
+                  minHeight: touchTarget.min,
+                  borderRadius: radius.pill,
+                  backgroundColor: colors.surfaceAlt,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <Ionicons name="stats-chart" size={22} color={colors.text} />
+            </Pressable>
+          </View>
         </View>
 
         {/* Overview. A real balance of zero matters, so nothing is shown until totals arrive. */}

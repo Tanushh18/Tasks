@@ -10,6 +10,7 @@ const ALL_ON: FeatureFlags = {
   location: true,
   assistant: true,
   notes: true,
+  groupExpenses: true,
 };
 
 interface FeatureFlagsContextValue {

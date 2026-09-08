@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme/useTheme";
@@ -49,15 +50,34 @@ export function EmptyState({
   subtitle,
   actionLabel,
   onAction,
+  icon,
+  tone,
+  toneMuted,
 }: {
   title: string;
   subtitle?: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** Friendly visual anchor — a soft tinted circle beats a bare wall of text. */
+  icon?: React.ComponentProps<typeof Ionicons>["name"];
+  /** Usually the owning module's feature colour. */
+  tone?: string;
+  toneMuted?: string;
 }) {
   const { colors, spacing, typography } = useTheme();
   return (
     <View style={styles.center}>
+      {icon ? (
+        <View
+          style={[
+            styles.emptyIcon,
+            { backgroundColor: toneMuted ?? colors.surfaceAlt, marginBottom: spacing.lg },
+          ]}
+          accessibilityElementsHidden
+        >
+          <Ionicons name={icon} size={32} color={tone ?? colors.textFaint} />
+        </View>
+      ) : null}
       <Text style={[typography.h3, { color: colors.text, textAlign: "center" }]}>{title}</Text>
       {subtitle ? (
         <Text
@@ -80,4 +100,5 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
     paddingHorizontal: 16,
   },
+  emptyIcon: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center" },
 });

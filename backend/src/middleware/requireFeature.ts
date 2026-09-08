@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { getFlags } from "../models/FeatureFlags";
 import { ApiError } from "../utils/ApiError";
 
-type FeatureName = "contacts" | "chat" | "ocr" | "location" | "assistant" | "notes";
+type FeatureName = "contacts" | "chat" | "ocr" | "location" | "assistant" | "notes" | "groupExpenses";
 
 export function requireFeature(name: FeatureName) {
   return (_req: Request, _res: Response, next: NextFunction): void => {

@@ -19,6 +19,7 @@ router.get(
         location: flags.location,
         assistant: flags.assistant,
         notes: flags.notes,
+        groupExpenses: flags.groupExpenses,
       },
     });
   })

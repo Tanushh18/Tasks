@@ -7,6 +7,7 @@ export interface FeatureFlags {
   location: boolean;
   assistant: boolean;
   notes: boolean;
+  groupExpenses: boolean;
 }
 
 export async function getFeatures(): Promise<FeatureFlags> {
