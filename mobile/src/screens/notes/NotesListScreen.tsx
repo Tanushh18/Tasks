@@ -95,6 +95,20 @@ export function NotesListScreen({ navigation }: Props) {
     return { pinned, rest };
   }, [notes, debouncedSearch]);
 
+  const toggleChecklistItem = useCallback(async (note: Note, itemIndex: number) => {
+    const nextItems = note.items.map((item, idx) =>
+      idx === itemIndex ? { ...item, done: !item.done } : item
+    );
+    // Optimistic update so tapping a checkbox in the list feels instant.
+    setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, items: nextItems } : n)));
+    try {
+      await notesApi.updateNote(note.id, { items: nextItems });
+    } catch (err) {
+      setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, items: note.items } : n)));
+      setError(getApiErrorMessage(err, "We couldn't update that checklist item."));
+    }
+  }, []);
+
   const confirmDelete = useCallback(async () => {
     const note = notePendingDelete;
     if (!note) return;
@@ -122,43 +136,91 @@ export function NotesListScreen({ navigation }: Props) {
     const isOwner = item.ownerId.id === user?.id;
     const doneCount = item.items.filter((i) => i.done).length;
     const tint = COLOR_TINTS[item.color];
+    const isPinned = item.pinned;
+    const previewItems = item.type === "checklist" ? item.items.slice(0, 3) : [];
     return (
-      <Pressable
+      <Card
         key={item.id}
-        onPress={() => navigation.navigate("NoteForm", { noteId: item.id })}
-        style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+        style={[styles.card, tint ? { backgroundColor: tint, borderColor: "transparent" } : null]}
       >
-        <Card style={[styles.card, tint ? { backgroundColor: tint, borderColor: "transparent" } : null]}>
-          <View style={styles.flex}>
-            <View style={styles.rowBetween}>
-              <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
+        <Pressable
+          onPress={() => navigation.navigate("NoteForm", { noteId: item.id })}
+          style={({ pressed }) => [styles.flex, { opacity: pressed ? 0.85 : 1 }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Open note ${item.title || "Untitled"}`}
+        >
+          <View style={styles.rowBetween}>
+            <View style={[styles.rowBetween, { flex: 1, justifyContent: "flex-start", gap: 4 }]}>
+              {isPinned ? <Ionicons name="pin" size={14} color={colors.primary} /> : null}
+              <Text style={[typography.bodyStrong, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>
                 {item.title || "Untitled"}
               </Text>
-              {!isOwner ? <Badge label={`Shared by ${item.ownerId.name}`} tone="primary" /> : null}
             </View>
-            {item.type === "checklist" ? (
-              <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
-                {doneCount}/{item.items.length} done
-              </Text>
-            ) : item.body ? (
-              <Text style={[typography.body, { color: colors.textMuted, marginTop: 2 }]} numberOfLines={2}>
-                {item.body}
+            {!isOwner ? <Badge label={`Shared by ${item.ownerId.name}`} tone="primary" /> : null}
+          </View>
+          {item.type === "checklist" ? (
+            <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
+              {doneCount}/{item.items.length} done
+            </Text>
+          ) : item.body ? (
+            <Text style={[typography.body, { color: colors.textMuted, marginTop: 2 }]} numberOfLines={2}>
+              {item.body}
+            </Text>
+          ) : null}
+        </Pressable>
+        {isOwner ? (
+          <Pressable
+            onPress={() => setNotePendingDelete(item)}
+            hitSlop={8}
+            style={{ marginLeft: spacing.sm }}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${item.title || "note"}`}
+          >
+            <Ionicons name="trash-outline" size={20} color={colors.textFaint} />
+          </Pressable>
+        ) : null}
+
+        {previewItems.length > 0 ? (
+          <View style={{ width: "100%", marginTop: spacing.sm, gap: 6 }}>
+            {previewItems.map((checkItem, idx) => (
+              <Pressable
+                key={idx}
+                onPress={() => toggleChecklistItem(item, idx)}
+                style={({ pressed }) => [styles.checklistRow, { opacity: pressed ? 0.7 : 1 }]}
+                hitSlop={4}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: checkItem.done }}
+                accessibilityLabel={`${checkItem.done ? "Mark incomplete" : "Mark complete"}: ${checkItem.text}`}
+              >
+                <Ionicons
+                  name={checkItem.done ? "checkbox" : "square-outline"}
+                  size={18}
+                  color={checkItem.done ? colors.primary : colors.textFaint}
+                />
+                <Text
+                  style={[
+                    typography.caption,
+                    {
+                      color: checkItem.done ? colors.textFaint : colors.text,
+                      textDecorationLine: checkItem.done ? "line-through" : "none",
+                      marginLeft: 6,
+                      flexShrink: 1,
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {checkItem.text}
+                </Text>
+              </Pressable>
+            ))}
+            {item.items.length > previewItems.length ? (
+              <Text style={[typography.caption, { color: colors.textFaint }]}>
+                +{item.items.length - previewItems.length} more
               </Text>
             ) : null}
           </View>
-          {isOwner ? (
-            <Pressable
-              onPress={() => setNotePendingDelete(item)}
-              hitSlop={8}
-              style={{ marginLeft: spacing.sm }}
-              accessibilityRole="button"
-              accessibilityLabel={`Delete ${item.title || "note"}`}
-            >
-              <Ionicons name="trash-outline" size={20} color={colors.textFaint} />
-            </Pressable>
-          ) : null}
-        </Card>
-      </Pressable>
+        ) : null}
+      </Card>
     );
   }
 
@@ -295,7 +357,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   searchBar: { flexDirection: "row", alignItems: "center", borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, fontSize: 16 },
-  card: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
+  card: { flexDirection: "row", alignItems: "flex-start", flexWrap: "wrap", marginBottom: 10 },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  checklistRow: { flexDirection: "row", alignItems: "center" },
   fab: { position: "absolute", right: 20, bottom: 20, flexDirection: "row", alignItems: "center", justifyContent: "center" },
 });
