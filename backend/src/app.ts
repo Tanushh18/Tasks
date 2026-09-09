@@ -21,6 +21,7 @@ import reminderRoutes from "./routes/reminderRoutes";
 import searchRoutes from "./routes/searchRoutes";
 import taskRoutes from "./routes/taskRoutes";
 import userRoutes from "./routes/userRoutes";
+import weeklySummaryRoutes from "./routes/weeklySummaryRoutes";
 
 export function createApp(): Express {
   const app = express();
@@ -61,6 +62,7 @@ export function createApp(): Express {
   app.use("/api/notes", noteRoutes);
   app.use("/api/group-expenses", groupExpenseRoutes);
   app.use("/api/polls", pollRoutes);
+  app.use("/api/weekly-summary", weeklySummaryRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

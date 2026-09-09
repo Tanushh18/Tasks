@@ -17,6 +17,9 @@ const userSchema = new Schema(
     isAdmin: { type: Boolean, default: false },
     blocked: { type: Boolean, default: false },
     mustChangeMpin: { type: Boolean, default: false },
+    // Opt-in per the brief: the weekly summary is a computed on-demand aggregation,
+    // not something surfaced unless the user has explicitly turned it on.
+    weeklySummaryEnabled: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
