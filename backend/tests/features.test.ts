@@ -25,6 +25,8 @@ describe("feature flags", () => {
       emergencyInfo: true,
       familyEvents: true,
       shoppingLists: true,
+      recurringPayments: true,
+      familyGoals: true,
     });
   });
 

@@ -16,6 +16,8 @@ const ALL_ON: FeatureFlags = {
   emergencyInfo: true,
   familyEvents: true,
   shoppingLists: true,
+  recurringPayments: true,
+  familyGoals: true,
 };
 
 interface FeatureFlagsContextValue {

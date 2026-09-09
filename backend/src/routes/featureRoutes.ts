@@ -25,6 +25,8 @@ router.get(
         emergencyInfo: flags.emergencyInfo,
         familyEvents: flags.familyEvents,
         shoppingLists: flags.shoppingLists,
+        recurringPayments: flags.recurringPayments,
+        familyGoals: flags.familyGoals,
       },
     });
   })

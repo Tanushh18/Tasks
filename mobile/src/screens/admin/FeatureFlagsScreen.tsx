@@ -23,6 +23,8 @@ const FLAG_LABELS: { key: keyof FeatureFlags; label: string; detail: string }[] 
   { key: "emergencyInfo", label: "Emergency Info", detail: "Emergency contacts and medical/home info" },
   { key: "familyEvents", label: "Family Events", detail: "Shared calendar of birthdays, trips and appointments" },
   { key: "shoppingLists", label: "Shopping Lists", detail: "Shared, checkable shopping lists" },
+  { key: "recurringPayments", label: "Recurring Payments", detail: "Recurring bill tracking and due-date reminders" },
+  { key: "familyGoals", label: "Family Goals", detail: "Shared savings goals and contributions" },
 ];
 
 export function FeatureFlagsScreen() {

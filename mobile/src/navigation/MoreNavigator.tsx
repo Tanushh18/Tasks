@@ -11,6 +11,11 @@ import { EmergencyNavigator } from "./EmergencyNavigator";
 import { InventoryNavigator } from "./InventoryNavigator";
 import { ShoppingListDetailScreen } from "../screens/shopping/ShoppingListDetailScreen";
 import { ShoppingListsScreen } from "../screens/shopping/ShoppingListsScreen";
+import { GoalDetailScreen } from "../screens/goals/GoalDetailScreen";
+import { GoalFormScreen } from "../screens/goals/GoalFormScreen";
+import { GoalsListScreen } from "../screens/goals/GoalsListScreen";
+import { RecurringPaymentFormScreen } from "../screens/payments/RecurringPaymentFormScreen";
+import { RecurringPaymentsListScreen } from "../screens/payments/RecurringPaymentsListScreen";
 import { NotesNavigator } from "./NotesNavigator";
 import { SettingsNavigator } from "./SettingsNavigator";
 import { VaultNavigator } from "./VaultNavigator";
@@ -39,6 +44,19 @@ export function MoreNavigator() {
         component={ShoppingListDetailScreen}
         options={({ route }) => ({ headerShown: true, title: route.params.name })}
       />
+      <Stack.Screen
+        name="RecurringPaymentsList"
+        component={RecurringPaymentsListScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="RecurringPaymentForm"
+        component={RecurringPaymentFormScreen}
+        options={{ headerShown: true }}
+      />
+      <Stack.Screen name="GoalsList" component={GoalsListScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="GoalForm" component={GoalFormScreen} options={{ headerShown: true }} />
+      <Stack.Screen name="GoalDetail" component={GoalDetailScreen} options={{ headerShown: true }} />
     </Stack.Navigator>
   );
 }

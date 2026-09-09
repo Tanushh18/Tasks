@@ -105,6 +105,11 @@ export type MoreStackParamList = {
   EventForm: { eventId?: string } | undefined;
   ShoppingLists: undefined;
   ShoppingListDetail: { listId: string; name: string };
+  RecurringPaymentsList: undefined;
+  RecurringPaymentForm: { paymentId?: string } | undefined;
+  GoalsList: undefined;
+  GoalForm: { goalId?: string } | undefined;
+  GoalDetail: { goalId: string; name: string };
 };
 
 export type MainTabParamList = {

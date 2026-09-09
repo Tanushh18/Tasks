@@ -13,6 +13,8 @@ export interface FeatureFlags {
   emergencyInfo: boolean;
   familyEvents: boolean;
   shoppingLists: boolean;
+  recurringPayments: boolean;
+  familyGoals: boolean;
 }
 
 export async function getFeatures(): Promise<FeatureFlags> {

@@ -16,9 +16,11 @@ import emergencyInfoRoutes from "./routes/emergencyInfoRoutes";
 import familyEventRoutes from "./routes/familyEventRoutes";
 import groupExpenseRoutes from "./routes/groupExpenseRoutes";
 import inventoryItemRoutes from "./routes/inventoryItemRoutes";
+import familyGoalRoutes from "./routes/familyGoalRoutes";
 import locationRoutes from "./routes/locationRoutes";
 import noteRoutes from "./routes/noteRoutes";
 import ocrRoutes from "./routes/ocrRoutes";
+import recurringPaymentRoutes from "./routes/recurringPaymentRoutes";
 import reminderRoutes from "./routes/reminderRoutes";
 import searchRoutes from "./routes/searchRoutes";
 import shoppingListRoutes from "./routes/shoppingListRoutes";
@@ -69,6 +71,8 @@ export function createApp(): Express {
   app.use("/api/emergency-info", emergencyInfoRoutes);
   app.use("/api/family-events", familyEventRoutes);
   app.use("/api/shopping-lists", shoppingListRoutes);
+  app.use("/api/recurring-payments", recurringPaymentRoutes);
+  app.use("/api/family-goals", familyGoalRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -15,6 +15,8 @@ const featureFlagsSchema = new Schema(
     emergencyInfo: { type: Boolean, default: true },
     familyEvents: { type: Boolean, default: true },
     shoppingLists: { type: Boolean, default: true },
+    recurringPayments: { type: Boolean, default: true },
+    familyGoals: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
