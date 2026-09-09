@@ -35,6 +35,11 @@ export function MoreScreen({ navigation }: Props) {
       {/* Location Sharing now lives under the Family tab, alongside the other
           people-shaped features, rather than being buried in More. */}
       <MoreRow
+        icon="sync-outline"
+        label="Sync Center"
+        onPress={() => navigation.navigate("SyncCenter")}
+      />
+      <MoreRow
         icon="settings-outline"
         label="Settings"
         onPress={() => navigation.navigate("Settings", { screen: "SettingsMain", params: undefined })}
