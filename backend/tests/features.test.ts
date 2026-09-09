@@ -20,6 +20,8 @@ describe("feature flags", () => {
       assistant: true,
       notes: true,
       groupExpenses: true,
+      recurringPayments: true,
+      familyGoals: true,
     });
   });
 
