@@ -10,6 +10,7 @@ import type { UserSearchResult } from "../../api/users";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { FamilyAvatar } from "../../components/FamilyAvatar";
 import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import { UserPicker } from "../../components/UserPicker";
@@ -123,6 +124,9 @@ export function ChatListScreen({ navigation }: Props) {
             >
               <Card style={{ marginBottom: spacing.md }}>
                 <View style={styles.row}>
+                  <View style={{ marginRight: spacing.sm }}>
+                    <FamilyAvatar name={item.name} size={40} />
+                  </View>
                   <View style={styles.flex}>
                     <View style={styles.rowBetween}>
                       <Text style={[typography.bodyStrong, { color: colors.text }]}>{item.name}</Text>

@@ -10,9 +10,12 @@ export async function pingLocation(input: LocationPingInput): Promise<void> {
   await apiClient.post("/location/ping", input);
 }
 
+export type ShareDuration = "1h" | "tonight" | "continuous";
+
 export interface ShareTarget {
   id: string;
   name: string;
+  expiresAt: string | null;
 }
 
 export interface SharedWithMeEntry {
@@ -33,8 +36,8 @@ export async function getShares(): Promise<LocationShares> {
   return data;
 }
 
-export async function startSharing(toUserId: string): Promise<void> {
-  await apiClient.post("/location/shares", { toUserId });
+export async function startSharing(toUserId: string, duration: ShareDuration = "continuous"): Promise<void> {
+  await apiClient.post("/location/shares", { toUserId, duration });
 }
 
 export async function stopSharing(toUserId: string): Promise<void> {
