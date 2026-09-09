@@ -48,6 +48,8 @@ function serializeFlags(flags: {
   assistant: boolean;
   notes: boolean;
   groupExpenses: boolean;
+  polls: boolean;
+  weeklySummary: boolean;
 }) {
   return {
     contacts: flags.contacts,
@@ -57,6 +59,8 @@ function serializeFlags(flags: {
     assistant: flags.assistant,
     notes: flags.notes,
     groupExpenses: flags.groupExpenses,
+    polls: flags.polls,
+    weeklySummary: flags.weeklySummary,
   };
 }
 

@@ -12,4 +12,6 @@ export const updateFeatureFlagsSchema = z.object({
   assistant: z.boolean().optional(),
   notes: z.boolean().optional(),
   groupExpenses: z.boolean().optional(),
+  polls: z.boolean().optional(),
+  weeklySummary: z.boolean().optional(),
 });

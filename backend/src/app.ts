@@ -16,6 +16,7 @@ import groupExpenseRoutes from "./routes/groupExpenseRoutes";
 import locationRoutes from "./routes/locationRoutes";
 import noteRoutes from "./routes/noteRoutes";
 import ocrRoutes from "./routes/ocrRoutes";
+import pollRoutes from "./routes/pollRoutes";
 import reminderRoutes from "./routes/reminderRoutes";
 import searchRoutes from "./routes/searchRoutes";
 import taskRoutes from "./routes/taskRoutes";
@@ -59,6 +60,7 @@ export function createApp(): Express {
   app.use("/api/features", featureRoutes);
   app.use("/api/notes", noteRoutes);
   app.use("/api/group-expenses", groupExpenseRoutes);
+  app.use("/api/polls", pollRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
