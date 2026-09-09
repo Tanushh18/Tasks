@@ -80,6 +80,10 @@ export type MoreStackParamList = {
   Notes: NavigatorScreenParams<NotesStackParamList>;
   AdminUsers: undefined;
   FeatureFlags: undefined;
+  EventsList: undefined;
+  EventForm: { eventId?: string } | undefined;
+  ShoppingLists: undefined;
+  ShoppingListDetail: { listId: string; name: string };
 };
 
 export type MainTabParamList = {
