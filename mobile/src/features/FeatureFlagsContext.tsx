@@ -11,6 +11,8 @@ const ALL_ON: FeatureFlags = {
   assistant: true,
   notes: true,
   groupExpenses: true,
+  polls: true,
+  weeklySummary: true,
 };
 
 interface FeatureFlagsContextValue {

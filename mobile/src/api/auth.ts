@@ -41,6 +41,7 @@ export async function updateSettings(input: {
   notificationsEnabled?: boolean;
   confirmFinancialActions?: boolean;
   speakAssistantReplies?: boolean;
+  weeklySummaryEnabled?: boolean;
 }): Promise<User> {
   const { data } = await apiClient.put<{ user: User }>("/auth/settings", input);
   return data.user;

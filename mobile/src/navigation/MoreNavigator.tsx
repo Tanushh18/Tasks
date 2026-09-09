@@ -4,7 +4,9 @@ import { AssistantScreen } from "../screens/assistant/AssistantScreen";
 import { AdminUsersScreen } from "../screens/admin/AdminUsersScreen";
 import { FeatureFlagsScreen } from "../screens/admin/FeatureFlagsScreen";
 import { MoreScreen } from "../screens/more/MoreScreen";
+import { WeeklySummaryScreen } from "../screens/summary/WeeklySummaryScreen";
 import { NotesNavigator } from "./NotesNavigator";
+import { PollsNavigator } from "./PollsNavigator";
 import { SettingsNavigator } from "./SettingsNavigator";
 import type { MoreStackParamList } from "./types";
 
@@ -17,6 +19,12 @@ export function MoreNavigator() {
       <Stack.Screen name="Assistant" component={AssistantScreen} />
       <Stack.Screen name="Settings" component={SettingsNavigator} />
       <Stack.Screen name="Notes" component={NotesNavigator} />
+      <Stack.Screen name="Polls" component={PollsNavigator} />
+      <Stack.Screen
+        name="WeeklySummary"
+        component={WeeklySummaryScreen}
+        options={{ headerShown: true, title: "Weekly Summary" }}
+      />
       <Stack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ headerShown: true, title: "Admin" }} />
       <Stack.Screen name="FeatureFlags" component={FeatureFlagsScreen} options={{ headerShown: true, title: "Feature Flags" }} />
     </Stack.Navigator>

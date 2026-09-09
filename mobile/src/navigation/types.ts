@@ -73,11 +73,19 @@ export type NotesStackParamList = {
   NoteForm: { noteId?: string; type?: "text" | "checklist" } | undefined;
 };
 
+export type PollsStackParamList = {
+  PollsList: undefined;
+  PollForm: undefined;
+  PollDetail: { pollId: string };
+};
+
 export type MoreStackParamList = {
   MoreMain: undefined;
   Assistant: { autoListen?: boolean } | undefined;
   Settings: NavigatorScreenParams<SettingsStackParamList>;
   Notes: NavigatorScreenParams<NotesStackParamList>;
+  Polls: NavigatorScreenParams<PollsStackParamList>;
+  WeeklySummary: undefined;
   AdminUsers: undefined;
   FeatureFlags: undefined;
 };

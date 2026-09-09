@@ -32,6 +32,16 @@ export function MoreScreen({ navigation }: Props) {
           onPress={() => navigation.navigate("Notes", { screen: "NotesList", params: undefined })}
         />
       ) : null}
+      {flags.polls ? (
+        <MoreRow
+          icon="stats-chart-outline"
+          label="Family Polls"
+          onPress={() => navigation.navigate("Polls", { screen: "PollsList", params: undefined })}
+        />
+      ) : null}
+      {flags.weeklySummary && user?.weeklySummaryEnabled ? (
+        <MoreRow icon="calendar-outline" label="Weekly Summary" onPress={() => navigation.navigate("WeeklySummary")} />
+      ) : null}
       {/* Location Sharing now lives under the Family tab, alongside the other
           people-shaped features, rather than being buried in More. */}
       <MoreRow

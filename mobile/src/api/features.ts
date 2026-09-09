@@ -8,6 +8,8 @@ export interface FeatureFlags {
   assistant: boolean;
   notes: boolean;
   groupExpenses: boolean;
+  polls: boolean;
+  weeklySummary: boolean;
 }
 
 export async function getFeatures(): Promise<FeatureFlags> {

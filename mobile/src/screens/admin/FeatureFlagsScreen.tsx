@@ -18,6 +18,8 @@ const FLAG_LABELS: { key: keyof FeatureFlags; label: string; detail: string }[] 
   { key: "assistant", label: "Assistant", detail: "The voice assistant" },
   { key: "notes", label: "Notes", detail: "The Notes feature" },
   { key: "groupExpenses", label: "Group Expenses", detail: "Trip/group expense splitting and settle-up" },
+  { key: "polls", label: "Family Polls", detail: "Quick question-and-vote polls" },
+  { key: "weeklySummary", label: "Weekly Summary", detail: "The opt-in weekly recap screen" },
 ];
 
 export function FeatureFlagsScreen() {
