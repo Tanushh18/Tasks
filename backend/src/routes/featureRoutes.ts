@@ -20,6 +20,8 @@ router.get(
         assistant: flags.assistant,
         notes: flags.notes,
         groupExpenses: flags.groupExpenses,
+        familyEvents: flags.familyEvents,
+        shoppingLists: flags.shoppingLists,
       },
     });
   })

@@ -12,12 +12,14 @@ import chatRoutes from "./routes/chatRoutes";
 import contactRoutes from "./routes/contactRoutes";
 import featureRoutes from "./routes/featureRoutes";
 import financeRoutes from "./routes/financeRoutes";
+import familyEventRoutes from "./routes/familyEventRoutes";
 import groupExpenseRoutes from "./routes/groupExpenseRoutes";
 import locationRoutes from "./routes/locationRoutes";
 import noteRoutes from "./routes/noteRoutes";
 import ocrRoutes from "./routes/ocrRoutes";
 import reminderRoutes from "./routes/reminderRoutes";
 import searchRoutes from "./routes/searchRoutes";
+import shoppingListRoutes from "./routes/shoppingListRoutes";
 import taskRoutes from "./routes/taskRoutes";
 import userRoutes from "./routes/userRoutes";
 
@@ -59,6 +61,8 @@ export function createApp(): Express {
   app.use("/api/features", featureRoutes);
   app.use("/api/notes", noteRoutes);
   app.use("/api/group-expenses", groupExpenseRoutes);
+  app.use("/api/family-events", familyEventRoutes);
+  app.use("/api/shopping-lists", shoppingListRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

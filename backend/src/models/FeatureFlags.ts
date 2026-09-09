@@ -10,6 +10,8 @@ const featureFlagsSchema = new Schema(
     assistant: { type: Boolean, default: true },
     notes: { type: Boolean, default: true },
     groupExpenses: { type: Boolean, default: true },
+    familyEvents: { type: Boolean, default: true },
+    shoppingLists: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
