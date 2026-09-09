@@ -73,11 +73,28 @@ export type NotesStackParamList = {
   NoteForm: { noteId?: string; type?: "text" | "checklist" } | undefined;
 };
 
+export type VaultStackParamList = {
+  VaultList: undefined;
+  VaultForm: { documentId?: string } | undefined;
+};
+
+export type InventoryStackParamList = {
+  InventoryList: undefined;
+  InventoryForm: { itemId?: string } | undefined;
+};
+
+export type EmergencyStackParamList = {
+  EmergencyInfoMain: undefined;
+};
+
 export type MoreStackParamList = {
   MoreMain: undefined;
   Assistant: { autoListen?: boolean } | undefined;
   Settings: NavigatorScreenParams<SettingsStackParamList>;
   Notes: NavigatorScreenParams<NotesStackParamList>;
+  Vault: NavigatorScreenParams<VaultStackParamList>;
+  Inventory: NavigatorScreenParams<InventoryStackParamList>;
+  EmergencyInfo: NavigatorScreenParams<EmergencyStackParamList>;
   AdminUsers: undefined;
   FeatureFlags: undefined;
 };

@@ -4,8 +4,11 @@ import { AssistantScreen } from "../screens/assistant/AssistantScreen";
 import { AdminUsersScreen } from "../screens/admin/AdminUsersScreen";
 import { FeatureFlagsScreen } from "../screens/admin/FeatureFlagsScreen";
 import { MoreScreen } from "../screens/more/MoreScreen";
+import { EmergencyNavigator } from "./EmergencyNavigator";
+import { InventoryNavigator } from "./InventoryNavigator";
 import { NotesNavigator } from "./NotesNavigator";
 import { SettingsNavigator } from "./SettingsNavigator";
+import { VaultNavigator } from "./VaultNavigator";
 import type { MoreStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
@@ -17,6 +20,9 @@ export function MoreNavigator() {
       <Stack.Screen name="Assistant" component={AssistantScreen} />
       <Stack.Screen name="Settings" component={SettingsNavigator} />
       <Stack.Screen name="Notes" component={NotesNavigator} />
+      <Stack.Screen name="Vault" component={VaultNavigator} />
+      <Stack.Screen name="Inventory" component={InventoryNavigator} />
+      <Stack.Screen name="EmergencyInfo" component={EmergencyNavigator} options={{ headerShown: true, title: "Emergency Info" }} />
       <Stack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ headerShown: true, title: "Admin" }} />
       <Stack.Screen name="FeatureFlags" component={FeatureFlagsScreen} options={{ headerShown: true, title: "Feature Flags" }} />
     </Stack.Navigator>
