@@ -6,8 +6,11 @@ export const pingSchema = z.object({
   accuracy: z.number().optional(),
 });
 
+export const shareDurationSchema = z.enum(["1h", "tonight", "continuous"]);
+
 export const startSharingSchema = z.object({
   toUserId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid user id"),
+  duration: shareDurationSchema.optional(),
 });
 
 export const toUserIdParamSchema = z.object({

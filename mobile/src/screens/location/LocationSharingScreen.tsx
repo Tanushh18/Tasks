@@ -4,8 +4,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, PROVIDER_DEFAULT, UrlTile } from "react-native-maps";
 import * as locationApi from "../../api/location";
+import type { ShareDuration } from "../../api/location";
 import type { UserSearchResult } from "../../api/users";
 import { getApiErrorMessage } from "../../api/client";
+import { BottomSheet } from "../../components/BottomSheet";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ScreenContainer } from "../../components/ScreenContainer";
@@ -14,6 +16,22 @@ import { EmptyState } from "../../components/StateViews";
 import { UserPicker } from "../../components/UserPicker";
 import { startLocationTracking, stopLocationTracking } from "../../location/backgroundLocationTask";
 import { useTheme } from "../../theme/useTheme";
+
+const DURATION_OPTIONS: { label: string; value: ShareDuration }[] = [
+  { label: "Share for 1 hour", value: "1h" },
+  { label: "Share until tonight", value: "tonight" },
+  { label: "Share continuously", value: "continuous" },
+];
+
+function formatExpiry(expiresAt: string | null): string {
+  if (!expiresAt) return "Sharing continuously";
+  const diffMs = new Date(expiresAt).getTime() - Date.now();
+  if (diffMs <= 0) return "Expired";
+  const minutes = Math.round(diffMs / 60000);
+  if (minutes < 60) return `Expires in ${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  return `Expires in ${hours}h`;
+}
 
 const POLL_INTERVAL_MS = 10000;
 
@@ -49,6 +67,7 @@ export function LocationSharingScreen() {
   const [stoppingId, setStoppingId] = useState<string | null>(null);
   const [myLocation, setMyLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [view, setView] = useState<"list" | "map">("list");
+  const [durationSheetVisible, setDurationSheetVisible] = useState(false);
   const mapRef = useRef<MapView | null>(null);
 
   const load = useCallback(async () => {
@@ -83,11 +102,12 @@ export function LocationSharingScreen() {
     }, [])
   );
 
-  async function handleStartSharing() {
+  async function handleStartSharing(duration: ShareDuration) {
     if (!selectedUser) return;
+    setDurationSheetVisible(false);
     setStarting(true);
     try {
-      await locationApi.startSharing(selectedUser.id);
+      await locationApi.startSharing(selectedUser.id, duration);
       const started = await startLocationTracking();
       if (!started) {
         Alert.alert(
@@ -144,7 +164,7 @@ export function LocationSharingScreen() {
       </View>
       <Button
         label="Share my location"
-        onPress={handleStartSharing}
+        onPress={() => setDurationSheetVisible(true)}
         disabled={!selectedUser}
         loading={starting}
         style={{ marginBottom: spacing.xl }}
@@ -154,7 +174,12 @@ export function LocationSharingScreen() {
       {shares && shares.sharingWith.length > 0 ? (
         shares.sharingWith.map((person) => (
           <Card key={person.id} style={{ marginBottom: spacing.md, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={[typography.bodyStrong, { color: colors.text }]}>{person.name}</Text>
+            <View>
+              <Text style={[typography.bodyStrong, { color: colors.text }]}>{person.name}</Text>
+              <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
+                {formatExpiry(person.expiresAt)}
+              </Text>
+            </View>
             <Button
               label="Stop sharing"
               variant="secondary"
@@ -167,6 +192,52 @@ export function LocationSharingScreen() {
       ) : (
         <EmptyState title="Not sharing with anyone" subtitle="Choose someone above to start." />
       )}
+
+      <BottomSheet
+        visible={durationSheetVisible}
+        onClose={() => setDurationSheetVisible(false)}
+        title="Share my location"
+        subtitle={selectedUser ? `Choose how long to share with ${selectedUser.name}` : undefined}
+        scrollable={false}
+      >
+        <View>
+          {DURATION_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value}
+              onPress={() => handleStartSharing(option.value)}
+              accessibilityRole="button"
+              accessibilityLabel={option.label}
+              style={({ pressed }) => [
+                styles.durationRow,
+                {
+                  minHeight: 48,
+                  borderRadius: radius.md,
+                  paddingHorizontal: spacing.md,
+                  backgroundColor: pressed ? colors.surfaceAlt : "transparent",
+                },
+              ]}
+            >
+              <Text style={[typography.body, { color: colors.text }]}>{option.label}</Text>
+            </Pressable>
+          ))}
+          <Pressable
+            onPress={() => setDurationSheetVisible(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+            style={({ pressed }) => [
+              styles.durationRow,
+              {
+                minHeight: 48,
+                borderRadius: radius.md,
+                paddingHorizontal: spacing.md,
+                backgroundColor: pressed ? colors.surfaceAlt : "transparent",
+              },
+            ]}
+          >
+            <Text style={[typography.body, { color: colors.danger }]}>Cancel</Text>
+          </Pressable>
+        </View>
+      </BottomSheet>
 
       <View style={{ marginTop: spacing.xl, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <SectionHeader title="Shared with me" />
@@ -259,6 +330,7 @@ export function LocationSharingScreen() {
 }
 
 const styles = StyleSheet.create({
+  durationRow: { justifyContent: "center" },
   toggleRow: { flexDirection: "row", gap: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, alignItems: "center", justifyContent: "center" },
   mapContainer: { height: 320, overflow: "hidden" },

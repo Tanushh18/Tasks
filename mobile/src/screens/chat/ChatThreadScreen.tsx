@@ -90,7 +90,12 @@ export function ChatThreadScreen({ route, navigation }: Props) {
           contentContainerStyle={{ padding: spacing.lg, flexGrow: 1 }}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
           renderItem={({ item }) => (
-            <ChatBubble role={item.fromUserId === user?.id ? "user" : "assistant"} text={item.text} />
+            <ChatBubble
+              role={item.fromUserId === user?.id ? "user" : "assistant"}
+              text={item.text}
+              senderName={item.fromUserId === user?.id ? undefined : name}
+              createdAt={item.createdAt}
+            />
           )}
           ListEmptyComponent={
             !loading ? (

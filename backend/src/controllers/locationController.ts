@@ -13,8 +13,8 @@ export const getShares = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const startSharing = asyncHandler(async (req: Request, res: Response) => {
-  const { toUserId } = req.body as { toUserId: string };
-  await locationService.startSharing(req.userId!, toUserId);
+  const { toUserId, duration } = req.body as { toUserId: string; duration?: locationService.ShareDuration };
+  await locationService.startSharing(req.userId!, toUserId, duration);
   res.status(204).send();
 });
 

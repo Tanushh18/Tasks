@@ -32,7 +32,7 @@ describe("location sharing", () => {
     expect(ping.status).toBe(204);
 
     const sharesA = await apiA.get("/api/location/shares");
-    expect(sharesA.body.sharingWith).toEqual([{ id: userIdB, name: "Bob" }]);
+    expect(sharesA.body.sharingWith).toEqual([{ id: userIdB, name: "Bob", expiresAt: null }]);
 
     const sharesB = await apiB.get("/api/location/shares");
     expect(sharesB.body.sharedWithMe).toHaveLength(1);
