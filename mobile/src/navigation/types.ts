@@ -80,6 +80,11 @@ export type MoreStackParamList = {
   Notes: NavigatorScreenParams<NotesStackParamList>;
   AdminUsers: undefined;
   FeatureFlags: undefined;
+  RecurringPaymentsList: undefined;
+  RecurringPaymentForm: { paymentId?: string } | undefined;
+  GoalsList: undefined;
+  GoalForm: { goalId?: string } | undefined;
+  GoalDetail: { goalId: string; name: string };
 };
 
 export type MainTabParamList = {
