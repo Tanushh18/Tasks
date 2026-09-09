@@ -4,6 +4,8 @@ const locationShareSchema = new Schema(
   {
     fromUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     toUserId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    // null means shared continuously (no expiry). Expired shares are filtered out on read.
+    expiresAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
