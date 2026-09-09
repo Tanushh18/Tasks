@@ -23,6 +23,8 @@ router.get(
         documentVault: flags.documentVault,
         householdInventory: flags.householdInventory,
         emergencyInfo: flags.emergencyInfo,
+        familyEvents: flags.familyEvents,
+        shoppingLists: flags.shoppingLists,
       },
     });
   })

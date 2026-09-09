@@ -53,6 +53,12 @@ export function MoreScreen({ navigation }: Props) {
           onPress={() => navigation.navigate("EmergencyInfo", { screen: "EmergencyInfoMain", params: undefined })}
         />
       ) : null}
+      {flags.familyEvents ? (
+        <MoreRow icon="calendar-outline" label="Family Events" onPress={() => navigation.navigate("EventsList")} />
+      ) : null}
+      {flags.shoppingLists ? (
+        <MoreRow icon="cart-outline" label="Shopping Lists" onPress={() => navigation.navigate("ShoppingLists")} />
+      ) : null}
       {/* Location Sharing now lives under the Family tab, alongside the other
           people-shaped features, rather than being buried in More. */}
       <MoreRow

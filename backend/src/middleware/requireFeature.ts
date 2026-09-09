@@ -12,7 +12,9 @@ type FeatureName =
   | "groupExpenses"
   | "documentVault"
   | "householdInventory"
-  | "emergencyInfo";
+  | "emergencyInfo"
+  | "familyEvents"
+  | "shoppingLists";
 
 export function requireFeature(name: FeatureName) {
   return (_req: Request, _res: Response, next: NextFunction): void => {

@@ -23,6 +23,8 @@ describe("feature flags", () => {
       documentVault: true,
       householdInventory: true,
       emergencyInfo: true,
+      familyEvents: true,
+      shoppingLists: true,
     });
   });
 

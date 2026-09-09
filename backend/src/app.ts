@@ -13,6 +13,7 @@ import contactRoutes from "./routes/contactRoutes";
 import featureRoutes from "./routes/featureRoutes";
 import financeRoutes from "./routes/financeRoutes";
 import emergencyInfoRoutes from "./routes/emergencyInfoRoutes";
+import familyEventRoutes from "./routes/familyEventRoutes";
 import groupExpenseRoutes from "./routes/groupExpenseRoutes";
 import inventoryItemRoutes from "./routes/inventoryItemRoutes";
 import locationRoutes from "./routes/locationRoutes";
@@ -20,6 +21,7 @@ import noteRoutes from "./routes/noteRoutes";
 import ocrRoutes from "./routes/ocrRoutes";
 import reminderRoutes from "./routes/reminderRoutes";
 import searchRoutes from "./routes/searchRoutes";
+import shoppingListRoutes from "./routes/shoppingListRoutes";
 import taskRoutes from "./routes/taskRoutes";
 import userRoutes from "./routes/userRoutes";
 import vaultDocumentRoutes from "./routes/vaultDocumentRoutes";
@@ -65,6 +67,8 @@ export function createApp(): Express {
   app.use("/api/vault-documents", vaultDocumentRoutes);
   app.use("/api/inventory-items", inventoryItemRoutes);
   app.use("/api/emergency-info", emergencyInfoRoutes);
+  app.use("/api/family-events", familyEventRoutes);
+  app.use("/api/shopping-lists", shoppingListRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

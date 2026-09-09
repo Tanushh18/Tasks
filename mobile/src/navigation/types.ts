@@ -101,6 +101,10 @@ export type MoreStackParamList = {
   AdminUsers: undefined;
   FeatureFlags: undefined;
   SyncCenter: undefined;
+  EventsList: undefined;
+  EventForm: { eventId?: string } | undefined;
+  ShoppingLists: undefined;
+  ShoppingListDetail: { listId: string; name: string };
 };
 
 export type MainTabParamList = {

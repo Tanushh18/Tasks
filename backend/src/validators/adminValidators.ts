@@ -15,4 +15,6 @@ export const updateFeatureFlagsSchema = z.object({
   documentVault: z.boolean().optional(),
   householdInventory: z.boolean().optional(),
   emergencyInfo: z.boolean().optional(),
+  familyEvents: z.boolean().optional(),
+  shoppingLists: z.boolean().optional(),
 });

@@ -13,6 +13,8 @@ const featureFlagsSchema = new Schema(
     documentVault: { type: Boolean, default: true },
     householdInventory: { type: Boolean, default: true },
     emergencyInfo: { type: Boolean, default: true },
+    familyEvents: { type: Boolean, default: true },
+    shoppingLists: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

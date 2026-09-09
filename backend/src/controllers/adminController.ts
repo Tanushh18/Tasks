@@ -51,6 +51,8 @@ function serializeFlags(flags: {
   documentVault: boolean;
   householdInventory: boolean;
   emergencyInfo: boolean;
+  familyEvents: boolean;
+  shoppingLists: boolean;
 }) {
   return {
     contacts: flags.contacts,
@@ -63,6 +65,8 @@ function serializeFlags(flags: {
     documentVault: flags.documentVault,
     householdInventory: flags.householdInventory,
     emergencyInfo: flags.emergencyInfo,
+    familyEvents: flags.familyEvents,
+    shoppingLists: flags.shoppingLists,
   };
 }
 

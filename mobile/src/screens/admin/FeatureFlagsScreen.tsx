@@ -21,6 +21,8 @@ const FLAG_LABELS: { key: keyof FeatureFlags; label: string; detail: string }[] 
   { key: "documentVault", label: "Document Vault", detail: "Storing and sharing important documents" },
   { key: "householdInventory", label: "Household Inventory", detail: "Tracking household items and warranties" },
   { key: "emergencyInfo", label: "Emergency Info", detail: "Emergency contacts and medical/home info" },
+  { key: "familyEvents", label: "Family Events", detail: "Shared calendar of birthdays, trips and appointments" },
+  { key: "shoppingLists", label: "Shopping Lists", detail: "Shared, checkable shopping lists" },
 ];
 
 export function FeatureFlagsScreen() {

@@ -11,6 +11,8 @@ export interface FeatureFlags {
   documentVault: boolean;
   householdInventory: boolean;
   emergencyInfo: boolean;
+  familyEvents: boolean;
+  shoppingLists: boolean;
 }
 
 export async function getFeatures(): Promise<FeatureFlags> {

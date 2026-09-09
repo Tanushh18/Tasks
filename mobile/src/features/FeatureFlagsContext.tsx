@@ -14,6 +14,8 @@ const ALL_ON: FeatureFlags = {
   documentVault: true,
   householdInventory: true,
   emergencyInfo: true,
+  familyEvents: true,
+  shoppingLists: true,
 };
 
 interface FeatureFlagsContextValue {
