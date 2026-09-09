@@ -130,15 +130,22 @@ export function SettingsScreen({ navigation }: Props) {
       </Text>
 
       <SectionHeader title="Account" />
-      <Card style={{ marginBottom: spacing.md }}>
-        <Text style={[typography.caption, { color: colors.textMuted }]}>Mobile number</Text>
-        <Text style={[typography.h3, { color: colors.text, marginTop: 2 }]}>{user?.mobileNumber}</Text>
-      </Card>
-
+      <SettingRow
+        label="Profile"
+        detail={user?.name ? `${user.name} · ${user.mobileNumber}` : user?.mobileNumber}
+        icon="person-circle-outline"
+        onPress={() => navigation.navigate("Profile")}
+      />
       <SettingRow
         label="Change MPIN"
         detail="Update the code you sign in with"
         onPress={() => navigation.navigate("ChangeMpin")}
+      />
+      <SettingRow
+        label="Privacy Center"
+        detail="How your family's data is protected"
+        icon="shield-checkmark-outline"
+        onPress={() => navigation.navigate("PrivacyCenter")}
       />
 
       <View style={{ marginTop: spacing.xl }}>
