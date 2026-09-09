@@ -18,6 +18,10 @@ interface AuthContextValue {
   updateUser: (user: User) => void;
   /** Called once the forced MPIN change succeeds, to let the user into the app. */
   clearMustChangeMpin: () => void;
+  /** True only right after a brand-new registration in this session — gates the one-time setup screen. */
+  justRegistered: boolean;
+  /** Called once the first-time setup screen is dismissed, to let the user into the main app. */
+  clearJustRegistered: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -25,6 +29,9 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Only ever set true by a successful `register()` call below, so restoring an existing
+  // session (app relaunch) or logging in never triggers the first-time setup screen.
+  const [justRegistered, setJustRegistered] = useState(false);
 
   // Every setUser goes through here so the storage scope can never drift from the signed-in user:
   // locally cached data (offline queue, dashboard cache) is keyed by it, and a stale scope would
@@ -59,6 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (name: string, mobileNumber: string, mpin: string, confirmMpin: string) => {
       const result = await authApi.register(name, mobileNumber, mpin, confirmMpin);
       await setSessionTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+      setJustRegistered(true);
       applyUser(result.user);
     },
     [applyUser]
@@ -94,6 +102,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser((prev) => (prev ? { ...prev, mustChangeMpin: false } : prev));
   }, []);
 
+  const clearJustRegistered = useCallback(() => {
+    setJustRegistered(false);
+  }, []);
+
   const needsMpinChange = Boolean(user?.mustChangeMpin);
 
   const value = useMemo(
@@ -108,8 +120,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshUser,
       updateUser,
       clearMustChangeMpin,
+      justRegistered,
+      clearJustRegistered,
     }),
-    [user, isLoading, needsMpinChange, register, login, logout, refreshUser, updateUser, clearMustChangeMpin]
+    [
+      user,
+      isLoading,
+      needsMpinChange,
+      register,
+      login,
+      logout,
+      refreshUser,
+      updateUser,
+      clearMustChangeMpin,
+      justRegistered,
+      clearJustRegistered,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
