@@ -8,6 +8,9 @@ export interface FeatureFlags {
   assistant: boolean;
   notes: boolean;
   groupExpenses: boolean;
+  documentVault: boolean;
+  householdInventory: boolean;
+  emergencyInfo: boolean;
 }
 
 export async function getFeatures(): Promise<FeatureFlags> {

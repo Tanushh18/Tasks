@@ -12,7 +12,9 @@ import chatRoutes from "./routes/chatRoutes";
 import contactRoutes from "./routes/contactRoutes";
 import featureRoutes from "./routes/featureRoutes";
 import financeRoutes from "./routes/financeRoutes";
+import emergencyInfoRoutes from "./routes/emergencyInfoRoutes";
 import groupExpenseRoutes from "./routes/groupExpenseRoutes";
+import inventoryItemRoutes from "./routes/inventoryItemRoutes";
 import locationRoutes from "./routes/locationRoutes";
 import noteRoutes from "./routes/noteRoutes";
 import ocrRoutes from "./routes/ocrRoutes";
@@ -20,6 +22,7 @@ import reminderRoutes from "./routes/reminderRoutes";
 import searchRoutes from "./routes/searchRoutes";
 import taskRoutes from "./routes/taskRoutes";
 import userRoutes from "./routes/userRoutes";
+import vaultDocumentRoutes from "./routes/vaultDocumentRoutes";
 
 export function createApp(): Express {
   const app = express();
@@ -59,6 +62,9 @@ export function createApp(): Express {
   app.use("/api/features", featureRoutes);
   app.use("/api/notes", noteRoutes);
   app.use("/api/group-expenses", groupExpenseRoutes);
+  app.use("/api/vault-documents", vaultDocumentRoutes);
+  app.use("/api/inventory-items", inventoryItemRoutes);
+  app.use("/api/emergency-info", emergencyInfoRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

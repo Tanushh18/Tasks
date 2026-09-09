@@ -20,6 +20,9 @@ describe("feature flags", () => {
       assistant: true,
       notes: true,
       groupExpenses: true,
+      documentVault: true,
+      householdInventory: true,
+      emergencyInfo: true,
     });
   });
 

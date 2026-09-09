@@ -32,6 +32,27 @@ export function MoreScreen({ navigation }: Props) {
           onPress={() => navigation.navigate("Notes", { screen: "NotesList", params: undefined })}
         />
       ) : null}
+      {flags.documentVault ? (
+        <MoreRow
+          icon="folder-outline"
+          label="Document Vault"
+          onPress={() => navigation.navigate("Vault", { screen: "VaultList", params: undefined })}
+        />
+      ) : null}
+      {flags.householdInventory ? (
+        <MoreRow
+          icon="cube-outline"
+          label="Household Inventory"
+          onPress={() => navigation.navigate("Inventory", { screen: "InventoryList", params: undefined })}
+        />
+      ) : null}
+      {flags.emergencyInfo ? (
+        <MoreRow
+          icon="medkit-outline"
+          label="Emergency Info"
+          onPress={() => navigation.navigate("EmergencyInfo", { screen: "EmergencyInfoMain", params: undefined })}
+        />
+      ) : null}
       {/* Location Sharing now lives under the Family tab, alongside the other
           people-shaped features, rather than being buried in More. */}
       <MoreRow
