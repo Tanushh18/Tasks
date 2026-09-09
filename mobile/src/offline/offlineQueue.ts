@@ -1,5 +1,6 @@
 import axios from "axios";
 import * as Crypto from "expo-crypto";
+import { getApiErrorMessage } from "../api/client";
 import * as financeApi from "../api/finance";
 import * as tasksApi from "../api/tasks";
 import { cancelTaskReminder, scheduleTaskReminder } from "../notifications/notificationService";
@@ -8,6 +9,18 @@ import { getJson, removeJson, setJson } from "./storage";
 
 /** Namespaced per user — see offline/scope.ts. Never read or written directly. */
 const QUEUE_KEY_BASE = "dt_offline_queue";
+
+/** Items that got a real server response but that response was an error — distinct from the
+ * queue itself (which only ever holds items still waiting to be tried). Kept so the Sync Center
+ * can show *why* something didn't make it, instead of the item just vanishing (spec §25). */
+const FAILED_KEY_BASE = "dt_offline_queue_failed";
+
+export interface FailedItem {
+  item: QueuedItem;
+  /** Human-readable reason, already run through getApiErrorMessage by the caller. */
+  reason: string;
+  failedAt: string;
+}
 
 /** The pre-namespacing key. Items left here belong to an account we can no longer identify. */
 const LEGACY_QUEUE_KEY = "dt_offline_queue";
@@ -140,6 +153,10 @@ export function isNetworkFailure(err: unknown): boolean {
   return axios.isAxiosError(err) && !err.response;
 }
 
+function describeError(err: unknown): string {
+  return getApiErrorMessage(err, "The server rejected this change.");
+}
+
 export async function enqueueTaskCreate(input: Omit<tasksApi.TaskInput, "idempotencyKey">): Promise<string> {
   const id = Crypto.randomUUID();
   const queue = await getQueue();
@@ -211,6 +228,62 @@ export async function listPending(): Promise<QueuedItem[]> {
   return getQueue();
 }
 
+async function getFailed(): Promise<FailedItem[]> {
+  const key = scopedKey(FAILED_KEY_BASE);
+  if (!key) return [];
+  return (await getJson<FailedItem[]>(key)) ?? [];
+}
+
+async function saveFailed(failed: FailedItem[]): Promise<void> {
+  await setJson(requireScopedKey(FAILED_KEY_BASE), failed);
+  notifyQueueChanged();
+}
+
+export async function listFailed(): Promise<FailedItem[]> {
+  return getFailed();
+}
+
+export async function getFailedCount(): Promise<number> {
+  return (await getFailed()).length;
+}
+
+/** One human-readable line per queue item kind, for the Sync Center list. */
+export function describeQueuedItem(item: QueuedItem): string {
+  switch (item.kind) {
+    case "task-create":
+      return `New task: ${item.input.title}`;
+    case "task-update":
+      return "Updated task";
+    case "task-delete":
+      return "Deleted task";
+    case "task-complete":
+      return item.completed ? "Completed task" : "Reopened task";
+    case "transaction-create":
+      return `New transaction: ${item.input.description || item.input.category}`;
+    case "transaction-update":
+      return "Updated transaction";
+    case "transaction-delete":
+      return "Deleted transaction";
+  }
+}
+
+/** Moves a failed item back onto the queue to be tried again on the next flush. */
+export async function retryFailedItem(id: string): Promise<void> {
+  const failed = await getFailed();
+  const target = failed.find((f) => f.item.id === id);
+  if (!target) return;
+  await saveFailed(failed.filter((f) => f.item.id !== id));
+  const queue = await getQueue();
+  queue.push(target.item);
+  await saveQueue(queue);
+}
+
+/** Drops a failed item for good — the user has decided it isn't worth retrying. */
+export async function discardFailedItem(id: string): Promise<void> {
+  const failed = await getFailed();
+  await saveFailed(failed.filter((f) => f.item.id !== id));
+}
+
 async function syncItem(item: QueuedItem): Promise<void> {
   switch (item.kind) {
     case "task-create": {
@@ -267,6 +340,7 @@ export async function flushQueue(): Promise<{ synced: number; failed: number; st
   let synced = 0;
   let failed = 0;
   const remaining: QueuedItem[] = [];
+  const newlyFailed: FailedItem[] = [];
 
   try {
     for (let i = 0; i < queue.length; i++) {
@@ -282,10 +356,16 @@ export async function flushQueue(): Promise<{ synced: number; failed: number; st
           return { synced, failed, stillOffline: true };
         }
         failed++;
+        // A genuine server response (not a network drop) that came back an error — surface it
+        // instead of dropping the item silently, so the Sync Center can show why it failed.
+        newlyFailed.push({ item, reason: describeError(err), failedAt: new Date().toISOString() });
       }
     }
 
     await saveQueue(remaining);
+    if (newlyFailed.length > 0) {
+      await saveFailed([...(await getFailed()), ...newlyFailed]);
+    }
     return { synced, failed, stillOffline: false };
   } finally {
     syncing = false;

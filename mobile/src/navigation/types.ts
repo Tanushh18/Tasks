@@ -8,6 +8,7 @@ export type AuthStackParamList = {
 export type HomeStackParamList = {
   HomeMain: undefined;
   Search: undefined;
+  NotificationsCenter: undefined;
 };
 
 export type TasksStackParamList = {
@@ -80,6 +81,7 @@ export type MoreStackParamList = {
   Notes: NavigatorScreenParams<NotesStackParamList>;
   AdminUsers: undefined;
   FeatureFlags: undefined;
+  SyncCenter: undefined;
 };
 
 export type MainTabParamList = {
