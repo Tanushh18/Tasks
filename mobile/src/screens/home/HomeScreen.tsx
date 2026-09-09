@@ -6,6 +6,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
+import * as chatApi from "../../api/chat";
 import * as financeApi from "../../api/finance";
 import * as tasksApi from "../../api/tasks";
 import { useAuth } from "../../auth/AuthContext";
@@ -23,7 +24,7 @@ import { buildTimeline, TodayTimeline, type TimelineEntry } from "../../componen
 import { useFeatureFlags } from "../../features/FeatureFlagsContext";
 import type { HomeStackParamList, MainTabParamList } from "../../navigation/types";
 import { cancelTaskReminder } from "../../notifications/notificationService";
-import { enqueueTaskComplete, enqueueTaskDelete, isNetworkFailure } from "../../offline/offlineQueue";
+import { enqueueTaskComplete, enqueueTaskDelete, getFailedCount, isNetworkFailure } from "../../offline/offlineQueue";
 import { scopedKey } from "../../offline/scope";
 import { getJson, setJson } from "../../offline/storage";
 import { useTheme } from "../../theme/useTheme";
@@ -77,6 +78,23 @@ export function HomeScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [taskPendingDelete, setTaskPendingDelete] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  /** Rough count for the bell badge — the Notifications Centre computes the same signals in
+   * full; this only needs a number, not the aggregated list itself. */
+  const loadNotificationCount = useCallback(async () => {
+    try {
+      const [overdueTasks, conversations, failedSyncCount] = await Promise.all([
+        tasksApi.listTasks({ status: "overdue" }),
+        chatApi.listConversations(),
+        getFailedCount(),
+      ]);
+      const unreadChats = conversations.reduce((sum, c) => sum + (c.unreadCount > 0 ? 1 : 0), 0);
+      setNotificationCount(overdueTasks.length + unreadChats + failedSyncCount);
+    } catch {
+      // Best-effort badge — a failed count fetch shouldn't disrupt the rest of the dashboard.
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setError(null);
@@ -129,7 +147,8 @@ export function HomeScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load])
+      loadNotificationCount();
+    }, [load, loadNotificationCount])
   );
 
   const editTask = useCallback(
@@ -295,6 +314,12 @@ export function HomeScreen({ navigation }: Props) {
         title={`${greeting()}${user?.name ? `, ${user.name.split(" ")[0]}` : ""}`}
         subtitle="Here's what's happening today"
         actions={[
+          {
+            icon: "notifications-outline",
+            label: "Notifications",
+            badgeCount: notificationCount,
+            onPress: () => navigation.navigate("NotificationsCenter"),
+          },
           {
             icon: "search",
             label: "Search your tasks and money",
