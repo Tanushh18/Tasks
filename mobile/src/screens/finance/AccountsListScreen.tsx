@@ -6,10 +6,13 @@ import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiErrorMessage } from "../../api/client";
 import * as financeApi from "../../api/finance";
+import { AppHeader } from "../../components/AppHeader";
 import { Card } from "../../components/Card";
 import { SectionHeader } from "../../components/SectionHeader";
-import { Skeleton, SkeletonLines } from "../../components/Skeleton";
+import { SkeletonList } from "../../components/Skeleton";
+import { StatCard } from "../../components/StatCard";
 import { EmptyState, ErrorState } from "../../components/StateViews";
+import { SyncBanner } from "../../components/SyncIndicator";
 import type { FinanceStackParamList } from "../../navigation/types";
 import { isNetworkFailure } from "../../offline/offlineQueue";
 import { loadCache, saveCache } from "../../offline/readCache";
@@ -32,8 +35,10 @@ const ACCOUNT_ICONS: Record<string, React.ComponentProps<typeof Ionicons>["name"
   custom: "pricetag",
 };
 
+const CARD_WIDTH = 220;
+
 export function AccountsListScreen({ navigation }: Props) {
-  const { colors, spacing, radius, typography, touchTarget, shadow } = useTheme();
+  const { colors, spacing, radius, typography, touchTarget, shadow, feature } = useTheme();
 
   const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [totals, setTotals] = useState<{ cashIn: number; cashOut: number; netFlow: number } | null>(null);
@@ -80,85 +85,53 @@ export function AccountsListScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["top", "left", "right"]}>
-      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
-        <View style={styles.headerRow}>
-          <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
-            Money
-          </Text>
-          <View style={{ flexDirection: "row", gap: spacing.sm }}>
-            <Pressable
-              onPress={() => navigation.navigate("GroupsList")}
-              accessibilityRole="button"
-              accessibilityLabel="Group expenses — split trip or shared spending"
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.headerAction,
-                {
-                  minWidth: touchTarget.min,
-                  minHeight: touchTarget.min,
-                  borderRadius: radius.pill,
-                  backgroundColor: colors.surfaceAlt,
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}
-            >
-              <Ionicons name="people" size={22} color={colors.text} />
-            </Pressable>
-            <Pressable
-              onPress={() => navigation.navigate("Insights")}
-              accessibilityRole="button"
-              accessibilityLabel="See where your money went"
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.headerAction,
-                {
-                  minWidth: touchTarget.min,
-                  minHeight: touchTarget.min,
-                  borderRadius: radius.pill,
-                  backgroundColor: colors.surfaceAlt,
-                  opacity: pressed ? 0.7 : 1,
-                },
-              ]}
-            >
-              <Ionicons name="stats-chart" size={22} color={colors.text} />
-            </Pressable>
-          </View>
-        </View>
+      <AppHeader
+        title="Money"
+        actions={[
+          {
+            icon: "people",
+            label: "Group expenses — split trip or shared spending",
+            onPress: () => navigation.navigate("GroupsList"),
+          },
+          { icon: "stats-chart", label: "See where your money went", onPress: () => navigation.navigate("Insights") },
+        ]}
+      />
 
-        {/* Overview. A real balance of zero matters, so nothing is shown until totals arrive. */}
-        <Card style={{ marginTop: spacing.lg }}>
-          {totals === null ? (
-            <View accessibilityRole="progressbar" accessibilityLabel="Loading your balance">
-              <Skeleton height={16} width="35%" />
-              <Skeleton height={30} width="60%" style={{ marginTop: spacing.sm }} />
-              <Skeleton height={16} width="80%" style={{ marginTop: spacing.lg }} />
-            </View>
-          ) : (
-            <>
-              <Text style={[typography.caption, { color: colors.textMuted }]}>Balance</Text>
-              <Text
-                style={[typography.amount, { color: colors.text, marginTop: 2 }]}
-                accessibilityLabel={`Balance ${formatCurrency(totals.netFlow)}`}
-              >
-                {formatCurrency(totals.netFlow)}
-              </Text>
-              <View style={[styles.totalsRow, { marginTop: spacing.lg }]}>
-                <View style={styles.flex}>
-                  <Text style={[typography.caption, { color: colors.textMuted }]}>Money in</Text>
-                  <Text style={[typography.h3, { color: colors.success, marginTop: 2 }]}>
-                    {formatCurrency(totals.cashIn)}
-                  </Text>
-                </View>
-                <View style={styles.flex}>
-                  <Text style={[typography.caption, { color: colors.textMuted }]}>Money out</Text>
-                  <Text style={[typography.h3, { color: colors.danger, marginTop: 2 }]}>
-                    {formatCurrency(totals.cashOut)}
-                  </Text>
-                </View>
-              </View>
-            </>
-          )}
-        </Card>
+      <View style={{ paddingHorizontal: spacing.lg }}>
+        {showingOfflineData ? (
+          <View style={{ marginTop: spacing.lg }}>
+            <SyncBanner />
+          </View>
+        ) : null}
+
+        {/* Money in / out / net — the three figures a family actually checks, no accounting jargon. */}
+        <View style={[styles.statRow, { marginTop: spacing.lg, gap: spacing.md }]}>
+          <StatCard
+            label="Money in"
+            value={totals ? formatCurrency(totals.cashIn) : undefined}
+            icon="arrow-down-circle"
+            tone={colors.success}
+            toneMuted={colors.successMuted}
+            style={styles.flex}
+          />
+          <StatCard
+            label="Money out"
+            value={totals ? formatCurrency(totals.cashOut) : undefined}
+            icon="arrow-up-circle"
+            tone={colors.danger}
+            toneMuted={colors.dangerMuted}
+            style={styles.flex}
+          />
+        </View>
+        <StatCard
+          label="Net"
+          value={totals ? formatCurrency(totals.netFlow) : undefined}
+          detail="Money in minus money out"
+          icon="wallet"
+          tone={feature.finance.solid}
+          toneMuted={feature.finance.muted}
+          style={{ marginTop: spacing.md }}
+        />
 
         {/* The two things people open this tab to do. */}
         <View style={[styles.actionRow, { marginTop: spacing.lg, gap: spacing.md }]}>
@@ -181,26 +154,9 @@ export function AccountsListScreen({ navigation }: Props) {
         </View>
       </View>
 
-      {showingOfflineData ? (
-        <Text
-          style={[
-            typography.caption,
-            {
-              color: colors.textMuted,
-              backgroundColor: colors.surfaceAlt,
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.lg,
-              textAlign: "center",
-            },
-          ]}
-        >
-          Showing offline data — will refresh when you're back online
-        </Text>
-      ) : null}
-
       {loading ? (
         <View style={{ paddingHorizontal: spacing.lg }}>
-          <SkeletonLines count={4} />
+          <SkeletonList count={3} />
         </View>
       ) : error ? (
         <ErrorState
@@ -210,11 +166,27 @@ export function AccountsListScreen({ navigation }: Props) {
             load();
           }}
         />
+      ) : accounts.length === 0 ? (
+        <View style={{ paddingHorizontal: spacing.lg }}>
+          <Card>
+            <EmptyState
+              icon="wallet-outline"
+              tone={feature.finance.solid}
+              toneMuted={feature.finance.muted}
+              title="No accounts added"
+              subtitle="An account is just a pot to track — like Home, Cash or Savings."
+              actionLabel="Add Account"
+              onAction={() => navigation.navigate("AccountForm", undefined)}
+            />
+          </Card>
+        </View>
       ) : (
         <FlatList
           data={accounts}
           keyExtractor={(item) => item.accountId}
-          contentContainerStyle={{ padding: spacing.lg, paddingTop: 0, paddingBottom: 96, flexGrow: 1 }}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 96, gap: spacing.md }}
           renderItem={({ item }) => (
             <Pressable
               onPress={() => navigation.navigate("AccountDetail", { accountId: item.accountId })}
@@ -222,44 +194,33 @@ export function AccountsListScreen({ navigation }: Props) {
               accessibilityLabel={`${item.name}, balance ${formatCurrency(item.balance)}`}
               style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
             >
-              <Card style={{ marginBottom: spacing.md, minHeight: touchTarget.large }}>
-                <View style={styles.accountRow}>
-                  <View
-                    style={[
-                      styles.accountIcon,
-                      { backgroundColor: colors.primaryMuted, borderRadius: radius.md, marginRight: spacing.md },
-                    ]}
-                  >
-                    <Ionicons name={ACCOUNT_ICONS[item.type] ?? "pricetag"} size={20} color={colors.primary} />
-                  </View>
-                  <View style={styles.flex}>
-                    <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
-                      {formatCurrency(item.cashIn)} in · {formatCurrency(item.cashOut)} out
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      typography.h3,
-                      { color: item.balance >= 0 ? colors.success : colors.danger, marginLeft: spacing.sm },
-                    ]}
-                  >
-                    {formatCurrency(item.balance)}
-                  </Text>
+              <Card style={[styles.accountCard, shadow.card, { width: CARD_WIDTH, minHeight: touchTarget.large + 40 }]}>
+                <View
+                  style={[
+                    styles.accountIcon,
+                    { backgroundColor: feature.finance.muted, borderRadius: radius.md, marginBottom: spacing.md },
+                  ]}
+                >
+                  <Ionicons name={ACCOUNT_ICONS[item.type] ?? "pricetag"} size={20} color={feature.finance.solid} />
                 </View>
+                <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text
+                  style={[
+                    typography.h2,
+                    { color: item.balance >= 0 ? colors.success : colors.danger, marginTop: 2 },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {formatCurrency(item.balance)}
+                </Text>
+                <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]} numberOfLines={1}>
+                  {formatCurrency(item.cashIn)} in · {formatCurrency(item.cashOut)} out
+                </Text>
               </Card>
             </Pressable>
           )}
-          ListEmptyComponent={
-            <EmptyState
-              title="No accounts added"
-              subtitle="An account is just a pot to track — like Home, Cash or Savings."
-              actionLabel="Add Account"
-              onAction={() => navigation.navigate("AccountForm", undefined)}
-            />
-          }
         />
       )}
 
@@ -323,12 +284,10 @@ function QuickMoneyAction({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  headerAction: { alignItems: "center", justifyContent: "center" },
-  totalsRow: { flexDirection: "row", gap: 16 },
+  statRow: { flexDirection: "row" },
   actionRow: { flexDirection: "row" },
   moneyAction: { flex: 1, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth },
-  accountRow: { flexDirection: "row", alignItems: "center" },
+  accountCard: { justifyContent: "flex-start" },
   accountIcon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   fab: { position: "absolute", right: 20, bottom: 20, flexDirection: "row", alignItems: "center", justifyContent: "center" },
 });

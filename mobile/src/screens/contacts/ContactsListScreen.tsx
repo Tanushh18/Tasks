@@ -10,6 +10,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { Badge } from "../../components/Badge";
 import { Card } from "../../components/Card";
 import { ConfirmationSheet } from "../../components/ConfirmationSheet";
+import { SectionHeader } from "../../components/SectionHeader";
 import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import type { ContactsStackParamList } from "../../navigation/types";
@@ -81,6 +82,12 @@ export function ContactsListScreen({ navigation }: Props) {
     );
   }, [contacts, debouncedSearch]);
 
+  const recentlyAdded = useMemo(
+    () => [...contacts].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5),
+    [contacts]
+  );
+  const showRecent = !debouncedSearch.trim() && recentlyAdded.length > 1;
+
   const confirmDelete = useCallback(async () => {
     const contact = contactPendingDelete;
     if (!contact) return;
@@ -100,9 +107,20 @@ export function ContactsListScreen({ navigation }: Props) {
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["top", "left", "right"]}>
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
         <View style={styles.rowBetween}>
-          <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
-            Contacts
-          </Text>
+          <View style={styles.titleRow}>
+            <Pressable
+              onPress={() => navigation.goBack()}
+              accessibilityRole="button"
+              accessibilityLabel="Back to Family"
+              hitSlop={8}
+              style={{ marginRight: spacing.sm }}
+            >
+              <Ionicons name="chevron-back" size={24} color={colors.text} />
+            </Pressable>
+            <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
+              Contacts
+            </Text>
+          </View>
           <Pressable
             onPress={() => navigation.navigate("ContactImport")}
             accessibilityRole="button"
@@ -161,6 +179,41 @@ export function ContactsListScreen({ navigation }: Props) {
         >
           Showing offline data — will refresh when you're back online
         </Text>
+      ) : null}
+
+      {!loading && !error && showRecent ? (
+        <View style={{ marginTop: spacing.md }}>
+          <View style={{ paddingHorizontal: spacing.lg }}>
+            <SectionHeader title="Recently added" />
+          </View>
+          <FlatList
+            data={recentlyAdded}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => navigation.navigate("ContactForm", { contactId: item.id })}
+                accessibilityRole="button"
+                accessibilityLabel={item.name}
+                style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+              >
+                <Card style={styles.recentCard}>
+                  <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]} numberOfLines={1}>
+                    {item.number}
+                  </Text>
+                </Card>
+              </Pressable>
+            )}
+          />
+          <View style={{ paddingHorizontal: spacing.lg, marginTop: spacing.lg }}>
+            <SectionHeader title="All contacts" />
+          </View>
+        </View>
       ) : null}
 
       {loading ? (
@@ -275,6 +328,8 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 16 },
   card: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  titleRow: { flexDirection: "row", alignItems: "center" },
   fab: { position: "absolute", right: 20, bottom: 20, flexDirection: "row", alignItems: "center", justifyContent: "center" },
   importButton: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6 },
+  recentCard: { width: 160 },
 });

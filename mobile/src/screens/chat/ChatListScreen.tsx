@@ -71,9 +71,20 @@ export function ChatListScreen({ navigation }: Props) {
           justifyContent: "space-between",
         }}
       >
-        <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
-          Chat
-        </Text>
+        <View style={styles.titleRow}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Back to Family"
+            hitSlop={8}
+            style={{ marginRight: spacing.sm }}
+          >
+            <Ionicons name="chevron-back" size={24} color={colors.text} />
+          </Pressable>
+          <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
+            Chat
+          </Text>
+        </View>
         <Pressable
           onPress={() => navigation.navigate("BluetoothChat")}
           accessibilityRole="button"
@@ -216,6 +227,7 @@ export function ChatListScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  titleRow: { flexDirection: "row", alignItems: "center" },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   fab: { position: "absolute", right: 20, bottom: 20, flexDirection: "row", alignItems: "center", justifyContent: "center" },
   bluetoothButton: {

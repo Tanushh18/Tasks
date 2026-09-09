@@ -20,14 +20,17 @@ export function FamilyNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="FamilyHub" component={FamilyHubScreen} />
-      <Stack.Screen name="ContactsList" component={ContactsListScreen} options={{ headerShown: true, title: "Contacts" }} />
+      {/* ContactsList and ChatList render their own title/search header (like
+          FamilyHub) rather than the native stack header, so they don't get
+          shown twice. */}
+      <Stack.Screen name="ContactsList" component={ContactsListScreen} />
       <Stack.Screen name="ContactForm" component={ContactFormScreen} options={{ headerShown: true, title: "" }} />
       <Stack.Screen
         name="ContactImport"
         component={ContactImportScreen}
         options={{ headerShown: true, title: "Import contacts" }}
       />
-      <Stack.Screen name="ChatList" component={ChatListScreen} options={{ headerShown: true, title: "Chat" }} />
+      <Stack.Screen name="ChatList" component={ChatListScreen} />
       <Stack.Screen name="ChatThread" component={ChatThreadScreen} options={{ headerShown: true, title: "" }} />
       <Stack.Screen
         name="BluetoothChat"

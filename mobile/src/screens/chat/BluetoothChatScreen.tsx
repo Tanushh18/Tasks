@@ -58,11 +58,8 @@ export function BluetoothChatScreen() {
   const isReady = status === "running";
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["top", "left", "right", "bottom"]}>
-      <View style={[styles.header, { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }]}>
-        <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
-          Bluetooth Chat
-        </Text>
+    <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["left", "right", "bottom"]}>
+      <View style={[styles.header, { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.sm }]}>
         <View style={styles.statusRow}>
           <View
             style={[
