@@ -10,6 +10,7 @@ export interface User {
   isAdmin: boolean;
   blocked: boolean;
   mustChangeMpin: boolean;
+  weeklySummaryEnabled: boolean;
   createdAt: string;
 }
 

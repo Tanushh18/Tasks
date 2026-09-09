@@ -19,4 +19,6 @@ export const updateFeatureFlagsSchema = z.object({
   shoppingLists: z.boolean().optional(),
   recurringPayments: z.boolean().optional(),
   familyGoals: z.boolean().optional(),
+  polls: z.boolean().optional(),
+  weeklySummary: z.boolean().optional(),
 });

@@ -27,6 +27,8 @@ router.get(
         shoppingLists: flags.shoppingLists,
         recurringPayments: flags.recurringPayments,
         familyGoals: flags.familyGoals,
+        polls: flags.polls,
+        weeklySummary: flags.weeklySummary,
       },
     });
   })

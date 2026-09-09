@@ -16,7 +16,9 @@ import { GoalFormScreen } from "../screens/goals/GoalFormScreen";
 import { GoalsListScreen } from "../screens/goals/GoalsListScreen";
 import { RecurringPaymentFormScreen } from "../screens/payments/RecurringPaymentFormScreen";
 import { RecurringPaymentsListScreen } from "../screens/payments/RecurringPaymentsListScreen";
+import { WeeklySummaryScreen } from "../screens/summary/WeeklySummaryScreen";
 import { NotesNavigator } from "./NotesNavigator";
+import { PollsNavigator } from "./PollsNavigator";
 import { SettingsNavigator } from "./SettingsNavigator";
 import { VaultNavigator } from "./VaultNavigator";
 import type { MoreStackParamList } from "./types";
@@ -33,6 +35,12 @@ export function MoreNavigator() {
       <Stack.Screen name="Vault" component={VaultNavigator} />
       <Stack.Screen name="Inventory" component={InventoryNavigator} />
       <Stack.Screen name="EmergencyInfo" component={EmergencyNavigator} options={{ headerShown: true, title: "Emergency Info" }} />
+      <Stack.Screen name="Polls" component={PollsNavigator} />
+      <Stack.Screen
+        name="WeeklySummary"
+        component={WeeklySummaryScreen}
+        options={{ headerShown: true, title: "Weekly Summary" }}
+      />
       <Stack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ headerShown: true, title: "Admin" }} />
       <Stack.Screen name="FeatureFlags" component={FeatureFlagsScreen} options={{ headerShown: true, title: "Feature Flags" }} />
       <Stack.Screen name="SyncCenter" component={SyncCenterScreen} options={{ headerShown: true, title: "Sync Center" }} />

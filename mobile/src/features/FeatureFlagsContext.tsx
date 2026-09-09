@@ -18,6 +18,8 @@ const ALL_ON: FeatureFlags = {
   shoppingLists: true,
   recurringPayments: true,
   familyGoals: true,
+  polls: true,
+  weeklySummary: true,
 };
 
 interface FeatureFlagsContextValue {

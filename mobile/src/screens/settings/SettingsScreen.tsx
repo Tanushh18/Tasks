@@ -103,6 +103,14 @@ export function SettingsScreen({ navigation }: Props) {
     );
   }
 
+  function toggleWeeklySummary(next: boolean) {
+    if (!user) return;
+    updateUser({ ...user, weeklySummaryEnabled: next });
+    void updateSetting({ weeklySummaryEnabled: next }, () =>
+      updateUser({ ...user, weeklySummaryEnabled: !next })
+    );
+  }
+
   async function changeCurrency(currency: string) {
     if (!user || user.currency === currency) return;
     const previous = user.currency;
@@ -172,6 +180,16 @@ export function SettingsScreen({ navigation }: Props) {
         detail="Read answers aloud after you use your voice"
         value={user?.speakAssistantReplies ?? true}
         onValueChange={toggleSpeakReplies}
+      />
+
+      <View style={{ marginTop: spacing.xl }}>
+        <SectionHeader title="Weekly summary" subtitle="A computed recap of your last 7 days" />
+      </View>
+      <ToggleRow
+        label="Show weekly summary"
+        detail="Tasks, spending and reminders from the last week, on demand"
+        value={user?.weeklySummaryEnabled ?? false}
+        onValueChange={toggleWeeklySummary}
       />
 
       <View style={{ marginTop: spacing.xl }}>

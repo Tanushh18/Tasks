@@ -21,12 +21,14 @@ import locationRoutes from "./routes/locationRoutes";
 import noteRoutes from "./routes/noteRoutes";
 import ocrRoutes from "./routes/ocrRoutes";
 import recurringPaymentRoutes from "./routes/recurringPaymentRoutes";
+import pollRoutes from "./routes/pollRoutes";
 import reminderRoutes from "./routes/reminderRoutes";
 import searchRoutes from "./routes/searchRoutes";
 import shoppingListRoutes from "./routes/shoppingListRoutes";
 import taskRoutes from "./routes/taskRoutes";
 import userRoutes from "./routes/userRoutes";
 import vaultDocumentRoutes from "./routes/vaultDocumentRoutes";
+import weeklySummaryRoutes from "./routes/weeklySummaryRoutes";
 
 export function createApp(): Express {
   const app = express();
@@ -73,6 +75,8 @@ export function createApp(): Express {
   app.use("/api/shopping-lists", shoppingListRoutes);
   app.use("/api/recurring-payments", recurringPaymentRoutes);
   app.use("/api/family-goals", familyGoalRoutes);
+  app.use("/api/polls", pollRoutes);
+  app.use("/api/weekly-summary", weeklySummaryRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

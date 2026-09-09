@@ -17,6 +17,8 @@ const featureFlagsSchema = new Schema(
     shoppingLists: { type: Boolean, default: true },
     recurringPayments: { type: Boolean, default: true },
     familyGoals: { type: Boolean, default: true },
+    polls: { type: Boolean, default: true },
+    weeklySummary: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

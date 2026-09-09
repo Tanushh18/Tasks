@@ -25,6 +25,8 @@ const FLAG_LABELS: { key: keyof FeatureFlags; label: string; detail: string }[] 
   { key: "shoppingLists", label: "Shopping Lists", detail: "Shared, checkable shopping lists" },
   { key: "recurringPayments", label: "Recurring Payments", detail: "Recurring bill tracking and due-date reminders" },
   { key: "familyGoals", label: "Family Goals", detail: "Shared savings goals and contributions" },
+  { key: "polls", label: "Family Polls", detail: "Quick question-and-vote polls" },
+  { key: "weeklySummary", label: "Weekly Summary", detail: "The opt-in weekly recap screen" },
 ];
 
 export function FeatureFlagsScreen() {

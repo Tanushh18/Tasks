@@ -55,6 +55,8 @@ function serializeFlags(flags: {
   shoppingLists: boolean;
   recurringPayments: boolean;
   familyGoals: boolean;
+  polls: boolean;
+  weeklySummary: boolean;
 }) {
   return {
     contacts: flags.contacts,
@@ -71,6 +73,8 @@ function serializeFlags(flags: {
     shoppingLists: flags.shoppingLists,
     recurringPayments: flags.recurringPayments,
     familyGoals: flags.familyGoals,
+    polls: flags.polls,
+    weeklySummary: flags.weeklySummary,
   };
 }
 

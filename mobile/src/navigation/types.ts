@@ -90,6 +90,12 @@ export type EmergencyStackParamList = {
   EmergencyInfoMain: undefined;
 };
 
+export type PollsStackParamList = {
+  PollsList: undefined;
+  PollForm: undefined;
+  PollDetail: { pollId: string };
+};
+
 export type MoreStackParamList = {
   MoreMain: undefined;
   Assistant: { autoListen?: boolean } | undefined;
@@ -98,6 +104,8 @@ export type MoreStackParamList = {
   Vault: NavigatorScreenParams<VaultStackParamList>;
   Inventory: NavigatorScreenParams<InventoryStackParamList>;
   EmergencyInfo: NavigatorScreenParams<EmergencyStackParamList>;
+  Polls: NavigatorScreenParams<PollsStackParamList>;
+  WeeklySummary: undefined;
   AdminUsers: undefined;
   FeatureFlags: undefined;
   SyncCenter: undefined;

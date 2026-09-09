@@ -32,6 +32,7 @@ function toPublicUser(user: {
   speakAssistantReplies: boolean;
   isAdmin: boolean;
   mustChangeMpin: boolean;
+  weeklySummaryEnabled: boolean;
   createdAt?: Date;
 }) {
   return {
@@ -45,6 +46,7 @@ function toPublicUser(user: {
     speakAssistantReplies: user.speakAssistantReplies,
     isAdmin: user.isAdmin,
     mustChangeMpin: user.mustChangeMpin,
+    weeklySummaryEnabled: user.weeklySummaryEnabled,
     createdAt: user.createdAt,
   };
 }
@@ -146,12 +148,20 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const updateSettings = asyncHandler(async (req: Request, res: Response) => {
-  const { currency, timezone, notificationsEnabled, confirmFinancialActions, speakAssistantReplies } = req.body as {
+  const {
+    currency,
+    timezone,
+    notificationsEnabled,
+    confirmFinancialActions,
+    speakAssistantReplies,
+    weeklySummaryEnabled,
+  } = req.body as {
     currency?: string;
     timezone?: string;
     notificationsEnabled?: boolean;
     confirmFinancialActions?: boolean;
     speakAssistantReplies?: boolean;
+    weeklySummaryEnabled?: boolean;
   };
   const user = await User.findById(req.userId);
   if (!user) throw ApiError.notFound("User not found");
@@ -161,6 +171,7 @@ export const updateSettings = asyncHandler(async (req: Request, res: Response) =
   if (notificationsEnabled !== undefined) user.notificationsEnabled = notificationsEnabled;
   if (confirmFinancialActions !== undefined) user.confirmFinancialActions = confirmFinancialActions;
   if (speakAssistantReplies !== undefined) user.speakAssistantReplies = speakAssistantReplies;
+  if (weeklySummaryEnabled !== undefined) user.weeklySummaryEnabled = weeklySummaryEnabled;
   await user.save();
 
   res.json({ user: toPublicUser(user) });

@@ -27,6 +27,8 @@ describe("feature flags", () => {
       shoppingLists: true,
       recurringPayments: true,
       familyGoals: true,
+      polls: true,
+      weeklySummary: true,
     });
   });
 
