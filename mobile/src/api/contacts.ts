@@ -24,7 +24,7 @@ export async function createContact(input: ContactInput): Promise<Contact> {
 }
 
 export async function updateContact(id: string, input: Partial<ContactInput>): Promise<Contact> {
-  const { data } = await apiClient.patch<{ contact: Contact }>(`/contacts/${id}`, input);
+  const { data } = await apiClient.put<{ contact: Contact }>(`/contacts/${id}`, input);
   return data.contact;
 }
 

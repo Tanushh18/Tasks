@@ -27,7 +27,7 @@ export async function createNote(input: NoteInput): Promise<Note> {
 }
 
 export async function updateNote(id: string, input: Partial<NoteInput>): Promise<Note> {
-  const { data } = await apiClient.patch<{ note: Note }>(`/notes/${id}`, input);
+  const { data } = await apiClient.put<{ note: Note }>(`/notes/${id}`, input);
   return data.note;
 }
 
