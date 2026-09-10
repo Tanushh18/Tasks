@@ -30,6 +30,7 @@ import { cancelTaskReminder } from "../../notifications/notificationService";
 import { enqueueTaskComplete, enqueueTaskDelete, getFailedCount, isNetworkFailure } from "../../offline/offlineQueue";
 import { scopedKey } from "../../offline/scope";
 import { getJson, setJson } from "../../offline/storage";
+import { useResponsive } from "../../theme/useResponsive";
 import { useTheme } from "../../theme/useTheme";
 import type { FinancialSummary, Task, TaskCounts, Transaction } from "../../types/models";
 import { formatCurrency } from "../../utils/currency";
@@ -55,6 +56,12 @@ interface DashboardCache {
   cachedAt: string;
 }
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
 function greeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -71,6 +78,7 @@ export function HomeScreen({ navigation }: Props) {
   const { colors, spacing, radius, typography, touchTarget, shadow, feature } = useTheme();
   const { user } = useAuth();
   const { flags } = useFeatureFlags();
+  const { columns, isTablet } = useResponsive();
 
   const [counts, setCounts] = useState<TaskCounts | null>(null);
   const [todaysTasks, setTodaysTasks] = useState<Task[]>([]);
@@ -521,7 +529,7 @@ export function HomeScreen({ navigation }: Props) {
         ]}
       />
 
-      <ScreenContainer onRefresh={load} refreshing={false} edges={["left", "right"]}>
+      <ScreenContainer onRefresh={load} refreshing={false} edges={["left", "right"]} fullWidth={isTablet}>
         <SyncBanner />
 
         {/* Anything that slipped. Stated as a fact with a way to act, never as a scolding. */}
@@ -550,8 +558,21 @@ export function HomeScreen({ navigation }: Props) {
         {/* Quick actions sit above the fold — these are what people open the app for. */}
         <QuickActions actions={quickActions} />
 
-        {/* Everything below is reorderable/hideable from Customize Home. */}
-        {widgetOrder.map((id) => renderWidget(id))}
+        {/* Everything below is reorderable/hideable from Customize Home. On a
+            tablet, pair widgets into two columns instead of stretching each
+            one full-width (spec §38) — order is preserved, just laid out
+            two-per-row. */}
+        {columns === 2
+          ? chunk(widgetOrder, 2).map((pair, rowIndex) => (
+              <View key={`row-${rowIndex}`} style={{ flexDirection: "row", gap: spacing.lg }}>
+                {pair.map((id) => (
+                  <View key={id} style={{ flex: 1 }}>
+                    {renderWidget(id)}
+                  </View>
+                ))}
+              </View>
+            ))
+          : widgetOrder.map((id) => renderWidget(id))}
       </ScreenContainer>
 
       {flags.assistant ? (
