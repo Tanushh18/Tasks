@@ -9,6 +9,7 @@ function serializeUser(user: {
   blocked: boolean;
   isAdmin: boolean;
   createdAt?: Date;
+  lastLoginAt?: Date | null;
 }) {
   return {
     id: String(user._id),
@@ -17,6 +18,7 @@ function serializeUser(user: {
     blocked: user.blocked,
     isAdmin: user.isAdmin,
     createdAt: user.createdAt,
+    lastLoginAt: user.lastLoginAt ?? null,
   };
 }
 

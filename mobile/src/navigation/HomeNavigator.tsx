@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
+import { CustomizeHomeScreen } from "../screens/home/CustomizeHomeScreen";
 import { HomeScreen } from "../screens/home/HomeScreen";
 import { SearchScreen } from "../screens/home/SearchScreen";
 import { NotificationsCenterScreen } from "../screens/notifications/NotificationsCenterScreen";
@@ -16,6 +17,11 @@ export function HomeNavigator() {
         name="NotificationsCenter"
         component={NotificationsCenterScreen}
         options={{ headerShown: true, title: "Notifications" }}
+      />
+      <Stack.Screen
+        name="CustomizeHome"
+        component={CustomizeHomeScreen}
+        options={{ headerShown: true, title: "Customize Home" }}
       />
     </Stack.Navigator>
   );

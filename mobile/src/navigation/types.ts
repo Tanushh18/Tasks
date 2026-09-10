@@ -9,6 +9,7 @@ export type HomeStackParamList = {
   HomeMain: undefined;
   Search: undefined;
   NotificationsCenter: undefined;
+  CustomizeHome: undefined;
 };
 
 export type TasksStackParamList = {

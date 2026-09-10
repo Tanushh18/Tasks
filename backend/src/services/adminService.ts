@@ -26,7 +26,7 @@ export async function updateFeatureFlags(patch: FeatureFlagsPatch): Promise<Feat
 
 export async function listUsers(callerId: string) {
   return User.find({ _id: { $ne: callerId } })
-    .select("name mobileNumber blocked isAdmin createdAt")
+    .select("name mobileNumber blocked isAdmin createdAt lastLoginAt")
     .sort("-createdAt");
 }
 

@@ -5,6 +5,7 @@ import morgan from "morgan";
 import { env } from "./config/env";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { apiRateLimiter } from "./middleware/rateLimiter";
+import activityFeedRoutes from "./routes/activityFeedRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import assistantRoutes from "./routes/assistantRoutes";
 import authRoutes from "./routes/authRoutes";
@@ -77,6 +78,7 @@ export function createApp(): Express {
   app.use("/api/family-goals", familyGoalRoutes);
   app.use("/api/polls", pollRoutes);
   app.use("/api/weekly-summary", weeklySummaryRoutes);
+  app.use("/api/activity-feed", activityFeedRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

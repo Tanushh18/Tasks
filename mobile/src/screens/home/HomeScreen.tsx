@@ -7,6 +7,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiErrorMessage } from "../../api/client";
+import * as activityFeedApi from "../../api/activityFeed";
 import * as chatApi from "../../api/chat";
 import * as financeApi from "../../api/finance";
 import * as tasksApi from "../../api/tasks";
@@ -23,6 +24,7 @@ import { EmptyState, ErrorState } from "../../components/StateViews";
 import { SyncBanner } from "../../components/SyncIndicator";
 import { buildTimeline, TodayTimeline, type TimelineEntry } from "../../components/TodayTimeline";
 import { useFeatureFlags } from "../../features/FeatureFlagsContext";
+import { getWidgetPrefs, WIDGET_DEFINITIONS, type WidgetId, type WidgetPrefs } from "../../home/widgets";
 import type { HomeStackParamList, MainTabParamList } from "../../navigation/types";
 import { cancelTaskReminder } from "../../notifications/notificationService";
 import { enqueueTaskComplete, enqueueTaskDelete, getFailedCount, isNetworkFailure } from "../../offline/offlineQueue";
@@ -80,6 +82,9 @@ export function HomeScreen({ navigation }: Props) {
   const [taskPendingDelete, setTaskPendingDelete] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [widgetPrefs, setWidgetPrefsState] = useState<WidgetPrefs | null>(null);
+  const [activity, setActivity] = useState<activityFeedApi.ActivityEntry[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
 
   /** Rough count for the bell badge — the Notifications Centre computes the same signals in
    * full; this only needs a number, not the aggregated list itself. */
@@ -145,11 +150,24 @@ export function HomeScreen({ navigation }: Props) {
     }
   }, []);
 
+  const loadActivity = useCallback(async () => {
+    setActivityLoading(true);
+    try {
+      setActivity(await activityFeedApi.getActivityFeed());
+    } catch {
+      // Non-critical dashboard content — a failed fetch just leaves the section empty.
+    } finally {
+      setActivityLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       load();
       loadNotificationCount();
-    }, [load, loadNotificationCount])
+      loadActivity();
+      getWidgetPrefs().then(setWidgetPrefsState);
+    }, [load, loadNotificationCount, loadActivity])
   );
 
   const editTask = useCallback(
@@ -309,6 +327,175 @@ export function HomeScreen({ navigation }: Props) {
 
   const overdueCount = counts?.overdue ?? 0;
 
+  function renderWidget(id: WidgetId) {
+    switch (id) {
+      case "today":
+        return (
+          <View style={{ marginTop: spacing.xl }} key={id}>
+            <SectionHeader
+              title="Today"
+              subtitle={
+                todaysTasks.length === 0 && todaysTransactions.length === 0
+                  ? "Nothing yet"
+                  : `${remainingToday} task${remainingToday === 1 ? "" : "s"} left${todaysTransactions.length > 0 ? ` · ${todaysTransactions.length} money entr${todaysTransactions.length === 1 ? "y" : "ies"}` : ""}`
+              }
+              actionLabel={todaysTasks.length > 0 ? "All tasks" : undefined}
+              onActionPress={() => navigation.navigate("TasksTab", { screen: "TaskList", params: undefined })}
+            />
+            {loading ? (
+              <SkeletonLines count={5} />
+            ) : timeline.length === 0 ? (
+              <Card>
+                <EmptyState
+                  icon="sunny-outline"
+                  tone={feature.tasks.solid}
+                  toneMuted={feature.tasks.muted}
+                  title="Nothing planned yet"
+                  subtitle="Add something your family needs to remember."
+                  actionLabel="Add Task"
+                  onAction={() => navigation.navigate("TasksTab", { screen: "TaskForm", params: undefined })}
+                />
+              </Card>
+            ) : (
+              <Card>
+                <TodayTimeline entries={timeline} />
+              </Card>
+            )}
+          </View>
+        );
+
+      case "money":
+        return (
+          <View style={{ marginTop: spacing.xl }} key={id}>
+            <SectionHeader
+              title="Money this month"
+              actionLabel="Open"
+              onActionPress={() => navigation.navigate("FinanceTab", { screen: "AccountsList", params: undefined })}
+            />
+            <View style={[styles.statRow, { gap: spacing.md }]}>
+              <StatCard
+                label="Money in"
+                value={summary ? formatCurrency(summary.cashIn) : undefined}
+                icon="arrow-down-circle"
+                tone={colors.success}
+                toneMuted={colors.successMuted}
+                style={styles.flex}
+              />
+              <StatCard
+                label="Money out"
+                value={summary ? formatCurrency(summary.cashOut) : undefined}
+                icon="arrow-up-circle"
+                tone={colors.danger}
+                toneMuted={colors.dangerMuted}
+                style={styles.flex}
+              />
+            </View>
+            <StatCard
+              label="Net"
+              value={summary ? formatCurrency(summary.netFlow) : undefined}
+              detail="Money in minus money out, this month"
+              icon="wallet"
+              tone={feature.finance.solid}
+              toneMuted={feature.finance.muted}
+              style={{ marginTop: spacing.md }}
+              onPress={() => navigation.navigate("FinanceTab", { screen: "Insights", params: undefined })}
+            />
+          </View>
+        );
+
+      case "comingUp":
+        return (
+          <View style={{ marginTop: spacing.xl }} key={id}>
+            <SectionHeader title="Coming up" />
+            {loading ? (
+              <SkeletonCard lines={1} />
+            ) : reminders.length === 0 ? (
+              <Card>
+                <EmptyState
+                  icon="notifications-outline"
+                  tone={feature.tasks.solid}
+                  toneMuted={feature.tasks.muted}
+                  title="No reminders set"
+                  subtitle="You'll see upcoming reminders here."
+                />
+              </Card>
+            ) : (
+              reminders.slice(0, REMINDER_PREVIEW_LIMIT).map((task) => (
+                <Pressable
+                  key={task.id}
+                  onPress={() => editTask(task.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${task.title}, ${reminderWhen(task)}`}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, marginBottom: spacing.sm }]}
+                >
+                  <Card style={{ minHeight: touchTarget.large }}>
+                    <View style={styles.rowCentered}>
+                      <View style={[styles.reminderIcon, { backgroundColor: feature.tasks.muted, borderRadius: radius.md }]}>
+                        <Ionicons name="notifications" size={20} color={feature.tasks.solid} />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: spacing.md }}>
+                        <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
+                          {task.title}
+                        </Text>
+                        <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
+                          {reminderWhen(task)}
+                        </Text>
+                      </View>
+                    </View>
+                  </Card>
+                </Pressable>
+              ))
+            )}
+          </View>
+        );
+
+      case "activity":
+        return (
+          <View style={{ marginTop: spacing.xl }} key={id}>
+            <SectionHeader title="Family activity" subtitle="Not a feed to scroll for fun — just what changed." />
+            {activityLoading ? (
+              <SkeletonLines count={3} />
+            ) : activity.length === 0 ? (
+              <Card>
+                <EmptyState
+                  icon="pulse-outline"
+                  tone={feature.contacts.solid}
+                  toneMuted={feature.contacts.muted}
+                  title="Nothing yet"
+                  subtitle="Tasks, expenses and contacts your family adds will show up here."
+                />
+              </Card>
+            ) : (
+              <Card>
+                {activity.slice(0, 6).map((entry, index) => (
+                  <View
+                    key={entry.id}
+                    style={{
+                      paddingVertical: spacing.sm,
+                      borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
+                      borderTopColor: colors.border,
+                    }}
+                  >
+                    <Text style={[typography.body, { color: colors.text }]}>
+                      <Text style={typography.bodyStrong}>{entry.actorName}</Text> {entry.text}
+                      {entry.amount ? ` (${formatCurrency(entry.amount)})` : ""}
+                    </Text>
+                  </View>
+                ))}
+              </Card>
+            )}
+          </View>
+        );
+
+      default:
+        return null;
+    }
+  }
+
+  const widgetOrder = widgetPrefs
+    ? widgetPrefs.order.filter((id) => !widgetPrefs.hidden.includes(id))
+    : WIDGET_DEFINITIONS.map((w) => w.id);
+
   return (
     <SafeAreaView style={styles.flex} edges={["top", "left", "right"]}>
       <AppHeader
@@ -325,6 +512,11 @@ export function HomeScreen({ navigation }: Props) {
             icon: "search",
             label: "Search your tasks and money",
             onPress: () => navigation.navigate("Search"),
+          },
+          {
+            icon: "options-outline",
+            label: "Customize Home",
+            onPress: () => navigation.navigate("CustomizeHome"),
           },
         ]}
       />
@@ -358,125 +550,8 @@ export function HomeScreen({ navigation }: Props) {
         {/* Quick actions sit above the fold — these are what people open the app for. */}
         <QuickActions actions={quickActions} />
 
-        {/* The day as one story: tasks, reminders and money interleaved. */}
-        <View style={{ marginTop: spacing.xl }}>
-          <SectionHeader
-            title="Today"
-            subtitle={
-              todaysTasks.length === 0 && todaysTransactions.length === 0
-                ? "Nothing yet"
-                : `${remainingToday} task${remainingToday === 1 ? "" : "s"} left${todaysTransactions.length > 0 ? ` · ${todaysTransactions.length} money entr${todaysTransactions.length === 1 ? "y" : "ies"}` : ""}`
-            }
-            actionLabel={todaysTasks.length > 0 ? "All tasks" : undefined}
-            onActionPress={() => navigation.navigate("TasksTab", { screen: "TaskList", params: undefined })}
-          />
-
-          {loading ? (
-            <SkeletonLines count={5} />
-          ) : timeline.length === 0 ? (
-            <Card>
-              <EmptyState
-                icon="sunny-outline"
-                tone={feature.tasks.solid}
-                toneMuted={feature.tasks.muted}
-                title="Nothing planned yet"
-                subtitle="Add something your family needs to remember."
-                actionLabel="Add Task"
-                onAction={() => navigation.navigate("TasksTab", { screen: "TaskForm", params: undefined })}
-              />
-            </Card>
-          ) : (
-            <Card>
-              <TodayTimeline entries={timeline} />
-            </Card>
-          )}
-        </View>
-
-        {/* Money, as context rather than the headline. */}
-        <View style={{ marginTop: spacing.xl }}>
-          <SectionHeader
-            title="Money this month"
-            actionLabel="Open"
-            onActionPress={() => navigation.navigate("FinanceTab", { screen: "AccountsList", params: undefined })}
-          />
-          <View style={[styles.statRow, { gap: spacing.md }]}>
-            <StatCard
-              label="Money in"
-              value={summary ? formatCurrency(summary.cashIn) : undefined}
-              icon="arrow-down-circle"
-              tone={colors.success}
-              toneMuted={colors.successMuted}
-              style={styles.flex}
-            />
-            <StatCard
-              label="Money out"
-              value={summary ? formatCurrency(summary.cashOut) : undefined}
-              icon="arrow-up-circle"
-              tone={colors.danger}
-              toneMuted={colors.dangerMuted}
-              style={styles.flex}
-            />
-          </View>
-          <StatCard
-            label="Net"
-            value={summary ? formatCurrency(summary.netFlow) : undefined}
-            detail="Money in minus money out, this month"
-            icon="wallet"
-            tone={feature.finance.solid}
-            toneMuted={feature.finance.muted}
-            style={{ marginTop: spacing.md }}
-            onPress={() => navigation.navigate("FinanceTab", { screen: "Insights", params: undefined })}
-          />
-        </View>
-
-        {/* What's coming up next, beyond today. */}
-        <View style={{ marginTop: spacing.xl }}>
-          <SectionHeader title="Coming up" />
-          {loading ? (
-            <SkeletonCard lines={1} />
-          ) : reminders.length === 0 ? (
-            <Card>
-              <EmptyState
-                icon="notifications-outline"
-                tone={feature.tasks.solid}
-                toneMuted={feature.tasks.muted}
-                title="No reminders set"
-                subtitle="You'll see upcoming reminders here."
-              />
-            </Card>
-          ) : (
-            reminders.slice(0, REMINDER_PREVIEW_LIMIT).map((task) => (
-              <Pressable
-                key={task.id}
-                onPress={() => editTask(task.id)}
-                accessibilityRole="button"
-                accessibilityLabel={`${task.title}, ${reminderWhen(task)}`}
-                style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, marginBottom: spacing.sm }]}
-              >
-                <Card style={{ minHeight: touchTarget.large }}>
-                  <View style={styles.rowCentered}>
-                    <View
-                      style={[
-                        styles.reminderIcon,
-                        { backgroundColor: feature.tasks.muted, borderRadius: radius.md },
-                      ]}
-                    >
-                      <Ionicons name="notifications" size={20} color={feature.tasks.solid} />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: spacing.md }}>
-                      <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
-                        {task.title}
-                      </Text>
-                      <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
-                        {reminderWhen(task)}
-                      </Text>
-                    </View>
-                  </View>
-                </Card>
-              </Pressable>
-            ))
-          )}
-        </View>
+        {/* Everything below is reorderable/hideable from Customize Home. */}
+        {widgetOrder.map((id) => renderWidget(id))}
       </ScreenContainer>
 
       {flags.assistant ? (

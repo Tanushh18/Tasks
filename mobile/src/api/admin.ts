@@ -8,6 +8,7 @@ export interface AdminUser {
   blocked: boolean;
   isAdmin: boolean;
   createdAt: string;
+  lastLoginAt: string | null;
 }
 
 export async function listUsers(): Promise<AdminUser[]> {
