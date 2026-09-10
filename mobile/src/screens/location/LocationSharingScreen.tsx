@@ -2,7 +2,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import * as Location from "expo-location";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT, UrlTile } from "react-native-maps";
+import MapView, { Marker, PROVIDER_DEFAULT, UrlTile } from "../../components/PlatformMapView";
 import * as locationApi from "../../api/location";
 import type { ShareDuration } from "../../api/location";
 import type { UserSearchResult } from "../../api/users";

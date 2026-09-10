@@ -4,8 +4,11 @@ import { NativeEventEmitter, NativeModules, PermissionsAndroid, Platform } from 
 // library). We deliberately avoid GATT connections/peripheral servers — that
 // role is unreliable across the RN ecosystem — in favor of pure advertisement
 // broadcasts, reassembled client-side. See protocol.ts for why.
+// There's no web build of this native module at all (not even a stub), so
+// requiring it on web throws instead of returning undefined — skip it there.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const BLEAdvertiser = require("react-native-ble-advertiser").default ?? require("react-native-ble-advertiser");
+const BLEAdvertiser =
+  Platform.OS === "web" ? null : require("react-native-ble-advertiser").default ?? require("react-native-ble-advertiser");
 import {
   BROADCAST_TARGET,
   ChunkAssembler,
