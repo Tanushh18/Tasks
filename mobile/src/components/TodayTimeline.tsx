@@ -1,8 +1,49 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { AccessibilityInfo, Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme/useTheme";
 import { formatTimeLabel } from "../utils/date";
+
+const STAGGER_STEP_MS = 40;
+const MAX_STAGGER_MS = 240; // cap so a long list doesn't take ages to finish appearing
+
+/** Fades and slides a row in on mount, staggered by position. Skips the
+ * animation under "reduce motion" rather than firing it anyway (spec §37). */
+function FadeInRow({ index, children }: { index: number; children: React.ReactNode }) {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (cancelled) return;
+      if (reduceMotion) {
+        progress.setValue(1);
+        return;
+      }
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: 220,
+        delay: Math.min(index * STAGGER_STEP_MS, MAX_STAGGER_MS),
+        useNativeDriver: true,
+      }).start();
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: progress,
+        transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }],
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
+}
 
 export type TimelineKind = "task" | "reminder" | "expense" | "income";
 
@@ -87,18 +128,25 @@ export function TodayTimeline({ entries }: { entries: TimelineEntry[] }) {
           </View>
         );
 
-        if (!entry.onPress) return <View key={entry.id}>{row}</View>;
+        if (!entry.onPress) {
+          return (
+            <FadeInRow key={entry.id} index={index}>
+              {row}
+            </FadeInRow>
+          );
+        }
 
         return (
-          <Pressable
-            key={entry.id}
-            onPress={entry.onPress}
-            accessibilityRole="button"
-            accessibilityLabel={`${formatTimeLabel(entry.time)}, ${entry.title}${entry.amount ? `, ${entry.amount}` : ""}${entry.detail ? `, ${entry.detail}` : ""}`}
-            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, minHeight: touchTarget.min }]}
-          >
-            {row}
-          </Pressable>
+          <FadeInRow key={entry.id} index={index}>
+            <Pressable
+              onPress={entry.onPress}
+              accessibilityRole="button"
+              accessibilityLabel={`${formatTimeLabel(entry.time)}, ${entry.title}${entry.amount ? `, ${entry.amount}` : ""}${entry.detail ? `, ${entry.detail}` : ""}`}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, minHeight: touchTarget.min }]}
+            >
+              {row}
+            </Pressable>
+          </FadeInRow>
         );
       })}
     </View>

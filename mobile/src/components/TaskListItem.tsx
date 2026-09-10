@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { useTheme } from "../theme/useTheme";
 import { formatDateLabel, formatTimeLabel } from "../utils/date";
@@ -38,6 +38,19 @@ export function TaskListItem({ task, onToggleComplete, onPress, onDelete, onShar
   const { colors, spacing, typography } = useTheme();
   const swipeRef = useRef<Swipeable>(null);
   const [menuVisible, setMenuVisible] = useState(false);
+
+  // A small bounce when a task is marked complete — enough to register as a
+  // response to the tap, not so much it slows down someone checking off a
+  // long list quickly (spec §33: "keep animations fast and subtle").
+  const checkScale = useRef(new Animated.Value(1)).current;
+  const wasCompleted = useRef(task.completed);
+  useEffect(() => {
+    if (task.completed && !wasCompleted.current) {
+      checkScale.setValue(0.7);
+      Animated.spring(checkScale, { toValue: 1, useNativeDriver: true, friction: 4, tension: 120 }).start();
+    }
+    wasCompleted.current = task.completed;
+  }, [task.completed, checkScale]);
 
   const checklist = task.checklist ?? [];
   const checklistDone = checklist.filter((item) => item.done).length;
@@ -128,11 +141,13 @@ export function TaskListItem({ task, onToggleComplete, onPress, onDelete, onShar
               hitSlop={8}
               style={{ marginRight: spacing.md, marginTop: 2 }}
             >
-              <Ionicons
-                name={task.completed ? "checkmark-circle" : "ellipse-outline"}
-                size={24}
-                color={task.completed ? colors.success : colors.textFaint}
-              />
+              <Animated.View style={{ transform: [{ scale: checkScale }] }}>
+                <Ionicons
+                  name={task.completed ? "checkmark-circle" : "ellipse-outline"}
+                  size={24}
+                  color={task.completed ? colors.success : colors.textFaint}
+                />
+              </Animated.View>
             </Pressable>
 
             <Pressable onPress={onPress} style={styles.flex} accessibilityRole="button" accessibilityLabel={`Open ${task.title}`}>

@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSyncStatus, type SyncState } from "../offline/useSyncStatus";
 import { useTheme } from "../theme/useTheme";
 
@@ -23,6 +23,20 @@ export function SyncIndicator({ onPress, hideWhenSynced }: Props) {
   const { colors, spacing, radius, typography } = useTheme();
   const { state, pendingCount } = useSyncStatus();
 
+  // A brief pulse the moment a sync actually finishes — small enough not to
+  // be a distraction, present enough to answer "did that just work?".
+  const pulse = useRef(new Animated.Value(1)).current;
+  const previousState = useRef(state);
+  useEffect(() => {
+    if (state === "synced" && previousState.current === "syncing") {
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.15, duration: 120, useNativeDriver: true }),
+        Animated.spring(pulse, { toValue: 1, useNativeDriver: true, friction: 5 }),
+      ]).start();
+    }
+    previousState.current = state;
+  }, [state, pulse]);
+
   if (hideWhenSynced && state === "synced") return null;
 
   const config: Record<SyncState, { label: string; icon: React.ComponentProps<typeof Ionicons>["name"]; tone: string; fill: string }> = {
@@ -40,10 +54,11 @@ export function SyncIndicator({ onPress, hideWhenSynced }: Props) {
   const { label, icon, tone, fill } = config[state];
 
   const content = (
-    <View
+    <Animated.View
       style={[
         styles.pill,
         { backgroundColor: fill, borderRadius: radius.pill, paddingHorizontal: spacing.md, gap: 6 },
+        { transform: [{ scale: pulse }] },
       ]}
     >
       {state === "syncing" ? (
@@ -52,7 +67,7 @@ export function SyncIndicator({ onPress, hideWhenSynced }: Props) {
         <Ionicons name={icon} size={14} color={tone} />
       )}
       <Text style={[typography.caption, { color: tone, fontWeight: "600" }]}>{label}</Text>
-    </View>
+    </Animated.View>
   );
 
   if (!onPress) {
