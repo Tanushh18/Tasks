@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Button } from "../../components/Button";
 import { useTheme } from "../../theme/useTheme";
@@ -50,7 +51,7 @@ export function OnboardingScreen({ onCreateFamily, onJoinFamily }: Props) {
   }
 
   return (
-    <View style={[styles.flex, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["top", "left", "right", "bottom"]}>
       <ScrollView
         ref={scrollRef}
         horizontal
@@ -108,7 +109,7 @@ export function OnboardingScreen({ onCreateFamily, onJoinFamily }: Props) {
           accessibilityHint="Takes you to the login screen"
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -5,6 +5,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiErrorMessage } from "../../api/client";
 import * as chatApi from "../../api/chat";
 import * as financeApi from "../../api/finance";
@@ -309,7 +310,7 @@ export function HomeScreen({ navigation }: Props) {
   const overdueCount = counts?.overdue ?? 0;
 
   return (
-    <View style={styles.flex}>
+    <SafeAreaView style={styles.flex} edges={["top", "left", "right"]}>
       <AppHeader
         title={`${greeting()}${user?.name ? `, ${user.name.split(" ")[0]}` : ""}`}
         subtitle="Here's what's happening today"
@@ -328,7 +329,7 @@ export function HomeScreen({ navigation }: Props) {
         ]}
       />
 
-      <ScreenContainer onRefresh={load} refreshing={false}>
+      <ScreenContainer onRefresh={load} refreshing={false} edges={["left", "right"]}>
         <SyncBanner />
 
         {/* Anything that slipped. Stated as a fact with a way to act, never as a scolding. */}
@@ -519,7 +520,7 @@ export function HomeScreen({ navigation }: Props) {
         onConfirm={confirmDelete}
         onCancel={() => setTaskPendingDelete(null)}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

@@ -2,14 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as eventsApi from "../../api/familyEvents";
 import type { FamilyEvent, FamilyEventType } from "../../api/familyEvents";
 import { getApiErrorMessage } from "../../api/client";
 import { Card } from "../../components/Card";
 import { ConfirmationSheet } from "../../components/ConfirmationSheet";
-import { ScreenContainer } from "../../components/ScreenContainer";
-import { SectionHeader } from "../../components/SectionHeader";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
@@ -78,75 +77,80 @@ export function EventsListScreen({ navigation }: Props) {
     }
   }
 
-  function renderEvent(item: FamilyEvent) {
-    const isOwner = item.createdBy?.id === user?.id;
-    return (
-      <Card key={item.id} style={styles.card}>
-        <Pressable
-          onPress={() => navigation.navigate("EventForm", { eventId: item.id })}
-          style={({ pressed }) => [styles.flex, styles.row, { opacity: pressed ? 0.85 : 1 }]}
-          accessibilityRole="button"
-          accessibilityLabel={`Open event ${item.title}`}
-        >
-          <View
-            style={[styles.iconTile, { backgroundColor: feature.tasks.muted, marginRight: spacing.md }]}
-            accessibilityElementsHidden
-          >
-            <Ionicons name={TYPE_ICONS[item.type]} size={20} color={feature.tasks.solid} />
-          </View>
-          <View style={styles.flex}>
-            <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
-              {item.date}
-              {item.time ? ` · ${item.time}` : ""}
-            </Text>
-            <Text style={[typography.caption, { color: colors.textFaint, marginTop: 2 }]} numberOfLines={1}>
-              {item.attendees.map((a) => a.name).join(", ")}
-            </Text>
-          </View>
-        </Pressable>
-        {isOwner ? (
-          <Pressable
-            onPress={() => setPendingDelete(item)}
-            hitSlop={8}
-            style={{ marginLeft: spacing.sm }}
-            accessibilityRole="button"
-            accessibilityLabel={`Delete ${item.title}`}
-          >
-            <Ionicons name="trash-outline" size={20} color={colors.textFaint} />
-          </Pressable>
-        ) : null}
-      </Card>
-    );
-  }
-
   return (
-    <ScreenContainer scroll={false} contentStyle={{ flex: 1 }}>
-      <SectionHeader title="Family Events" subtitle="Birthdays, trips, appointments and more" />
-
-      <SegmentedControl segments={[...TABS]} value={tab} onChange={setTab} />
-
-      <View style={{ flex: 1, marginTop: spacing.lg }}>
-        {loading ? (
+    <SafeAreaView style={styles.flex} edges={["left", "right"]}>
+      {loading ? (
+        <View style={{ padding: spacing.lg }}>
           <SkeletonLines count={5} />
-        ) : error ? (
-          <ErrorState message={error} onRetry={() => { setLoading(true); load(tab); }} />
-        ) : events.length === 0 ? (
-          <EmptyState
-            title={tab === "upcoming" ? "No upcoming events" : "No past events"}
-            subtitle={tab === "upcoming" ? "Add a birthday, trip or appointment to get started." : undefined}
-            actionLabel={tab === "upcoming" ? "Add event" : undefined}
-            onAction={tab === "upcoming" ? () => navigation.navigate("EventForm", undefined) : undefined}
-            icon="calendar-outline"
-            tone={feature.tasks.solid}
-            toneMuted={feature.tasks.muted}
-          />
-        ) : (
-          events.map(renderEvent)
-        )}
-      </View>
+        </View>
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => { setLoading(true); load(tab); }} />
+      ) : (
+        <FlatList
+          data={events}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: 96, flexGrow: 1 }}
+          ListHeaderComponent={
+            <View style={{ marginBottom: spacing.lg }}>
+              <SegmentedControl segments={[...TABS]} value={tab} onChange={setTab} />
+            </View>
+          }
+          renderItem={({ item }) => {
+            const isOwner = item.createdBy?.id === user?.id;
+            return (
+              <Card style={styles.card}>
+                <Pressable
+                  onPress={() => navigation.navigate("EventForm", { eventId: item.id })}
+                  style={({ pressed }) => [styles.flex, styles.row, { opacity: pressed ? 0.85 : 1 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open event ${item.title}`}
+                >
+                  <View
+                    style={[styles.iconTile, { backgroundColor: feature.tasks.muted, marginRight: spacing.md }]}
+                    accessibilityElementsHidden
+                  >
+                    <Ionicons name={TYPE_ICONS[item.type]} size={20} color={feature.tasks.solid} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
+                      {item.date}
+                      {item.time ? ` · ${item.time}` : ""}
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.textFaint, marginTop: 2 }]} numberOfLines={1}>
+                      {item.attendees.map((a) => a.name).join(", ")}
+                    </Text>
+                  </View>
+                </Pressable>
+                {isOwner ? (
+                  <Pressable
+                    onPress={() => setPendingDelete(item)}
+                    hitSlop={8}
+                    style={{ marginLeft: spacing.sm }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete ${item.title}`}
+                  >
+                    <Ionicons name="trash-outline" size={20} color={colors.textFaint} />
+                  </Pressable>
+                ) : null}
+              </Card>
+            );
+          }}
+          ListEmptyComponent={
+            <EmptyState
+              title={tab === "upcoming" ? "No upcoming events" : "No past events"}
+              subtitle={tab === "upcoming" ? "Add a birthday, trip or appointment to get started." : undefined}
+              actionLabel={tab === "upcoming" ? "Add event" : undefined}
+              onAction={tab === "upcoming" ? () => navigation.navigate("EventForm", undefined) : undefined}
+              icon="calendar-outline"
+              tone={feature.tasks.solid}
+              toneMuted={feature.tasks.muted}
+            />
+          }
+        />
+      )}
 
       <Pressable
         onPress={() => navigation.navigate("EventForm", undefined)}
@@ -179,7 +183,7 @@ export function EventsListScreen({ navigation }: Props) {
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
       />
-    </ScreenContainer>
+    </SafeAreaView>
   );
 }
 

@@ -15,7 +15,7 @@ export function PrivacyCenterScreen() {
   const { colors, spacing, typography } = useTheme();
 
   return (
-    <ScreenContainer>
+    <ScreenContainer edges={["left", "right"]}>
       <Text accessibilityRole="header" style={[typography.h1, { color: colors.text, marginBottom: spacing.xl }]}>
         Privacy Center
       </Text>

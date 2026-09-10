@@ -3,6 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiErrorMessage } from "../../api/client";
 import * as chatApi from "../../api/chat";
 import * as contactsApi from "../../api/contacts";
@@ -112,13 +113,13 @@ export function FamilyHubScreen({ navigation }: Props) {
   ].filter((d): d is NonNullable<typeof d> => d !== null);
 
   return (
-    <View style={styles.flex}>
+    <SafeAreaView style={styles.flex} edges={["top", "left", "right"]}>
       <AppHeader
         title="Family"
         subtitle={members.length > 0 ? `${members.length + 1} people` : "Your private family space"}
       />
 
-      <ScreenContainer onRefresh={load} refreshing={false}>
+      <ScreenContainer onRefresh={load} refreshing={false} edges={["left", "right"]}>
         <SectionHeader title="Everyone" />
 
         {loading ? (
@@ -228,7 +229,7 @@ export function FamilyHubScreen({ navigation }: Props) {
           ))}
         </View>
       </ScreenContainer>
-    </View>
+    </SafeAreaView>
   );
 }
 

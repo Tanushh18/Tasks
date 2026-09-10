@@ -73,7 +73,7 @@ export function SyncCenterScreen({ navigation }: Props) {
   );
 
   return (
-    <ScreenContainer onRefresh={refresh} refreshing={false}>
+    <ScreenContainer onRefresh={refresh} refreshing={false} edges={["left", "right"]}>
       <View style={[styles.header, { marginBottom: spacing.lg }]}>
         <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
           Sync Center

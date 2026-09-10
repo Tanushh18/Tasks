@@ -38,7 +38,7 @@ export function WeeklySummaryScreen() {
   );
 
   return (
-    <ScreenContainer>
+    <ScreenContainer edges={["left", "right"]}>
       <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
         Weekly Summary
       </Text>

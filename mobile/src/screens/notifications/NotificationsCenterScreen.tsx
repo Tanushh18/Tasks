@@ -130,7 +130,7 @@ export function NotificationsCenterScreen({ navigation }: Props) {
   const categories: Category[] = ["Tasks", "Chat", "System"];
 
   return (
-    <ScreenContainer onRefresh={load} refreshing={false}>
+    <ScreenContainer onRefresh={load} refreshing={false} edges={["left", "right"]}>
       <Text accessibilityRole="header" style={[typography.h1, { color: colors.text, marginBottom: spacing.xl }]}>
         Notifications
       </Text>

@@ -20,7 +20,11 @@ export function FirstTimeSetupScreen({ onFinish }: Props) {
   const { colors, spacing, typography } = useTheme();
 
   return (
-    <ScreenContainer contentStyle={{ flexGrow: 1, justifyContent: "center" }} scroll={false}>
+    <ScreenContainer
+      contentStyle={{ flexGrow: 1, justifyContent: "center" }}
+      scroll={false}
+      edges={["top", "left", "right", "bottom"]}
+    >
       <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
         <Ionicons name="people-outline" size={64} color={colors.primary} />
       </View>

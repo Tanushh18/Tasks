@@ -11,22 +11,22 @@ export interface AdminUser {
 }
 
 export async function listUsers(): Promise<AdminUser[]> {
-  const { data } = await apiClient.get<{ users: AdminUser[] }>("/admin/users");
+  const { data } = await apiClient.get<{ users: AdminUser[] }>("/admin");
   return data.users;
 }
 
 export async function blockUser(id: string): Promise<AdminUser> {
-  const { data } = await apiClient.post<{ user: AdminUser }>(`/admin/users/${id}/block`);
+  const { data } = await apiClient.post<{ user: AdminUser }>(`/admin/${id}/block`);
   return data.user;
 }
 
 export async function unblockUser(id: string): Promise<AdminUser> {
-  const { data } = await apiClient.post<{ user: AdminUser }>(`/admin/users/${id}/unblock`);
+  const { data } = await apiClient.post<{ user: AdminUser }>(`/admin/${id}/unblock`);
   return data.user;
 }
 
 export async function resetMpin(id: string): Promise<{ mpin: string; user: AdminUser }> {
-  const { data } = await apiClient.post<{ mpin: string; user: AdminUser }>(`/admin/users/${id}/reset-mpin`);
+  const { data } = await apiClient.post<{ mpin: string; user: AdminUser }>(`/admin/${id}/reset-mpin`);
   return data;
 }
 

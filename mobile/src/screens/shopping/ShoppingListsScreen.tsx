@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiErrorMessage } from "../../api/client";
 import * as shoppingApi from "../../api/shoppingLists";
 import type { ShoppingList } from "../../api/shoppingLists";
@@ -10,8 +11,6 @@ import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ConfirmationSheet } from "../../components/ConfirmationSheet";
-import { ScreenContainer } from "../../components/ScreenContainer";
-import { SectionHeader } from "../../components/SectionHeader";
 import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
@@ -93,70 +92,72 @@ export function ShoppingListsScreen({ navigation }: Props) {
     }
   }
 
-  function renderList(item: ShoppingList) {
-    const isOwner = item.createdBy?.id === user?.id;
-    const doneCount = item.items.filter((i) => i.checked).length;
-    return (
-      <Card key={item.id} style={styles.card}>
-        <Pressable
-          onPress={() => navigation.navigate("ShoppingListDetail", { listId: item.id, name: item.name })}
-          style={({ pressed }) => [styles.flex, styles.row, { opacity: pressed ? 0.85 : 1 }]}
-          accessibilityRole="button"
-          accessibilityLabel={`Open list ${item.name}`}
-        >
-          <View
-            style={[styles.iconTile, { backgroundColor: feature.notes.muted, marginRight: spacing.md }]}
-            accessibilityElementsHidden
-          >
-            <Ionicons name="cart-outline" size={20} color={feature.notes.solid} />
-          </View>
-          <View style={styles.flex}>
-            <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
-              {item.name}
-            </Text>
-            <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
-              {doneCount}/{item.items.length} checked
-            </Text>
-          </View>
-        </Pressable>
-        {isOwner ? (
-          <Pressable
-            onPress={() => setPendingDelete(item)}
-            hitSlop={8}
-            style={{ marginLeft: spacing.sm }}
-            accessibilityRole="button"
-            accessibilityLabel={`Delete ${item.name}`}
-          >
-            <Ionicons name="trash-outline" size={20} color={colors.textFaint} />
-          </Pressable>
-        ) : null}
-      </Card>
-    );
-  }
-
   return (
-    <ScreenContainer scroll={false} contentStyle={{ flex: 1 }}>
-      <SectionHeader title="Shopping Lists" subtitle="Grocery, Home, Travel — whatever you name it" />
-
-      <View style={{ flex: 1 }}>
-        {loading ? (
+    <SafeAreaView style={styles.flex} edges={["left", "right"]}>
+      {loading ? (
+        <View style={{ padding: spacing.lg }}>
           <SkeletonLines count={5} />
-        ) : error ? (
-          <ErrorState message={error} onRetry={() => { setLoading(true); load(); }} />
-        ) : lists.length === 0 ? (
-          <EmptyState
-            title="No shopping lists yet"
-            subtitle="Create a list and start adding items."
-            actionLabel="New list"
-            onAction={handleAddPress}
-            icon="cart-outline"
-            tone={feature.notes.solid}
-            toneMuted={feature.notes.muted}
-          />
-        ) : (
-          lists.map(renderList)
-        )}
-      </View>
+        </View>
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => { setLoading(true); load(); }} />
+      ) : (
+        <FlatList
+          data={lists}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: 96, flexGrow: 1 }}
+          renderItem={({ item }) => {
+            const isOwner = item.createdBy?.id === user?.id;
+            const doneCount = item.items.filter((i) => i.checked).length;
+            return (
+              <Card style={styles.card}>
+                <Pressable
+                  onPress={() => navigation.navigate("ShoppingListDetail", { listId: item.id, name: item.name })}
+                  style={({ pressed }) => [styles.flex, styles.row, { opacity: pressed ? 0.85 : 1 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open list ${item.name}`}
+                >
+                  <View
+                    style={[styles.iconTile, { backgroundColor: feature.notes.muted, marginRight: spacing.md }]}
+                    accessibilityElementsHidden
+                  >
+                    <Ionicons name="cart-outline" size={20} color={feature.notes.solid} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
+                      {doneCount}/{item.items.length} checked
+                    </Text>
+                  </View>
+                </Pressable>
+                {isOwner ? (
+                  <Pressable
+                    onPress={() => setPendingDelete(item)}
+                    hitSlop={8}
+                    style={{ marginLeft: spacing.sm }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete ${item.name}`}
+                  >
+                    <Ionicons name="trash-outline" size={20} color={colors.textFaint} />
+                  </Pressable>
+                ) : null}
+              </Card>
+            );
+          }}
+          ListEmptyComponent={
+            <EmptyState
+              title="No shopping lists yet"
+              subtitle="Create a list and start adding items."
+              actionLabel="New list"
+              onAction={handleAddPress}
+              icon="cart-outline"
+              tone={feature.notes.solid}
+              toneMuted={feature.notes.muted}
+            />
+          }
+        />
+      )}
 
       <Pressable
         onPress={handleAddPress}
@@ -207,7 +208,7 @@ export function ShoppingListsScreen({ navigation }: Props) {
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
       />
-    </ScreenContainer>
+    </SafeAreaView>
   );
 }
 

@@ -1,6 +1,6 @@
 import React from "react";
 import { RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { useTheme } from "../theme/useTheme";
 
 interface Props {
@@ -9,9 +9,20 @@ interface Props {
   onRefresh?: () => void;
   refreshing?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
+  /** Override which edges get safe-area insets. Drop "top" when a screen
+   * already applies it above this container (e.g. its own AppHeader sits in
+   * a SafeAreaView) — otherwise the top inset is applied twice. */
+  edges?: Edge[];
 }
 
-export function ScreenContainer({ children, scroll = true, onRefresh, refreshing, contentStyle }: Props) {
+export function ScreenContainer({
+  children,
+  scroll = true,
+  onRefresh,
+  refreshing,
+  contentStyle,
+  edges = ["top", "left", "right"],
+}: Props) {
   const { colors, spacing } = useTheme();
 
   const content = (
@@ -19,7 +30,7 @@ export function ScreenContainer({ children, scroll = true, onRefresh, refreshing
   );
 
   return (
-    <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["top", "left", "right"]}>
+    <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={edges}>
       {scroll ? (
         <ScrollView
           contentContainerStyle={styles.flexGrow}
