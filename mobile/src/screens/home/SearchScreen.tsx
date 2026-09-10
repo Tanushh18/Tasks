@@ -190,12 +190,18 @@ export function SearchScreen({ navigation }: Props) {
           <EmptyState
             title="Search everything"
             subtitle="Find a task, a money entry or an account by name."
+            icon="search-outline"
+            tone={colors.primary}
+            toneMuted={colors.primaryMuted}
           />
         )
       ) : totalResults === 0 ? (
         <EmptyState
           title="Nothing matched that"
           subtitle={`No results for "${query.trim()}".`}
+          icon="search-outline"
+          tone={colors.textFaint}
+          toneMuted={colors.surfaceAlt}
           actionLabel="Clear search"
           onAction={() => setQuery("")}
         />

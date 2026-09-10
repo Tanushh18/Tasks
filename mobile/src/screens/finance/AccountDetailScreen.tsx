@@ -21,7 +21,7 @@ import type { FinanceStackParamList } from "../../navigation/types";
 type Props = NativeStackScreenProps<FinanceStackParamList, "AccountDetail">;
 
 export function AccountDetailScreen({ navigation, route }: Props) {
-  const { colors, spacing, radius, typography } = useTheme();
+  const { colors, spacing, radius, typography, feature } = useTheme();
   const { accountId } = route.params;
 
   const [account, setAccount] = useState<FinanceAccount | null>(null);
@@ -107,7 +107,15 @@ export function AccountDetailScreen({ navigation, route }: Props) {
 
   if (loading) return <LoadingState label="Loading account…" />;
   if (error) return <ErrorState message={error} onRetry={() => { setLoading(true); load(); }} />;
-  if (!account) return <EmptyState title="Account not found" />;
+  if (!account)
+    return (
+      <EmptyState
+        title="Account not found"
+        icon="alert-circle-outline"
+        tone={colors.danger}
+        toneMuted={colors.dangerMuted}
+      />
+    );
 
   const cashIn = transactions.filter((t) => t.type === "IN").reduce((sum, t) => sum + t.amount, 0);
   const cashOut = transactions.filter((t) => t.type === "OUT").reduce((sum, t) => sum + t.amount, 0);
@@ -175,7 +183,13 @@ export function AccountDetailScreen({ navigation, route }: Props) {
           </Pressable>
         )}
         ListEmptyComponent={
-          <EmptyState title="No transactions yet" subtitle="Add your first cash in or cash out below." />
+          <EmptyState
+            title="No transactions yet"
+            subtitle="Add your first cash in or cash out below."
+            icon="receipt-outline"
+            tone={feature.finance.solid}
+            toneMuted={feature.finance.muted}
+          />
         }
       />
 

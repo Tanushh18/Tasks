@@ -34,7 +34,7 @@ const COLOR_TINTS: Record<NoteColor, string | undefined> = {
 };
 
 export function NotesListScreen({ navigation }: Props) {
-  const { colors, spacing, radius, typography, touchTarget, shadow } = useTheme();
+  const { colors, spacing, radius, typography, touchTarget, shadow, feature } = useTheme();
   const { user } = useAuth();
 
   const [notes, setNotes] = useState<Note[]>([]);
@@ -291,11 +291,22 @@ export function NotesListScreen({ navigation }: Props) {
         />
       ) : filtered.pinned.length === 0 && filtered.rest.length === 0 ? (
         debouncedSearch.trim() ? (
-          <EmptyState title="Nothing matched that" subtitle={`No notes found for "${debouncedSearch.trim()}".`} actionLabel="Clear search" onAction={() => setSearch("")} />
+          <EmptyState
+            title="Nothing matched that"
+            subtitle={`No notes found for "${debouncedSearch.trim()}".`}
+            icon="search-outline"
+            tone={feature.notes.solid}
+            toneMuted={feature.notes.muted}
+            actionLabel="Clear search"
+            onAction={() => setSearch("")}
+          />
         ) : (
           <EmptyState
             title="No notes yet"
             subtitle="Jot something down or make a checklist."
+            icon="document-text-outline"
+            tone={feature.notes.solid}
+            toneMuted={feature.notes.muted}
             actionLabel="Add note"
             onAction={handleAddPress}
           />

@@ -99,6 +99,9 @@ export function InventoryListScreen({ navigation }: Props) {
         <EmptyState
           title="No items yet"
           subtitle="Track appliances, electronics, and other belongings with purchase and warranty details."
+          icon="cube-outline"
+          tone={colors.primary}
+          toneMuted={colors.primaryMuted}
           actionLabel="Add item"
           onAction={() => navigation.navigate("InventoryForm", undefined)}
         />

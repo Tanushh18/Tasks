@@ -25,7 +25,7 @@ type Props = NativeStackScreenProps<ContactsStackParamList, "ContactsList">;
 const SEARCH_DEBOUNCE_MS = 300;
 
 export function ContactsListScreen({ navigation }: Props) {
-  const { colors, spacing, radius, typography, touchTarget, shadow } = useTheme();
+  const { colors, spacing, radius, typography, touchTarget, shadow, feature } = useTheme();
   const { user } = useAuth();
 
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -274,11 +274,22 @@ export function ContactsListScreen({ navigation }: Props) {
           }}
           ListEmptyComponent={
             debouncedSearch.trim() ? (
-              <EmptyState title="Nothing matched that" subtitle={`No contacts found for "${debouncedSearch.trim()}".`} actionLabel="Clear search" onAction={() => setSearch("")} />
+              <EmptyState
+                title="Nothing matched that"
+                subtitle={`No contacts found for "${debouncedSearch.trim()}".`}
+                icon="search-outline"
+                tone={feature.contacts.solid}
+                toneMuted={feature.contacts.muted}
+                actionLabel="Clear search"
+                onAction={() => setSearch("")}
+              />
             ) : (
               <EmptyState
                 title="No contacts yet"
                 subtitle="Add the people you want to keep track of."
+                icon="people-outline"
+                tone={feature.contacts.solid}
+                toneMuted={feature.contacts.muted}
                 actionLabel="Add contact"
                 onAction={() => navigation.navigate("ContactForm", undefined)}
               />

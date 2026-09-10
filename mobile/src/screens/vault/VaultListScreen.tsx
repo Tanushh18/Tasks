@@ -99,6 +99,9 @@ export function VaultListScreen({ navigation }: Props) {
         <EmptyState
           title="No documents yet"
           subtitle="Store insurance papers, warranties, and other important documents here."
+          icon="folder-outline"
+          tone={colors.primary}
+          toneMuted={colors.primaryMuted}
           actionLabel="Add document"
           onAction={() => navigation.navigate("VaultForm", undefined)}
         />

@@ -96,6 +96,9 @@ export function PollsListScreen({ navigation }: Props) {
         <EmptyState
           title={tab === "active" ? "No active polls" : "No closed polls yet"}
           subtitle={tab === "active" ? "Ask the family a quick question." : "Polls appear here once they're closed."}
+          icon="stats-chart-outline"
+          tone={colors.primary}
+          toneMuted={colors.primaryMuted}
           actionLabel={tab === "active" ? "New poll" : undefined}
           onAction={tab === "active" ? () => navigation.navigate("PollForm") : undefined}
         />

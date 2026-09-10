@@ -31,7 +31,7 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function ChatListScreen({ navigation }: Props) {
-  const { colors, spacing, radius, typography, touchTarget, shadow } = useTheme();
+  const { colors, spacing, radius, typography, touchTarget, shadow, feature } = useTheme();
 
   const [conversations, setConversations] = useState<chatApi.Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,6 +149,9 @@ export function ChatListScreen({ navigation }: Props) {
             <EmptyState
               title="No chats yet"
               subtitle="Start a conversation with someone."
+              icon="chatbubbles-outline"
+              tone={feature.chat.solid}
+              toneMuted={feature.chat.muted}
               actionLabel="New chat"
               onAction={() => setNewChatVisible(true)}
             />

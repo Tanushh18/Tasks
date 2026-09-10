@@ -15,7 +15,7 @@ import { useTheme } from "../../theme/useTheme";
 type Props = NativeStackScreenProps<FinanceStackParamList, "GroupsList">;
 
 export function GroupsListScreen({ navigation }: Props) {
-  const { colors, spacing, radius, typography, touchTarget, shadow } = useTheme();
+  const { colors, spacing, radius, typography, touchTarget, shadow, feature } = useTheme();
 
   const [groups, setGroups] = useState<groupExpenseApi.ExpenseGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,6 +90,9 @@ export function GroupsListScreen({ navigation }: Props) {
             <EmptyState
               title="No groups yet"
               subtitle="Create a group for a trip or shared expenses, and add the people splitting it."
+              icon="people-outline"
+              tone={feature.finance.solid}
+              toneMuted={feature.finance.muted}
               actionLabel="New group"
               onAction={() => navigation.navigate("GroupForm", undefined)}
             />

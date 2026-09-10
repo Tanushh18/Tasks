@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, FlatList, Image, Text, View } from "react-nat
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ScreenContainer } from "../../components/ScreenContainer";
+import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState } from "../../components/StateViews";
 import { scanImageWithFallback } from "../../localServer/ocrWithFallback";
 import { listPendingScans, removePendingScan, type PendingScan } from "../../localServer/pendingScans";
@@ -21,7 +22,7 @@ function formatCapturedAt(iso: string): string {
 }
 
 export function PendingScansScreen({}: Props) {
-  const { colors, spacing, typography } = useTheme();
+  const { colors, spacing, typography, feature } = useTheme();
   const [scans, setScans] = useState<PendingScan[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -87,10 +88,24 @@ export function PendingScansScreen({}: Props) {
     }
   }
 
-  if (!loading && scans.length === 0) {
+  if (loading) {
     return (
       <ScreenContainer>
-        <EmptyState title="Nothing pending" subtitle="Photos scanned while offline will show up here." />
+        <SkeletonLines count={3} />
+      </ScreenContainer>
+    );
+  }
+
+  if (scans.length === 0) {
+    return (
+      <ScreenContainer>
+        <EmptyState
+          title="Nothing pending"
+          subtitle="Photos scanned while offline will show up here."
+          icon="images-outline"
+          tone={feature.finance.solid}
+          toneMuted={feature.finance.muted}
+        />
       </ScreenContainer>
     );
   }

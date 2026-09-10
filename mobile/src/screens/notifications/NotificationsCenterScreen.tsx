@@ -10,7 +10,7 @@ import * as tasksApi from "../../api/tasks";
 import { Card } from "../../components/Card";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeader } from "../../components/SectionHeader";
-import { EmptyState, LoadingState } from "../../components/StateViews";
+import { EmptyState, ErrorState, LoadingState } from "../../components/StateViews";
 import { listFailed } from "../../offline/offlineQueue";
 import { useTheme } from "../../theme/useTheme";
 import type { HomeStackParamList, MainTabParamList } from "../../navigation/types";
@@ -39,14 +39,25 @@ interface NotificationItem {
 export function NotificationsCenterScreen({ navigation }: Props) {
   const { colors, spacing, typography, feature } = useTheme();
   const [items, setItems] = useState<NotificationItem[] | null>(null);
+  const [allSourcesFailed, setAllSourcesFailed] = useState(false);
 
   const load = useCallback(async () => {
-    const [overdueTasks, reminders, conversations, failedSyncs] = await Promise.all([
-      tasksApi.listTasks({ status: "overdue" }).catch(() => []),
-      tasksApi.getUpcomingReminders().catch(() => []),
-      chatApi.listConversations().catch(() => []),
-      listFailed().catch(() => []),
+    const [overdueTasksR, remindersR, conversationsR, failedSyncsR] = await Promise.allSettled([
+      tasksApi.listTasks({ status: "overdue" }),
+      tasksApi.getUpcomingReminders(),
+      chatApi.listConversations(),
+      listFailed(),
     ]);
+    const orEmpty = <T,>(r: PromiseSettledResult<T[]>): T[] => (r.status === "fulfilled" ? r.value : []);
+    const overdueTasks = orEmpty(overdueTasksR);
+    const reminders = orEmpty(remindersR);
+    const conversations = orEmpty(conversationsR);
+    const failedSyncs = orEmpty(failedSyncsR);
+
+    // If every source failed, this is very likely "no connection at all" rather than
+    // "nothing to report" — show that as an error, not as a cheerful empty state.
+    const results = [overdueTasksR, remindersR, conversationsR, failedSyncsR];
+    setAllSourcesFailed(results.every((r) => r.status === "rejected"));
 
     const result: NotificationItem[] = [];
 
@@ -137,10 +148,14 @@ export function NotificationsCenterScreen({ navigation }: Props) {
 
       {items === null ? (
         <LoadingState label="Loading notifications…" />
+      ) : allSourcesFailed ? (
+        <ErrorState message="We couldn't load your notifications." onRetry={load} />
       ) : items.length === 0 ? (
         <Card>
           <EmptyState
             icon="notifications-off-outline"
+            tone={feature.tasks.solid}
+            toneMuted={feature.tasks.muted}
             title="Nothing to show"
             subtitle="You're all caught up."
           />

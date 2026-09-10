@@ -142,7 +142,14 @@ export function TaskCalendarScreen({ navigation }: Props) {
     const dayEvents = eventsOn(date);
 
     if (dayTasks.length === 0 && dayTx.length === 0 && dayEvents.length === 0) {
-      return <EmptyState title="Nothing on this day" />;
+      return (
+        <EmptyState
+          title="Nothing on this day"
+          icon="calendar-outline"
+          tone={feature.tasks.solid}
+          toneMuted={feature.tasks.muted}
+        />
+      );
     }
 
     return (
@@ -275,7 +282,13 @@ export function TaskCalendarScreen({ navigation }: Props) {
       ) : (
         <View style={{ flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
           {agendaDays.length === 0 ? (
-            <EmptyState title="Nothing coming up" subtitle="Your agenda for the rest of this month is clear." />
+            <EmptyState
+              title="Nothing coming up"
+              subtitle="Your agenda for the rest of this month is clear."
+              icon="checkmark-done-outline"
+              tone={feature.tasks.solid}
+              toneMuted={feature.tasks.muted}
+            />
           ) : (
             agendaDays.map((date) => (
               <Pressable

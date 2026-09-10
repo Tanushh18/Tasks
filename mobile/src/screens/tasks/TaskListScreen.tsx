@@ -61,7 +61,7 @@ function filtersFor(key: FilterKey, search: string): tasksApi.TaskFilters {
 }
 
 export function TaskListScreen({ navigation }: Props) {
-  const { colors, spacing, radius, typography, touchTarget, shadow } = useTheme();
+  const { colors, spacing, radius, typography, touchTarget, shadow, feature } = useTheme();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<FilterKey>("today");
@@ -344,6 +344,9 @@ export function TaskListScreen({ navigation }: Props) {
               <EmptyState
                 title="Nothing matched that"
                 subtitle={`No tasks found for "${debouncedSearch.trim()}".`}
+                icon="search-outline"
+                tone={feature.tasks.solid}
+                toneMuted={feature.tasks.muted}
                 actionLabel="Clear search"
                 onAction={() => setSearch("")}
               />
@@ -351,6 +354,9 @@ export function TaskListScreen({ navigation }: Props) {
               <EmptyState
                 title={EMPTY_COPY[filter].title}
                 subtitle={EMPTY_COPY[filter].subtitle}
+                icon="checkbox-outline"
+                tone={feature.tasks.solid}
+                toneMuted={feature.tasks.muted}
                 actionLabel="Add Task"
                 onAction={() => navigation.navigate("TaskForm", undefined)}
               />

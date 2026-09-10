@@ -12,7 +12,8 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeader } from "../../components/SectionHeader";
-import { EmptyState } from "../../components/StateViews";
+import { SkeletonLines } from "../../components/Skeleton";
+import { EmptyState, ErrorState } from "../../components/StateViews";
 import { UserPicker } from "../../components/UserPicker";
 import { startLocationTracking, stopLocationTracking } from "../../location/backgroundLocationTask";
 import { useTheme } from "../../theme/useTheme";
@@ -59,9 +60,10 @@ function distanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: numb
 }
 
 export function LocationSharingScreen() {
-  const { colors, spacing, radius, typography } = useTheme();
+  const { colors, spacing, radius, typography, feature } = useTheme();
 
   const [shares, setShares] = useState<locationApi.LocationShares | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
   const [starting, setStarting] = useState(false);
   const [stoppingId, setStoppingId] = useState<string | null>(null);
@@ -70,12 +72,20 @@ export function LocationSharingScreen() {
   const [durationSheetVisible, setDurationSheetVisible] = useState(false);
   const mapRef = useRef<MapView | null>(null);
 
+  const hasLoadedOnce = useRef(false);
   const load = useCallback(async () => {
     try {
       const result = await locationApi.getShares();
       setShares(result);
-    } catch {
-      // Keep showing the last known state; this screen polls, so a transient failure is fine to skip.
+      setError(null);
+      hasLoadedOnce.current = true;
+    } catch (err) {
+      // Once we have data, this screen polls — a transient failure mid-poll is fine to skip
+      // silently. But the very first load has nothing to fall back on, so that one needs to
+      // be visible rather than leaving the screen stuck on a skeleton forever.
+      if (!hasLoadedOnce.current) {
+        setError(getApiErrorMessage(err, "We couldn't load location sharing."));
+      }
     }
   }, []);
 
@@ -156,6 +166,28 @@ export function LocationSharingScreen() {
     }
   }
 
+  if (error && shares === null) {
+    return (
+      <ScreenContainer>
+        <ErrorState
+          message={error}
+          onRetry={() => {
+            setError(null);
+            load();
+          }}
+        />
+      </ScreenContainer>
+    );
+  }
+
+  if (shares === null) {
+    return (
+      <ScreenContainer>
+        <SkeletonLines count={4} />
+      </ScreenContainer>
+    );
+  }
+
   return (
     <ScreenContainer>
       <SectionHeader title="Share my location" subtitle="Pick someone to share your live location with" />
@@ -190,7 +222,13 @@ export function LocationSharingScreen() {
           </Card>
         ))
       ) : (
-        <EmptyState title="Not sharing with anyone" subtitle="Choose someone above to start." />
+        <EmptyState
+          title="Not sharing with anyone"
+          subtitle="Choose someone above to start."
+          icon="location-outline"
+          tone={feature.location.solid}
+          toneMuted={feature.location.muted}
+        />
       )}
 
       <BottomSheet
@@ -294,7 +332,13 @@ export function LocationSharingScreen() {
             </Card>
           ))
         ) : (
-          <EmptyState title="Nobody is sharing with you" subtitle="When someone shares their location, it'll show up here." />
+          <EmptyState
+            title="Nobody is sharing with you"
+            subtitle="When someone shares their location, it'll show up here."
+            icon="people-outline"
+            tone={feature.location.solid}
+            toneMuted={feature.location.muted}
+          />
         )
       ) : (
         <View style={[styles.mapContainer, { borderRadius: radius.lg }]}>
