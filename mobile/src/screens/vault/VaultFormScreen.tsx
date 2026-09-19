@@ -1,18 +1,18 @@
-import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as vaultApi from "../../api/vaultDocuments";
 import type { VaultDocumentCategory } from "../../api/vaultDocuments";
 import { Button } from "../../components/Button";
 import { ConfirmationSheet } from "../../components/ConfirmationSheet";
 import { ScreenContainer } from "../../components/ScreenContainer";
+import { FilePreview } from "../../components/FilePreview";
 import { LoadingState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
 import type { VaultStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/useTheme";
-import { labelForMimeType, mimeTypeFromDataUrl, pickDocumentFile, pickImage, showFilePickerSheet } from "../../utils/filePicker";
+import { pickDocumentFile, pickImage, showFilePickerSheet } from "../../utils/filePicker";
 
 type Props = NativeStackScreenProps<VaultStackParamList, "VaultForm">;
 
@@ -113,9 +113,6 @@ export function VaultFormScreen({ navigation, route }: Props) {
 
   if (loading) return <LoadingState label="Loading…" />;
 
-  const mimeType = mimeTypeFromDataUrl(fileData);
-  const isImage = mimeType?.startsWith("image/") ?? false;
-
   return (
     <ScreenContainer>
       <Text accessibilityRole="header" style={[typography.h1, { color: colors.text, marginBottom: spacing.lg }]}>
@@ -150,28 +147,7 @@ export function VaultFormScreen({ navigation, route }: Props) {
       </View>
 
       <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>Document file</Text>
-      {fileData ? (
-        isImage ? (
-          <Image source={{ uri: fileData }} style={[styles.preview, { borderRadius: radius.md, marginBottom: spacing.md }]} />
-        ) : (
-          <View
-            style={[
-              styles.filePreview,
-              {
-                backgroundColor: colors.surfaceAlt,
-                borderRadius: radius.md,
-                marginBottom: spacing.md,
-                padding: spacing.lg,
-              },
-            ]}
-          >
-            <Ionicons name="document-text-outline" size={28} color={colors.textMuted} />
-            <Text style={[typography.bodyStrong, { color: colors.text, marginLeft: spacing.md, flexShrink: 1 }]}>
-              {fileName ?? labelForMimeType(mimeType)}
-            </Text>
-          </View>
-        )
-      ) : null}
+      {fileData ? <FilePreview dataUrl={fileData} fileName={fileName} /> : null}
       <Button
         label={fileData ? "Replace file" : "Add file"}
         variant="secondary"
@@ -222,6 +198,4 @@ export function VaultFormScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingVertical: 8, paddingHorizontal: 14, borderWidth: StyleSheet.hairlineWidth },
-  preview: { width: "100%", height: 200, resizeMode: "cover" },
-  filePreview: { flexDirection: "row", alignItems: "center" },
 });

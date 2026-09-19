@@ -1,14 +1,36 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { getAccessToken, getRefreshToken, notifySessionExpired, setSessionTokens } from "../auth/sessionStore";
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000/api";
+/**
+ * Backend servers in priority order. EXPO_PUBLIC_API_URLS is a comma-separated list; the single
+ * EXPO_PUBLIC_API_URL still works for local development. If the active server is down the client
+ * moves on to the next one and stays there until that one fails too.
+ */
+export const API_BASE_URLS: string[] = (
+  process.env.EXPO_PUBLIC_API_URLS ??
+  process.env.EXPO_PUBLIC_API_URL ??
+  "http://localhost:4000/api"
+)
+  .split(",")
+  .map((url: string) => url.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+
+let activeServerIndex = 0;
+
+/** The server requests are currently sent to. */
+export function getActiveBaseUrl(): string {
+  return API_BASE_URLS[activeServerIndex];
+}
+
+export const API_BASE_URL = API_BASE_URLS[0];
 
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URLS[0],
   timeout: 15000,
 });
 
 apiClient.interceptors.request.use((config) => {
+  config.baseURL = getActiveBaseUrl();
   const token = getAccessToken();
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -31,7 +53,7 @@ async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null;
 
   try {
-    const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
+    const response = await axios.post(`${getActiveBaseUrl()}/auth/refresh`, { refreshToken });
     const tokens = response.data as { accessToken: string; refreshToken: string };
     await setSessionTokens(tokens);
     return tokens.accessToken;
@@ -40,11 +62,35 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 }
 
+/** True when the server itself looks unreachable (as opposed to it answering with an error). */
+function isServerDown(error: AxiosError): boolean {
+  const status = error.response?.status;
+  if (status === 502 || status === 503 || status === 504) return true;
+  if (error.response) return false;
+  if (error.code === "ERR_CANCELED") return false;
+  // A timeout may mean the server did receive a write, so only replay reads after one.
+  if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
+    return (error.config?.method ?? "get").toLowerCase() === "get";
+  }
+  return true;
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const original = error.config as (InternalAxiosRequestConfig & { _retried?: boolean }) | undefined;
+    const original = error.config as
+      | (InternalAxiosRequestConfig & { _retried?: boolean; _serversTried?: number })
+      | undefined;
     const status = error.response?.status;
+
+    if (original && API_BASE_URLS.length > 1 && isServerDown(error)) {
+      const tried = original._serversTried ?? 1;
+      if (tried < API_BASE_URLS.length) {
+        original._serversTried = tried + 1;
+        activeServerIndex = (activeServerIndex + 1) % API_BASE_URLS.length;
+        return apiClient(original);
+      }
+    }
 
     if (
       status === 401 &&

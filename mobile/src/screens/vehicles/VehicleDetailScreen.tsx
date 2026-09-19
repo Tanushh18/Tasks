@@ -116,6 +116,9 @@ export function VehicleDetailScreen({ navigation, route }: Props) {
                       </Text>
                     ) : null}
                   </View>
+                  {doc.fileData ? (
+                    <Ionicons name="attach-outline" size={18} color={colors.textMuted} style={{ marginRight: spacing.sm }} />
+                  ) : null}
                   {doc.reminderEnabled ? (
                     <Ionicons name="notifications-outline" size={18} color={colors.primary} style={{ marginRight: spacing.sm }} />
                   ) : null}

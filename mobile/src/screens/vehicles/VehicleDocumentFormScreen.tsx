@@ -2,20 +2,21 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as vehicleDocumentsApi from "../../api/vehicleDocuments";
 import type { VehicleDocumentType } from "../../api/vehicleDocuments";
 import { Button } from "../../components/Button";
 import { ConfirmationSheet } from "../../components/ConfirmationSheet";
 import { ScreenContainer } from "../../components/ScreenContainer";
+import { FilePreview } from "../../components/FilePreview";
 import { LoadingState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
 import type { VehicleStackParamList } from "../../navigation/types";
 import { ensureNotificationSetup, scheduleVehicleDocumentReminder } from "../../notifications/notificationService";
 import { useTheme } from "../../theme/useTheme";
 import { formatDateLabel, toIsoDate } from "../../utils/date";
-import { labelForMimeType, mimeTypeFromDataUrl, pickDocumentFile, pickImage, showFilePickerSheet } from "../../utils/filePicker";
+import { pickDocumentFile, pickImage, showFilePickerSheet } from "../../utils/filePicker";
 
 type Props = NativeStackScreenProps<VehicleStackParamList, "VehicleDocumentForm">;
 
@@ -158,9 +159,6 @@ export function VehicleDocumentFormScreen({ navigation, route }: Props) {
 
   if (loading) return <LoadingState label="Loading…" />;
 
-  const mimeType = mimeTypeFromDataUrl(fileData);
-  const isImage = mimeType?.startsWith("image/") ?? false;
-
   return (
     <ScreenContainer>
       <Text accessibilityRole="header" style={[typography.h1, { color: colors.text, marginBottom: spacing.lg }]}>
@@ -243,23 +241,7 @@ export function VehicleDocumentFormScreen({ navigation, route }: Props) {
       </View>
 
       <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>File</Text>
-      {fileData ? (
-        isImage ? (
-          <Image source={{ uri: fileData }} style={[styles.preview, { borderRadius: radius.md, marginBottom: spacing.md }]} />
-        ) : (
-          <View
-            style={[
-              styles.filePreview,
-              { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, marginBottom: spacing.md, padding: spacing.lg },
-            ]}
-          >
-            <Ionicons name="document-text-outline" size={28} color={colors.textMuted} />
-            <Text style={[typography.bodyStrong, { color: colors.text, marginLeft: spacing.md, flexShrink: 1 }]}>
-              {fileName ?? labelForMimeType(mimeType)}
-            </Text>
-          </View>
-        )
-      ) : null}
+      {fileData ? <FilePreview dataUrl={fileData} fileName={fileName} /> : null}
       <Button
         label={fileData ? "Replace file" : "Attach file"}
         variant="secondary"
@@ -318,6 +300,4 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   row: { flexDirection: "row", alignItems: "center" },
-  preview: { width: "100%", height: 200, resizeMode: "cover" },
-  filePreview: { flexDirection: "row", alignItems: "center" },
 });

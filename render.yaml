@@ -23,7 +23,9 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      # Must be IDENTICAL on every server the app can fail over to, or a login made on one
+      # server is rejected by the other. Copy the same values from backend/.env.
       - key: JWT_ACCESS_SECRET
-        generateValue: true
+        sync: false
       - key: JWT_REFRESH_SECRET
-        generateValue: true
+        sync: false
