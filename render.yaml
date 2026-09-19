@@ -1,0 +1,29 @@
+# Render Blueprint: in the Render dashboard choose New -> Blueprint and pick this repo.
+# Secrets (sync: false) are NOT stored here; Render asks you to type them once at setup.
+services:
+  - type: web
+    name: we-three-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 30d
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
+      - key: MONGO_URI
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true

@@ -51,6 +51,7 @@ function serializeFlags(flags: {
   notes: boolean;
   groupExpenses: boolean;
   documentVault: boolean;
+  vehicleManagement: boolean;
   householdInventory: boolean;
   emergencyInfo: boolean;
   familyEvents: boolean;
@@ -69,6 +70,7 @@ function serializeFlags(flags: {
     notes: flags.notes,
     groupExpenses: flags.groupExpenses,
     documentVault: flags.documentVault,
+    vehicleManagement: flags.vehicleManagement,
     householdInventory: flags.householdInventory,
     emergencyInfo: flags.emergencyInfo,
     familyEvents: flags.familyEvents,

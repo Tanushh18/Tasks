@@ -21,6 +21,7 @@ router.get(
         notes: flags.notes,
         groupExpenses: flags.groupExpenses,
         documentVault: flags.documentVault,
+        vehicleManagement: flags.vehicleManagement,
         householdInventory: flags.householdInventory,
         emergencyInfo: flags.emergencyInfo,
         familyEvents: flags.familyEvents,

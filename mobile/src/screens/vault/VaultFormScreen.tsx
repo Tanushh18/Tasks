@@ -1,7 +1,7 @@
+import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as vaultApi from "../../api/vaultDocuments";
 import type { VaultDocumentCategory } from "../../api/vaultDocuments";
@@ -12,6 +12,7 @@ import { LoadingState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
 import type { VaultStackParamList } from "../../navigation/types";
 import { useTheme } from "../../theme/useTheme";
+import { labelForMimeType, mimeTypeFromDataUrl, pickDocumentFile, pickImage, showFilePickerSheet } from "../../utils/filePicker";
 
 type Props = NativeStackScreenProps<VaultStackParamList, "VaultForm">;
 
@@ -35,6 +36,7 @@ export function VaultFormScreen({ navigation, route }: Props) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<VaultDocumentCategory>("other");
   const [fileData, setFileData] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(false);
@@ -58,31 +60,15 @@ export function VaultFormScreen({ navigation, route }: Props) {
     })();
   }, [documentId]);
 
-  async function pickFrom(source: "camera" | "library") {
-    const permission =
-      source === "camera"
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert("Permission needed", "Please allow access so we can add this document.");
-      return;
-    }
-
-    const result =
-      source === "camera"
-        ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], base64: true, quality: 0.7 })
-        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], base64: true, quality: 0.7 });
-
-    if (result.canceled || !result.assets?.[0]?.base64) return;
-    setFileData(`data:image/jpeg;base64,${result.assets[0].base64}`);
+  async function handlePick(source: "camera" | "library" | "document") {
+    const picked = source === "document" ? await pickDocumentFile() : await pickImage(source);
+    if (!picked) return;
+    setFileData(picked.dataUrl);
+    setFileName(picked.fileName);
   }
 
   function handlePickPress() {
-    Alert.alert("Add a photo", "Choose a photo source.", [
-      { text: "Take Photo", onPress: () => pickFrom("camera") },
-      { text: "Choose from Library", onPress: () => pickFrom("library") },
-      { text: "Cancel", style: "cancel" },
-    ]);
+    showFilePickerSheet(handlePick, "Add file");
   }
 
   async function handleSave() {
@@ -92,7 +78,7 @@ export function VaultFormScreen({ navigation, route }: Props) {
       return;
     }
     if (!fileData) {
-      setError("Please add a photo of the document.");
+      setError("Please add a file for this document.");
       return;
     }
     setSaving(true);
@@ -127,6 +113,9 @@ export function VaultFormScreen({ navigation, route }: Props) {
 
   if (loading) return <LoadingState label="Loading…" />;
 
+  const mimeType = mimeTypeFromDataUrl(fileData);
+  const isImage = mimeType?.startsWith("image/") ?? false;
+
   return (
     <ScreenContainer>
       <Text accessibilityRole="header" style={[typography.h1, { color: colors.text, marginBottom: spacing.lg }]}>
@@ -160,16 +149,35 @@ export function VaultFormScreen({ navigation, route }: Props) {
         ))}
       </View>
 
-      <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>Document photo</Text>
+      <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>Document file</Text>
       {fileData ? (
-        <Image source={{ uri: fileData }} style={[styles.preview, { borderRadius: radius.md, marginBottom: spacing.md }]} />
+        isImage ? (
+          <Image source={{ uri: fileData }} style={[styles.preview, { borderRadius: radius.md, marginBottom: spacing.md }]} />
+        ) : (
+          <View
+            style={[
+              styles.filePreview,
+              {
+                backgroundColor: colors.surfaceAlt,
+                borderRadius: radius.md,
+                marginBottom: spacing.md,
+                padding: spacing.lg,
+              },
+            ]}
+          >
+            <Ionicons name="document-text-outline" size={28} color={colors.textMuted} />
+            <Text style={[typography.bodyStrong, { color: colors.text, marginLeft: spacing.md, flexShrink: 1 }]}>
+              {fileName ?? labelForMimeType(mimeType)}
+            </Text>
+          </View>
+        )
       ) : null}
       <Button
-        label={fileData ? "Replace photo" : "Add photo"}
+        label={fileData ? "Replace file" : "Add file"}
         variant="secondary"
         onPress={handlePickPress}
         style={{ marginBottom: spacing.lg }}
-        accessibilityLabel={fileData ? "Replace document photo" : "Add document photo"}
+        accessibilityLabel={fileData ? "Replace attached file" : "Attach file"}
       />
 
       <TextField label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional" multiline />
@@ -215,4 +223,5 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: { paddingVertical: 8, paddingHorizontal: 14, borderWidth: StyleSheet.hairlineWidth },
   preview: { width: "100%", height: 200, resizeMode: "cover" },
+  filePreview: { flexDirection: "row", alignItems: "center" },
 });

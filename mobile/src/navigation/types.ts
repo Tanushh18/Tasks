@@ -82,6 +82,13 @@ export type VaultStackParamList = {
   VaultForm: { documentId?: string } | undefined;
 };
 
+export type VehicleStackParamList = {
+  VehicleList: undefined;
+  VehicleDetail: { vehicleId: string; name: string };
+  VehicleForm: { vehicleId?: string } | undefined;
+  VehicleDocumentForm: { vehicleId: string; documentId?: string } | undefined;
+};
+
 export type InventoryStackParamList = {
   InventoryList: undefined;
   InventoryForm: { itemId?: string } | undefined;
@@ -103,6 +110,7 @@ export type MoreStackParamList = {
   Settings: NavigatorScreenParams<SettingsStackParamList>;
   Notes: NavigatorScreenParams<NotesStackParamList>;
   Vault: NavigatorScreenParams<VaultStackParamList>;
+  Vehicles: NavigatorScreenParams<VehicleStackParamList>;
   Inventory: NavigatorScreenParams<InventoryStackParamList>;
   EmergencyInfo: NavigatorScreenParams<EmergencyStackParamList>;
   Polls: NavigatorScreenParams<PollsStackParamList>;

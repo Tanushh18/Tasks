@@ -21,6 +21,7 @@ describe("feature flags", () => {
       notes: true,
       groupExpenses: true,
       documentVault: true,
+      vehicleManagement: true,
       householdInventory: true,
       emergencyInfo: true,
       familyEvents: true,

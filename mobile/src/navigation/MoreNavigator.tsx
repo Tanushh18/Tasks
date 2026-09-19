@@ -21,6 +21,7 @@ import { NotesNavigator } from "./NotesNavigator";
 import { PollsNavigator } from "./PollsNavigator";
 import { SettingsNavigator } from "./SettingsNavigator";
 import { VaultNavigator } from "./VaultNavigator";
+import { VehicleNavigator } from "./VehicleNavigator";
 import type { MoreStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
@@ -33,6 +34,7 @@ export function MoreNavigator() {
       <Stack.Screen name="Settings" component={SettingsNavigator} />
       <Stack.Screen name="Notes" component={NotesNavigator} />
       <Stack.Screen name="Vault" component={VaultNavigator} />
+      <Stack.Screen name="Vehicles" component={VehicleNavigator} />
       <Stack.Screen name="Inventory" component={InventoryNavigator} />
       <Stack.Screen name="EmergencyInfo" component={EmergencyNavigator} options={{ headerShown: true, title: "Emergency Info" }} />
       <Stack.Screen name="Polls" component={PollsNavigator} />

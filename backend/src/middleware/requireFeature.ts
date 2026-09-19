@@ -11,6 +11,7 @@ type FeatureName =
   | "notes"
   | "groupExpenses"
   | "documentVault"
+  | "vehicleManagement"
   | "householdInventory"
   | "emergencyInfo"
   | "familyEvents"

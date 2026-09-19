@@ -39,6 +39,13 @@ export function MoreScreen({ navigation }: Props) {
           onPress={() => navigation.navigate("Vault", { screen: "VaultList", params: undefined })}
         />
       ) : null}
+      {flags.vehicleManagement ? (
+        <MoreRow
+          icon="car-outline"
+          label="Vehicle Management"
+          onPress={() => navigation.navigate("Vehicles", { screen: "VehicleList", params: undefined })}
+        />
+      ) : null}
       {flags.householdInventory ? (
         <MoreRow
           icon="cube-outline"

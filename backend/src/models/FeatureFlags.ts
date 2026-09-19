@@ -11,6 +11,7 @@ const featureFlagsSchema = new Schema(
     notes: { type: Boolean, default: true },
     groupExpenses: { type: Boolean, default: true },
     documentVault: { type: Boolean, default: true },
+    vehicleManagement: { type: Boolean, default: true },
     householdInventory: { type: Boolean, default: true },
     emergencyInfo: { type: Boolean, default: true },
     familyEvents: { type: Boolean, default: true },

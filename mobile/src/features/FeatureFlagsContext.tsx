@@ -12,6 +12,7 @@ const ALL_ON: FeatureFlags = {
   notes: true,
   groupExpenses: true,
   documentVault: true,
+  vehicleManagement: true,
   householdInventory: true,
   emergencyInfo: true,
   familyEvents: true,

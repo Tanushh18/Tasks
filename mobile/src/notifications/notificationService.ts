@@ -111,6 +111,59 @@ export async function cancelTaskReminder(localNotificationId: string | null): Pr
   await notifee.cancelTriggerNotification(localNotificationId).catch(() => undefined);
 }
 
+const VEHICLE_DOC_CHANNEL_ID = "vehicle-doc-reminders";
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Schedules (or reschedules) a lightweight reminder for a vehicle document nearing its expiry.
+ * Unlike task alarms this is a plain notification — no full-screen alarm treatment — fired once,
+ * 3 days before `expiresAt` (or immediately-ish if that moment has already passed but the expiry
+ * itself is still in the future). Returns the new notification id, or null if nothing was scheduled.
+ */
+export async function scheduleVehicleDocumentReminder(doc: {
+  id: string;
+  label: string;
+  expiresAt: string | null;
+  reminderEnabled: boolean;
+  localNotificationId?: string | null;
+}): Promise<string | null> {
+  if (doc.localNotificationId) {
+    await notifee.cancelTriggerNotification(doc.localNotificationId).catch(() => undefined);
+  }
+
+  if (!doc.reminderEnabled || !doc.expiresAt) {
+    return null;
+  }
+
+  const expiresAtMillis = new Date(doc.expiresAt).getTime();
+  if (Number.isNaN(expiresAtMillis) || expiresAtMillis <= Date.now()) {
+    return null;
+  }
+
+  const reminderAtMillis = Math.max(expiresAtMillis - THREE_DAYS_MS, Date.now() + 60 * 1000);
+
+  if (Platform.OS === "android") {
+    await notifee.createChannel({
+      id: VEHICLE_DOC_CHANNEL_ID,
+      name: "Vehicle Document Reminders",
+      importance: AndroidImportance.HIGH,
+    });
+  }
+
+  return notifee.createTriggerNotification(
+    {
+      title: "Document expiring soon",
+      body: `${doc.label} expires soon`,
+      data: { vehicleDocumentId: doc.id },
+      android: { channelId: VEHICLE_DOC_CHANNEL_ID, importance: AndroidImportance.HIGH },
+    },
+    {
+      type: TriggerType.TIMESTAMP,
+      timestamp: reminderAtMillis,
+    }
+  );
+}
+
 export async function snoozeReminder(task: Task, minutes = 10): Promise<string> {
   return notifee.createTriggerNotification(
     { ...buildAlarmNotification(task), title: "Task Reminder (snoozed)" },

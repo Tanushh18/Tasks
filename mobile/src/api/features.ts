@@ -9,6 +9,7 @@ export interface FeatureFlags {
   notes: boolean;
   groupExpenses: boolean;
   documentVault: boolean;
+  vehicleManagement: boolean;
   householdInventory: boolean;
   emergencyInfo: boolean;
   familyEvents: boolean;
