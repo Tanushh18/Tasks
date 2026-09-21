@@ -24,9 +24,12 @@ export function getActiveBaseUrl(): string {
 
 export const API_BASE_URL = API_BASE_URLS[0];
 
+// Render's free tier spins a sleeping instance back up on the first request, which can take
+// 30-50s; a shorter timeout would give up (and, for non-safe-to-replay requests, report failure)
+// before the server ever gets a chance to answer.
 export const apiClient = axios.create({
   baseURL: API_BASE_URLS[0],
-  timeout: 15000,
+  timeout: 30000,
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -62,15 +65,24 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 }
 
+// Endpoints with no side effects worth worrying about duplicating: a timed-out login/register
+// almost never means the write landed (Render free-tier cold starts just don't answer in time),
+// and retrying either one against the other server is harmless even on the rare chance it did.
+const SAFE_TO_REPLAY_ON_TIMEOUT_URLS = ["/auth/login", "/auth/register"];
+
 /** True when the server itself looks unreachable (as opposed to it answering with an error). */
 function isServerDown(error: AxiosError): boolean {
   const status = error.response?.status;
   if (status === 502 || status === 503 || status === 504) return true;
   if (error.response) return false;
   if (error.code === "ERR_CANCELED") return false;
-  // A timeout may mean the server did receive a write, so only replay reads after one.
+  // A timeout may mean the server did receive a write, so only replay reads (and the handful of
+  // known-safe writes above) after one.
   if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
-    return (error.config?.method ?? "get").toLowerCase() === "get";
+    const method = (error.config?.method ?? "get").toLowerCase();
+    if (method === "get") return true;
+    const url = error.config?.url ?? "";
+    return SAFE_TO_REPLAY_ON_TIMEOUT_URLS.some((safeUrl) => url.includes(safeUrl));
   }
   return true;
 }
