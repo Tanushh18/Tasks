@@ -54,4 +54,40 @@ describe("apiClient server failover", () => {
     await expect(apiClient.get("/tasks")).rejects.toBeDefined();
     expect(calls).toBe(2);
   });
+
+  function timeoutError(config: InternalAxiosRequestConfig) {
+    const error = new Error("timeout of 30000ms exceeded") as Error & {
+      isAxiosError: true;
+      config: InternalAxiosRequestConfig;
+      code: string;
+    };
+    error.isAxiosError = true;
+    error.config = config;
+    error.code = "ECONNABORTED";
+    return error;
+  }
+
+  it("fails over to the backup server when login times out on a cold-starting server", async () => {
+    const seen: string[] = [];
+    apiClient.defaults.adapter = async (config) => {
+      seen.push(String(config.baseURL));
+      if (config.baseURL === "https://primary.test/api") throw timeoutError(config);
+      return ok(config);
+    };
+
+    const res = await apiClient.post("/auth/login", { mobileNumber: "9999999999", mpin: "0000" });
+    expect(res.status).toBe(200);
+    expect(seen).toEqual(["https://primary.test/api", "https://backup.test/api"]);
+  });
+
+  it("does not replay an arbitrary write (e.g. creating a task) after a timeout", async () => {
+    let calls = 0;
+    apiClient.defaults.adapter = async (config) => {
+      calls += 1;
+      throw timeoutError(config);
+    };
+
+    await expect(apiClient.post("/tasks", { title: "x" })).rejects.toBeDefined();
+    expect(calls).toBe(1);
+  });
 });
