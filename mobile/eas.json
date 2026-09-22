@@ -11,7 +11,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URLS": "https://tasks-g9h1.onrender.com/api,https://we-three-api.onrender.com/api"
+        "EXPO_PUBLIC_API_URLS": "https://we-three-api.onrender.com/api"
       }
     },
     "preview": {
@@ -20,13 +20,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URLS": "https://tasks-g9h1.onrender.com/api,https://we-three-api.onrender.com/api"
+        "EXPO_PUBLIC_API_URLS": "https://we-three-api.onrender.com/api"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URLS": "https://tasks-g9h1.onrender.com/api,https://we-three-api.onrender.com/api"
+        "EXPO_PUBLIC_API_URLS": "https://we-three-api.onrender.com/api"
       }
     }
   }

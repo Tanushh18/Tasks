@@ -30,5 +30,5 @@ To actually make OCR/voice work locally, install a local engine and replace the 
   [Ollama](https://ollama.com) (e.g. `ollama pull moondream`).
 - **Voice/command understanding**: a small instruction-following model through Ollama (e.g. `ollama
   pull llama3.2`), prompted to return the same structured action shape the cloud assistant already
-  uses, then call `https://tasks-g9h1.onrender.com/api/...` with the phone's access token (sent in
+  uses, then call `https://we-three-api.onrender.com/api/...` with the phone's access token (sent in
   the request body) to actually perform the action.
