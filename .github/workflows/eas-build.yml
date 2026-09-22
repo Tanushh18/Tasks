@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "mobile/**"
+  # The push trigger above ignores changes to this file, so a fix to the workflow
+  # itself can only be exercised by starting a run by hand.
+  workflow_dispatch:
 
 jobs:
   build:
