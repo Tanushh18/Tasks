@@ -34,4 +34,28 @@ jobs:
 
       - name: Build Android APK (preview)
         working-directory: mobile
-        run: eas build --platform android --profile preview --non-interactive --no-wait
+        # --no-wait is removed so the job blocks until the build finishes and
+        # we can fetch the resulting APK URL for Firebase distribution below.
+        run: eas build --platform android --profile preview --non-interactive --json > eas-build-output.json
+
+      - name: Resolve build artifact URL
+        working-directory: mobile
+        run: |
+          ARTIFACT_URL=$(node -e "console.log(require('./eas-build-output.json')[0].artifacts.buildUrl)")
+          if [ -z "$ARTIFACT_URL" ] || [ "$ARTIFACT_URL" = "undefined" ]; then
+            echo "Could not resolve APK artifact URL from EAS build output" >&2
+            exit 1
+          fi
+          echo "ARTIFACT_URL=$ARTIFACT_URL" >> "$GITHUB_ENV"
+
+      - name: Download APK
+        run: curl -L "$ARTIFACT_URL" -o app-preview.apk
+
+      - name: Distribute APK to Firebase App Distribution testers
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          groups: testers
+          file: app-preview.apk
+          releaseNotes: ${{ github.event.head_commit.message }}
