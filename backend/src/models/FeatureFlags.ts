@@ -20,6 +20,7 @@ const featureFlagsSchema = new Schema(
     familyGoals: { type: Boolean, default: true },
     polls: { type: Boolean, default: true },
     weeklySummary: { type: Boolean, default: true },
+    leads: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
