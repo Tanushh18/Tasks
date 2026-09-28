@@ -6,6 +6,7 @@ import { FeatureFlagsScreen } from "../screens/admin/FeatureFlagsScreen";
 import { EventFormScreen } from "../screens/events/EventFormScreen";
 import { EventsListScreen } from "../screens/events/EventsListScreen";
 import { MoreScreen } from "../screens/more/MoreScreen";
+import { LeadsNavigator } from "./LeadsNavigator";
 import { SyncCenterScreen } from "../screens/more/SyncCenterScreen";
 import { EmergencyNavigator } from "./EmergencyNavigator";
 import { InventoryNavigator } from "./InventoryNavigator";
@@ -30,6 +31,7 @@ export function MoreNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MoreMain" component={MoreScreen} />
+      <Stack.Screen name="Leads" component={LeadsNavigator} />
       <Stack.Screen name="Assistant" component={AssistantScreen} />
       <Stack.Screen name="Settings" component={SettingsNavigator} />
       <Stack.Screen name="Notes" component={NotesNavigator} />

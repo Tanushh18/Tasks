@@ -21,6 +21,7 @@ const ALL_ON: FeatureFlags = {
   familyGoals: true,
   polls: true,
   weeklySummary: true,
+  leads: true,
 };
 
 interface FeatureFlagsContextValue {

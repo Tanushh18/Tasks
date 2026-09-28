@@ -2,11 +2,13 @@ import { createApp } from "./app";
 import { connectDatabase } from "./config/db";
 import { env } from "./config/env";
 import { logger } from "./utils/logger";
+import { startLeadSyncScheduler } from "./services/leadService";
 
 async function main() {
   await connectDatabase();
 
   const app = createApp();
+  startLeadSyncScheduler(15);
   const server = app.listen(env.port, () => {
     logger.info(`Backend listening on port ${env.port} (${env.nodeEnv})`);
   });

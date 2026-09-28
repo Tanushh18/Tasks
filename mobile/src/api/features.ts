@@ -18,6 +18,7 @@ export interface FeatureFlags {
   familyGoals: boolean;
   polls: boolean;
   weeklySummary: boolean;
+  leads: boolean;
 }
 
 export async function getFeatures(): Promise<FeatureFlags> {

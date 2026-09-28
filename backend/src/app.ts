@@ -31,6 +31,7 @@ import userRoutes from "./routes/userRoutes";
 import vaultDocumentRoutes from "./routes/vaultDocumentRoutes";
 import vehicleRoutes from "./routes/vehicleRoutes";
 import weeklySummaryRoutes from "./routes/weeklySummaryRoutes";
+import leadRoutes from "./routes/leadRoutes";
 
 export function createApp(): Express {
   const app = express();
@@ -81,6 +82,7 @@ export function createApp(): Express {
   app.use("/api/polls", pollRoutes);
   app.use("/api/weekly-summary", weeklySummaryRoutes);
   app.use("/api/activity-feed", activityFeedRoutes);
+  app.use("/api/leads", leadRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

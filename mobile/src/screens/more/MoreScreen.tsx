@@ -22,6 +22,9 @@ export function MoreScreen({ navigation }: Props) {
         More
       </Text>
 
+      {flags.leads ? (
+        <MoreRow icon="people-outline" label="Lead Tracker" onPress={() => navigation.navigate("Leads")} />
+      ) : null}
       {flags.assistant ? (
         <MoreRow icon="mic-outline" label="Assistant" onPress={() => navigation.navigate("Assistant", undefined)} />
       ) : null}
