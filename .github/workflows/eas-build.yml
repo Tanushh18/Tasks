@@ -1,7 +1,12 @@
 name: EAS Build (mobile)
 
 on:
-  # Temporarily manual-only while the app is re-linked to a new EAS project.
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+  # The push trigger above ignores changes to this file, so a fix to the workflow
+  # itself can only be exercised by starting a run by hand.
   workflow_dispatch:
 
 jobs:
@@ -27,6 +32,6 @@ jobs:
         working-directory: mobile
         run: eas init --account tanush18 --force --non-interactive
 
-      - name: Build Android (preview)
+      - name: Build Android
         working-directory: mobile
-        run: eas build --platform android --profile preview --non-interactive --no-wait
+        run: eas build --platform android --non-interactive --no-wait
