@@ -32,6 +32,6 @@ jobs:
         working-directory: mobile
         run: eas init --account tanushhh18 --force --non-interactive
 
-      - name: Build Android
+      - name: Build Android APK (preview)
         working-directory: mobile
-        run: eas build --platform android --non-interactive --no-wait
+        run: eas build --platform android --profile preview --non-interactive --no-wait
