@@ -1,12 +1,7 @@
 name: EAS Build (mobile)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "mobile/**"
-  # The push trigger above ignores changes to this file, so a fix to the workflow
-  # itself can only be exercised by starting a run by hand.
+  # Temporarily manual-only while the app is re-linked to a new EAS project.
   workflow_dispatch:
 
 jobs:
@@ -27,6 +22,10 @@ jobs:
       - name: Install dependencies
         working-directory: mobile
         run: npm ci
+
+      - name: Create or link new EAS project
+        working-directory: mobile
+        run: eas init --account tanush18 --force --non-interactive
 
       - name: Build Android (preview)
         working-directory: mobile
