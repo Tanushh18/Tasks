@@ -106,6 +106,7 @@ export type PollsStackParamList = {
 
 export type MoreStackParamList = {
   MoreMain: undefined;
+  Leads: undefined;
   Assistant: { autoListen?: boolean } | undefined;
   Settings: NavigatorScreenParams<SettingsStackParamList>;
   Notes: NavigatorScreenParams<NotesStackParamList>;
