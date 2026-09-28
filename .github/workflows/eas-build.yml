@@ -30,7 +30,7 @@ jobs:
 
       - name: Create or link new EAS project
         working-directory: mobile
-        run: eas init --account tanush18 --force --non-interactive
+        run: eas init --force --non-interactive
 
       - name: Build Android
         working-directory: mobile
