@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "We Three",
-    "slug": "daily-tasks-reminder",
+    "slug": "we-three-t23",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,7 +14,7 @@
         "NSCameraUsageDescription": "Used to scan business cards and receipts to fill in forms for you.",
         "NSPhotoLibraryUsageDescription": "Used to pick a business card or receipt photo to fill in forms for you.",
         "NSLocationWhenInUseUsageDescription": "Used to share your location with family members while the app is open.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Used to keep sharing your location with family members while sharing is turned on, even when the app is in the background.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Used to keep sharing your location with family members while sharing is turned on, even when sharing is turned on.",
         "NSBluetoothAlwaysUsageDescription": "Used to send and relay Bluetooth Chat messages directly between nearby phones, with no internet connection required.",
         "NSBluetoothPeripheralUsageDescription": "Used so nearby phones can discover your Bluetooth Chat messages, with no internet connection required.",
         "UIBackgroundModes": [
@@ -99,11 +99,6 @@
       "./plugins/withAlarmSound.js",
       "expo-sharing"
     ],
-    "extra": {
-      "eas": {
-        "projectId": "2b880eb1-75db-4535-af56-3b3053a1377e"
-      }
-    },
     "owner": "tanush18"
   }
 }
