@@ -30,6 +30,7 @@ router.get(
         familyGoals: flags.familyGoals,
         polls: flags.polls,
         weeklySummary: flags.weeklySummary,
+        leads: flags.leads,
       },
     });
   })
