@@ -1,198 +1,937 @@
-# We Three — Smart Tasks, Reminder, Finance & Contacts App
+# We Three — Comprehensive Family Management App
 
-A family task/reminder manager, personal finance tracker, and shared contacts book with mobile-number + MPIN auth and MongoDB sync.
-See `/Users/t/.claude/plans/merry-wandering-allen.md` for the full phased plan.
+A full-featured family management application combining task management, financial tracking, contacts, events, and AI-powered assistance. Built with modern technologies including Node.js/Express backend, React Native mobile frontend, TypeScript throughout, and MongoDB for data persistence.
 
-**Phase 1: done and verified.** Auth, tasks, reminders/local notifications, finance accounts &
-transactions, settings — all working end-to-end against a real backend API.
+## Table of Contents
 
-**Phase 2: done, structurally verified — needs your Gemini key for a live test.** Gemini AI
-integration with backend-controlled tool-calling (never raw DB access), a confirmation flow for
-financial actions, a real chat UI, and real microphone voice input + spoken replies. See "AI &
-Voice setup" below.
+- [Overview](#overview)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Installation & Setup](#installation--setup)
+  - [Prerequisites](#prerequisites)
+  - [Backend Setup](#backend-setup)
+  - [Mobile App Setup](#mobile-app-setup)
+  - [Local Server Setup](#local-server-setup)
+- [Running the Application](#running-the-application)
+- [Configuration](#configuration)
+- [API Documentation](#api-documentation)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Production Hardening](#production-hardening)
+- [Offline Support](#offline-support)
+- [Security](#security)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
-**Phase 3: done.** Finance charts (cash-flow trend, category/account breakdown), a calendar view for
-tasks, global search, an offline queue with idempotent sync, a 38-test backend suite, and production
-hardening (Dockerfile, trust-proxy config, test-env-aware rate limiting). Details below.
+## Overview
 
-## Project structure
+"We Three" is a comprehensive family management platform that helps families:
+- **Stay organized**: Manage shared tasks, reminders, and events
+- **Track finances**: Monitor accounts, transactions, and group expenses
+- **Stay connected**: Maintain shared contacts and emergency information
+- **Plan together**: Set family goals, manage shopping lists, and track family events
+- **Get AI assistance**: Leverage Gemini integration for smart recommendations and voice commands
+- **Reduce friction**: Intuitive mobile app with offline support and real-time sync
+
+The application consists of three components:
+1. **Backend API** (Node.js/Express) - REST API with MongoDB persistence
+2. **Mobile App** (React Native/Expo) - Cross-platform iOS and Android
+3. **Local Server** (Node.js) - Optional local AI processing (OCR and voice)
+
+## Features
+
+### Core Features
+
+#### Task & Reminder Management
+- Create, edit, delete, and complete tasks
+- Set reminders with customizable notification times
+- Task calendar view with month overview and task details
+- Priority levels and task categorization
+- Recurring task support (via recurring payments system)
+
+#### Financial Management
+- Multiple account support with custom account names
+- Track cash-in and cash-out transactions
+- Financial insights with charts:
+  - 6-month cash-flow trend line
+  - Category-wise spending breakdown
+  - Account-wise spending comparison
+- Transaction history with filtering and search
+- Account balance calculations (cash-in minus cash-out)
+
+#### Group Expenses
+- Create expense groups with multiple members
+- Log shared expenses
+- Automatic settlement calculations
+- Settlement payment tracking
+
+#### Contact Management
+- Shared family contacts with phone numbers
+- Import contacts from device
+- Emergency contact information
+- Emergency info with details like blood type, medical conditions
+
+#### Family Events
+- Create and manage family events
+- Event scheduling with dates and times
+- Weekly summary of upcoming events
+
+#### Notes & Documentation
+- Create and organize notes
+- Rich text support
+- Quick note access
+
+#### Shopping & Inventory
+- Shared shopping lists
+- Check-off items as purchased
+- Inventory management for household items
+- Track quantity and status
+
+#### Vehicles (Automotive Management)
+- Track vehicle details and information
+- Manage vehicle documents (registration, insurance, etc.)
+- Document expiry tracking
+
+#### Additional Features
+- **Polls**: Create family polls and voting
+- **Lead Management**: Track and manage leads (CRM-like functionality)
+- **Vault Documents**: Secure document storage
+- **Location Sharing**: Share real-time location with family
+- **Notifications Center**: Consolidated notification management
+- **Sync Center**: Monitor offline/online sync status
+- **Admin Features**: User management and feature flags
+
+### AI & Voice Integration
+
+- **Gemini Integration**: Backend-controlled tool-calling for safety (never exposes API key to mobile)
+- **Voice Input**: Microphone input with speech recognition (requires native build)
+- **Voice Output**: Text-to-speech for assistant responses
+- **Financial Confirmations**: Requires explicit user confirmation for money-related actions
+- **Text Chat**: Conversational interface with Gemini
+
+### Offline Support
+
+- **Offline Queue**: Creates, tasks, and transactions queued locally when offline
+- **Idempotent Sync**: Same idempotency key prevents duplicates on flaky connections
+- **Dashboard Cache**: Home screen shows cached data with sync status banner
+- **Automatic Sync**: Syncs automatically on app start and when going online
+
+## Tech Stack
+
+### Backend
+
+- **Runtime**: Node.js (v20+)
+- **Framework**: Express.js
+- **Language**: TypeScript
+- **Database**: MongoDB with Mongoose ODM
+- **Authentication**: JWT (JSON Web Tokens)
+- **Password Hashing**: bcryptjs
+- **Rate Limiting**: express-rate-limit
+- **Security**: Helmet for HTTP headers
+- **Logging**: Morgan for HTTP request logging
+- **Validation**: Zod for runtime type validation
+- **AI**: Google Generative AI (Gemini)
+- **Date/Time**: Luxon for timezone-aware date handling
+- **In-Memory DB**: mongodb-memory-server (development)
+- **Testing**: Jest + Supertest
+
+### Mobile App
+
+- **Framework**: Expo (React Native SDK)
+- **Language**: TypeScript
+- **Navigation**: React Navigation (bottom tabs + native stack)
+- **UI Components**: React Native + Expo components
+- **HTTP Client**: Axios
+- **Storage**: AsyncStorage for local persistence
+- **Cryptography**: expo-crypto for secure operations
+- **File Management**: expo-file-system, expo-document-picker
+- **Media**: expo-image-picker, expo-camera (via expo-document-picker)
+- **Location**: expo-location for GPS
+- **Notifications**: Notifee for local notifications
+- **Speech**: expo-speech, expo-speech-recognition
+- **Networking**: @react-native-community/netinfo for connectivity
+- **Platform-specific**: expo-contacts, react-native-maps, react-native-ble-advertiser
+- **Charts**: react-native-svg (custom SVG-based visualizations)
+- **Calendar**: react-native-calendars
+- **Date/Time**: @react-native-community/datetimepicker
+
+### DevOps & Deployment
+
+- **Docker**: Multi-stage build for production backend
+- **Deployment Platform**: Render.com (via render.yaml)
+- **Database Hosting**: MongoDB Atlas
+- **Mobile Build**: EAS (Expo Application Services)
+- **Code Quality**: TypeScript for static type checking
+
+## Project Structure
 
 ```
-backend/   Node.js + Express + TypeScript + MongoDB (Mongoose) REST API
-mobile/    Expo (React Native) + TypeScript app — Android & iOS
+Tasks/
+├── backend/                    # Node.js/Express REST API
+│   ├── src/
+│   │   ├── app.ts             # Express app factory
+│   │   ├── server.ts          # Entry point
+│   │   ├── config/
+│   │   │   ├── db.ts          # MongoDB connection (memory or Atlas)
+│   │   │   ├── env.ts         # Environment validation
+│   │   │   └── jwt.ts         # JWT configuration
+│   │   ├── controllers/       # Route handlers (30+ controllers)
+│   │   ├── routes/            # API endpoints (30+ route files)
+│   │   ├── models/            # MongoDB schemas (Mongoose)
+│   │   ├── services/          # Business logic
+│   │   ├── middleware/        # Express middleware
+│   │   ├── validators/        # Input validation (Zod schemas)
+│   │   └── utils/             # Helper functions
+│   ├── tests/                 # Jest test suite (38+ tests)
+│   ├── .env.example           # Environment variables template
+│   ├── Dockerfile             # Multi-stage production build
+│   ├── package.json           # Dependencies
+│   ├── tsconfig.json          # TypeScript configuration
+│   └── jest.config.js         # Test configuration
+│
+├── mobile/                     # React Native/Expo mobile app
+│   ├── src/
+│   │   ├── App.tsx            # Root component
+│   │   ├── app.json           # Expo configuration
+│   │   ├── screens/           # Feature screens (60+ screens)
+│   │   ├── components/        # Reusable UI components
+│   │   ├── api/               # API client and hooks
+│   │   ├── auth/              # Authentication logic
+│   │   ├── navigation/        # Navigation structure
+│   │   ├── types/             # TypeScript type definitions
+│   │   ├── theme/             # Colors, typography, theming
+│   │   ├── utils/             # Helper functions
+│   │   ├── offline/           # Offline queue management
+│   │   ├── location/          # Location services
+│   │   ├── notifications/     # Local notifications
+│   │   ├── voice/             # Speech recognition & TTS
+│   │   └── features/          # Feature flags
+│   ├── .env.example           # Environment variables template
+│   ├── eas.json               # EAS build configuration
+│   ├── package.json           # Dependencies
+│   ├── tsconfig.json          # TypeScript configuration
+│   └── app.json               # Expo app manifest
+│
+├── local-server/              # Optional local AI server
+│   ├── server.js              # Node.js server for OCR/voice
+│   ├── package.json           # Dependencies
+│   └── README.md              # Local server documentation
+│
+├── render.yaml                # Render deployment blueprint
+├── .github/
+│   └── workflows/             # GitHub Actions CI/CD
+└── README.md                  # Original documentation
+
 ```
 
-## Running the backend
+### API Structure
 
+The backend exposes the following API routes (all prefixed with `/api`):
+
+**Authentication**: `/auth` (register, login, logout, refresh token)
+**Users**: `/user` (profile, settings)
+**Tasks**: `/tasks` (CRUD + calendar view)
+**Reminders**: `/reminders` (get upcoming reminders)
+**Finance**: `/finance/accounts`, `/finance/transactions` (account management, transactions)
+**Contacts**: `/contacts` (CRUD)
+**Events**: `/events` (family events)
+**Chat**: `/chat` (message history, threads)
+**Assistant**: `/assistant/message` (Gemini integration)
+**Group Expenses**: `/group-expenses`, `/group-expenses/groups` (group management)
+**Polls**: `/polls` (create, vote)
+**Shopping Lists**: `/shopping-lists` (list management)
+**Vehicles**: `/vehicles` (vehicle details)
+**Notes**: `/notes` (note management)
+**Inventory**: `/inventory` (inventory items)
+**Goals**: `/family-goals` (family goal tracking)
+**Vault**: `/vault-documents` (secure document storage)
+**Location**: `/location` (location sharing)
+**Leads**: `/leads` (lead management/CRM)
+**Admin**: `/admin` (admin operations)
+**Search**: `/search` (global search)
+
+## Installation & Setup
+
+### Prerequisites
+
+- **Node.js**: v20.19.4 or higher (or `nvm install --lts`)
+- **npm**: Included with Node.js
+- **Git**: For version control
+- **MongoDB**: Either local instance or MongoDB Atlas account
+- **Expo CLI**: For mobile development (`npm install -g expo-cli`)
+- **Android Studio** (optional): For Android development
+- **Xcode** (optional, macOS only): For iOS development
+
+### Backend Setup
+
+1. **Navigate to backend directory**:
+   ```bash
+   cd backend
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables**:
+   ```bash
+   cp .env.example .env
+   ```
+
+4. **Edit `.env` file**:
+   - Leave `MONGO_URI` empty for local development (uses in-memory MongoDB)
+   - Or set `MONGO_URI` to your MongoDB Atlas connection string for persistent data
+   - Generate JWT secrets: `openssl rand -hex 32` (run twice for both secrets)
+   - Add `GEMINI_API_KEY` from https://aistudio.google.com/apikey (optional, for AI features)
+
+   Example `.env` for local development:
+   ```
+   PORT=4000
+   NODE_ENV=development
+   MONGO_URI=
+   JWT_ACCESS_SECRET=your-generated-secret-here
+   JWT_REFRESH_SECRET=your-generated-secret-here
+   JWT_ACCESS_EXPIRES_IN=15m
+   JWT_REFRESH_EXPIRES_IN=30d
+   CORS_ORIGIN=*
+   GEMINI_API_KEY=
+   GEMINI_MODEL=gemini-3.6-flash
+   ```
+
+5. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
+
+   The backend will be available at `http://localhost:4000`
+
+6. **Health check**:
+   ```bash
+   curl http://localhost:4000/health
+   ```
+
+### Mobile App Setup
+
+1. **Navigate to mobile directory**:
+   ```bash
+   cd mobile
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables**:
+   ```bash
+   cp .env.example .env
+   ```
+
+4. **Edit `.env` file** to point to your backend:
+   ```
+   # For iOS simulator
+   EXPO_PUBLIC_API_URL=http://localhost:4000/api
+   
+   # For Android emulator
+   EXPO_PUBLIC_API_URL=http://10.0.2.2:4000/api
+   
+   # For physical device (replace with your computer's LAN IP)
+   EXPO_PUBLIC_API_URL=http://<your-lan-ip>:4000/api
+   ```
+
+5. **Note on Expo Go vs Native Build**:
+   - The app uses `expo-speech-recognition` which requires native code
+   - **Cannot** run on Expo Go anymore
+   - **Must** use a dev-client build: `npx expo run:android` or `npx expo run:ios`
+   - Or build via EAS: `eas build --platform android --profile preview`
+
+6. **Start development**:
+   ```bash
+   # Start the development server
+   npx expo start
+   
+   # In a separate terminal, build for your platform:
+   # For Android
+   npx expo run:android
+   
+   # For iOS (macOS only)
+   npx expo run:ios
+   ```
+
+### Local Server Setup
+
+The local server is optional and allows processing OCR and voice commands on your machine instead of the cloud.
+
+1. **Navigate to local-server directory**:
+   ```bash
+   cd local-server
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Start the server**:
+   ```bash
+   npm start
+   ```
+   
+   Or with custom port:
+   ```bash
+   PORT=3001 npm start
+   ```
+
+4. **In the mobile app**, go to **Settings → Local AI server** and enter the public URL of your tunnel (using a service like ngrok or Cloudflare Tunnel).
+
+**Note**: The local server currently returns `501 NOT_IMPLEMENTED` for OCR and voice processing. To enable:
+- **OCR**: Install Tesseract or use Ollama with a vision model
+- **Voice**: Use Ollama with a language model and call the backend API with the action
+
+See `local-server/README.md` for detailed implementation instructions.
+
+## Running the Application
+
+### Full Stack Development
+
+**Terminal 1 - Backend**:
 ```bash
 cd backend
-npm install
-cp .env.example .env   # fill in JWT secrets; leave MONGO_URI empty for local dev
 npm run dev
 ```
 
-- If `MONGO_URI` is left empty, the backend automatically boots an **in-memory MongoDB**
-  (`mongodb-memory-server`) — good for local development, but data does **not** persist across
-  restarts.
-- To use a real database (required in production), set `MONGO_URI` to a MongoDB Atlas connection
-  string in `backend/.env`. Nothing else needs to change — the app code is identical either way.
-- Health check: `GET http://localhost:4000/health`
+**Terminal 2 - Mobile**:
+```bash
+cd mobile
+npx expo run:android  # or ios
+```
 
-Verified end-to-end during Phase 1: register → login → create task with reminder → create finance
-account → cash-in/cash-out transactions → financial summary math → data isolation between two
-different users → validation errors (weak MPIN, mismatched confirm, negative amounts, missing
-auth) — all behaved correctly.
+**Terminal 3 (optional) - Local Server**:
+```bash
+cd local-server
+npm start
+```
 
-### Automated tests (Phase 3)
+### Accessing the Application
+
+- **Backend API**: http://localhost:4000
+- **Health Check**: http://localhost:4000/health
+- **Mobile App**: Runs on your Android device/emulator or iOS simulator
+
+### Test Data / Initial Setup
+
+1. **Register a family member**:
+   - Mobile number (any 10-digit number in dev)
+   - Create MPIN (4-6 digits)
+   - Confirm MPIN
+
+2. **Explore features**:
+   - Create a task with a reminder
+   - Add a finance account and transaction
+   - Create a contact
+   - Create a family event
+   - (If AI enabled) Use the Assistant tab for chat
+
+## Configuration
+
+### Backend Configuration
+
+All configuration is via environment variables in `backend/.env`:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | 4000 | Server port |
+| `NODE_ENV` | development | Environment (development/production/test) |
+| `MONGO_URI` | (empty) | MongoDB connection string (empty = in-memory dev DB) |
+| `JWT_ACCESS_SECRET` | (required) | Secret for signing access tokens |
+| `JWT_REFRESH_SECRET` | (required) | Secret for signing refresh tokens |
+| `JWT_ACCESS_EXPIRES_IN` | 15m | Access token expiry |
+| `JWT_REFRESH_EXPIRES_IN` | 30d | Refresh token expiry |
+| `CORS_ORIGIN` | * | CORS allowed origins |
+| `GEMINI_API_KEY` | (optional) | Google Gemini API key |
+| `GEMINI_MODEL` | gemini-3.6-flash | Gemini model to use |
+| `ADMIN_MOBILE_NUMBERS` | (optional) | Comma-separated admin phone numbers |
+
+### Mobile App Configuration
+
+All configuration is via environment variables in `mobile/.env`:
+
+| Variable | Purpose |
+|----------|---------|
+| `EXPO_PUBLIC_API_URL` | Backend API base URL |
+
+### Feature Flags
+
+The application supports feature flags for progressive rollout of features. Configure via the admin interface or database.
+
+## API Documentation
+
+### Authentication Flow
+
+1. **Register**: `POST /api/auth/register`
+   ```json
+   {
+     "mobileNumber": "9876543210",
+     "mpin": "1234"
+   }
+   ```
+   Returns: `{ accessToken, refreshToken, userId }`
+
+2. **Login**: `POST /api/auth/login`
+   ```json
+   {
+     "mobileNumber": "9876543210",
+     "mpin": "1234"
+   }
+   ```
+   Returns: `{ accessToken, refreshToken, userId }`
+
+3. **Refresh Token**: `POST /api/auth/refresh`
+   - Requires: `refreshToken` header
+   - Returns: New `accessToken`
+
+### Example API Calls
+
+**Create a Task**:
+```bash
+curl -X POST http://localhost:4000/api/tasks \
+  -H "Authorization: Bearer <access-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Buy groceries",
+    "description": "Milk, eggs, bread",
+    "priority": "high",
+    "dueDate": "2024-12-31T18:00:00Z"
+  }'
+```
+
+**Get Upcoming Reminders**:
+```bash
+curl http://localhost:4000/api/reminders/upcoming \
+  -H "Authorization: Bearer <access-token>"
+```
+
+**Create a Finance Transaction**:
+```bash
+curl -X POST http://localhost:4000/api/finance/transactions \
+  -H "Authorization: Bearer <access-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "accountId": "account-id",
+    "amount": 500,
+    "type": "cash-out",
+    "category": "groceries",
+    "description": "Weekly shopping"
+  }'
+```
+
+**Send a Message to AI Assistant**:
+```bash
+curl -X POST http://localhost:4000/api/assistant/message \
+  -H "Authorization: Bearer <access-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "What is my total spending this month?"
+  }'
+```
+
+For complete API documentation, refer to individual route files in `backend/src/routes/`.
+
+## Testing
+
+### Running Backend Tests
 
 ```bash
 cd backend
 npm test
 ```
 
-38 tests across auth, tasks, finance, search, and assistant (`tests/*.test.ts`, Jest + Supertest,
-against a fresh in-memory MongoDB per run). All passing. Writing these caught two real bugs no
-amount of manual curl-testing had surfaced:
+**Test Coverage**:
+- 38+ tests covering authentication, tasks, finance, search, admin, and assistant
+- Each test run uses a fresh in-memory MongoDB
+- Tests verify business logic, validation, and data isolation
 
-- **Compound sparse-index gotcha**: the idempotency-key unique index was defined with `sparse: true`
-  on a *compound* key (`{userId, idempotencyKey}`). MongoDB's sparse rule for compound indexes only
-  excludes a document if it's missing **all** indexed fields — since `userId` is always present,
-  every task/transaction was still indexed with `idempotencyKey: null`, so the *second* task or
-  transaction any user created would silently fail with a duplicate-key error. Fixed with a
-  `partialFilterExpression: { idempotencyKey: { $exists: true } }` instead of `sparse`.
-- The registration rate limiter (correctly) blocks after 10 requests/hour — which a fast test suite
-  creating dozens of users blows straight through. Rate limiters are now `skip`ped under
-  `NODE_ENV=test` (identical behavior in dev/production; nothing else changed).
+**Key Test Findings** (bugs caught):
+1. **Compound Sparse Index Gotcha**: Fixed idempotency-key unique index to use `partialFilterExpression`
+2. **Rate Limiter in Tests**: Rate limiters are skipped under `NODE_ENV=test`
 
-## Running the mobile app
+### Running Mobile Tests
 
 ```bash
 cd mobile
-cp .env.example .env
-# edit EXPO_PUBLIC_API_URL in .env to point at your backend:
-#   iOS simulator      -> http://localhost:4000/api
-#   Android emulator    -> http://10.0.2.2:4000/api
-#   Physical device      -> http://<your-computer's-LAN-IP>:4000/api
-npm install
-npx expo start
+npm test
 ```
 
-Then press `i` (iOS simulator), `a` (Android emulator), or scan the QR code with Expo Go on a
-physical device. The backend must be running and reachable at the URL you set above.
+### Test Coverage Areas
 
-**Important:** since Phase 2 added real microphone voice input (`expo-speech-recognition`), **Expo
-Go can no longer run this app** — that library needs native code Expo Go doesn't ship. Use
-`npx expo run:android` or `npx expo run:ios` (or an EAS development build) instead of `expo start`
-+ Expo Go from now on. Everything else in the app (typed chat, tasks, finance, TTS) still works the
-same way, just from the dev-client build rather than Expo Go.
+- **Auth**: User registration, login, token refresh, MPIN validation
+- **Tasks**: Create, read, update, delete, reminders, calendar
+- **Finance**: Accounts, transactions, balance calculations, group expenses
+- **Search**: Global search across tasks, transactions, contacts
+- **Admin**: User management, feature flags
+- **Assistant**: Gemini integration, tool-calling safety
+- **Offline**: Queue management, idempotent sync
 
-**What I verified in this environment:** the full TypeScript project typechecks with zero errors
-after every phase, and Metro successfully bundles the entire app for both iOS and Android with no
-import or build errors (re-checked after Phase 3's charts/calendar/search/offline additions too).
+## Deployment
 
-This machine also has a real Android emulator and SDK, so I've twice tried to go further than
-bundle-checking and actually build + install the dev client on the emulator (`Pixel_7_API`) to
-exercise voice input for real — both times it ran out of disk mid-build (`ENOSPC`) rather than
-failing on anything in the code. Everything up to that point worked correctly: prebuild succeeded,
-the Gradle distribution downloaded, and the native compile started — this was purely a disk-space
-problem, not an app problem. The main culprit was `~/.gradle` (Gradle's download/build cache — not
-part of this project, lives in your home directory) growing to 2.3GB across the two attempts; with
-your OK I removed it after the second attempt, which took free space from ~3.5GB back up to ~6.8GB.
-It'll rebuild itself (smaller and just what's needed) on the next `npx expo run:android`. I haven't
-re-run the build since clearing it — if you'd like me to try again, say so and I will; otherwise
-this is the natural next thing to run yourself when convenient.
+### Production Environment Setup
 
-## AI & Voice setup (Phase 2)
+1. **Database**: MongoDB Atlas
+   - Create cluster at mongodb.com
+   - Get connection string
+   - Set `MONGO_URI` in production environment
+
+2. **API Keys**:
+   - Generate JWT secrets: `openssl rand -hex 32`
+   - Get Gemini API key from https://aistudio.google.com/apikey
+   - Never commit these to git
+
+3. **CORS Configuration**:
+   - Set `CORS_ORIGIN` to your actual frontend domain(s)
+   - Remove `*` from production
+
+### Deploying to Render
+
+The repository includes a `render.yaml` blueprint for automatic deployment:
+
+1. **Push code to GitHub**
+2. **Connect to Render.com**:
+   - Choose "New" → "Blueprint"
+   - Select this repository
+   - Render auto-detects `render.yaml`
+3. **Configure secrets**:
+   - `MONGO_URI`: Your MongoDB Atlas connection string
+   - `JWT_ACCESS_SECRET`: Generated secret
+   - `JWT_REFRESH_SECRET`: Generated secret
+   - `GEMINI_API_KEY`: Gemini API key
+4. **Deploy**: Render automatically deploys on git push
+
+**Health Check**: Render pings `/health` for liveness verification
+
+### Docker Deployment
+
+Build and run the Docker image manually:
 
 ```bash
+# Build
 cd backend
-# add to .env:
-GEMINI_API_KEY=your-key-from-https://aistudio.google.com/apikey
-GEMINI_MODEL=gemini-3.6-flash   # already the default; only change if you want a different model
+docker build -t we-three-api:latest .
+
+# Run
+docker run -p 4000:4000 \
+  -e MONGO_URI="mongodb+srv://..." \
+  -e JWT_ACCESS_SECRET="..." \
+  -e JWT_REFRESH_SECRET="..." \
+  -e GEMINI_API_KEY="..." \
+  -e NODE_ENV=production \
+  we-three-api:latest
 ```
 
-No mobile-side config needed for AI — the mobile app only ever talks to your backend, never to
-Gemini directly, per the "never expose the AI key in the mobile app" requirement.
+### Mobile App Deployment
 
-- **Text chat**: works immediately in a dev-client build once the backend has a Gemini key. Without
-  a key, `POST /api/assistant/message` returns a clean `503 AI_NOT_CONFIGURED` error (verified) —
-  the app shows that as a chat message rather than crashing.
-- **Voice input**: tap the mic on the Assistant tab, or "Voice Command" on Home. Requires the
-  dev-client build (see above) and microphone/speech permission on first use.
-- **Confirmation for money**: Settings → AI & Voice → "Confirm financial actions" (on by default).
-  When on, the assistant proposes cash-in/cash-out transactions and waits for you to tap Confirm
-  before saving anything — it never silently writes a financial transaction to your account.
-- **Spoken replies**: Settings → AI & Voice → "Speak assistant replies" (on by default) reads
-  responses aloud after you use voice input.
+**iOS App Store**:
+```bash
+cd mobile
+eas build --platform ios
+eas submit --platform ios
+```
 
-## Charts, calendar & search (Phase 3)
+**Google Play Store**:
+```bash
+cd mobile
+eas build --platform android
+eas submit --platform android
+```
 
-- **Finance → the bar-chart icon → Insights**: a 6-month cash-flow trend line, category-wise
-  spending, and account-wise spending, all built with `react-native-svg` and plain Views (no chart
-  library) following the `dataviz` skill's method. The 8-hue categorical palette used for
-  category/account bars is the skill's validated default, re-checked with its own
-  `validate_palette.js` against this app's actual light (`#FFFFFF`) and dark (`#191B23`) chart
-  surfaces — both pass. Cash-in/cash-out use the app's existing semantic success/danger colors
-  rather than the categorical ramp, since that mapping is already the fixed convention everywhere
-  else in the app (badges, text). Category/account breakdowns cap at the top 6 + "Other" per the
-  skill's series-count ladder, and every bar carries a direct text label (never color-alone
-  identity) — required regardless, since 3 of the 8 hues fall under 3:1 contrast on the light
-  surface.
-- **Tasks → the calendar icon**: month view with a dot on any day that has tasks (red if overdue),
-  tap a day to see/add/complete/delete its tasks.
-- **Home → the search icon**: debounced global search across tasks, transactions, and account
-  names, scoped to the signed-in user (verified in the backend test suite).
+**Requires**:
+- EAS account (free tier available)
+- Apple Developer account (paid, $99/year)
+- Google Play Developer account (paid, $25 one-time)
 
-## Offline support (Phase 3)
+## Production Hardening
 
-Scope: **creating** a task or logging a transaction while offline. Editing/deleting offline and
-full offline-first browsing are not covered — flagged here rather than silently left out.
+The application includes production-ready features:
 
-- If saving a new task or transaction gets a genuine network failure (no response at all — not a
-  validation error), it's queued locally (AsyncStorage) with a client-generated idempotency key
-  instead of being lost, and you see "Saved offline — will sync automatically."
-- The queue flushes automatically on app start (if online) and every time the device transitions
-  from offline to online (`@react-native-community/netinfo`). Each retry reuses the same
-  idempotency key, so a flaky connection can never create a duplicate — the backend recognizes the
-  key and returns the original record instead of inserting again (covered by the backend test
-  suite).
-- The Home dashboard caches its last successful load and falls back to it (with a "You're offline —
-  showing data from Xm ago" banner and a pending-sync count) if the network call fails. Other
-  screens don't cache yet — a reasonable next cut if you want full offline browsing.
+### Security
+- **CORS**: Configurable allowed origins
+- **Helmet**: HTTP security headers
+- **JWT**: Secure token-based authentication
+- **Password Hashing**: bcryptjs with salt rounds
+- **Rate Limiting**: Prevents brute force (registration: 10 req/hour)
+- **Input Validation**: Zod schemas on all inputs
 
-## Production deployment
+### Performance
+- **Indexes**: MongoDB indexes on frequently queried fields
+- **Caching**: Dashboard cache for offline support
+- **Compression**: HTTP compression via Express
+- **Lazy Loading**: Mobile app components lazy-loaded
 
-- `backend/Dockerfile` — multi-stage build (`npm run build` → slim runtime image), `EXPOSE 4000`,
-  runs as the non-root `node` user.
-- Set `app.set("trust proxy", 1)` is already wired in for `NODE_ENV=production` — needed so the
-  login/register rate limiters see the real client IP through a reverse proxy/load balancer instead
-  of rate-limiting the proxy itself.
-- Required env vars in production: `MONGO_URI` (a real Atlas string — the code throws at startup if
-  this is missing when `NODE_ENV=production`), `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` (also
-  required, no dev fallback in production), `GEMINI_API_KEY` for the assistant, `CORS_ORIGIN` set to
-  your actual app origin(s) instead of `*`.
-- Health check for your load balancer / orchestrator: `GET /health`.
+### Reliability
+- **Health Checks**: `/health` endpoint for monitoring
+- **Error Handling**: Structured error responses
+- **Logging**: Morgan HTTP logging + custom logger
+- **Database Connection**: Automatic connection pooling
+- **Graceful Shutdown**: Handles SIGINT/SIGTERM signals
 
-## Notes / things to know
+### Configuration
+- **Multi-stage Docker Build**: Slim production image
+- **Environment-specific Config**: Dev vs. production modes
+- **Trust Proxy**: Set to `1` for reverse proxy/load balancer
+- **Non-root User**: Docker runs as `node` user for security
 
-- **No OTP anywhere**, per your instruction — registration is Mobile Number → Create MPIN →
-  Confirm MPIN only.
-- **Reminders are part of Task**, not a separate database resource (the spec described both). Every
-  reminder belongs to a task; `GET /api/reminders/upcoming` is a read-only view derived from tasks.
-- **Account balance = cash-in − cash-out** for that account (optionally within a date range) — a
-  cash-flow balance, not a ledger balance seeded from an opening amount.
-- Local notifications use `expo-notifications` and work in Expo Go. Push notifications (a different
-  feature, not used in Phase 1) are restricted in Expo Go on Android — not relevant here since all
-  reminders are scheduled locally on-device.
-- Your installed Node.js is v20.18.0; several dependencies (React Native 0.86, Metro) request
-  `>=20.19.4`. Everything installed and ran fine, but if you hit odd Metro/bundling issues later,
-  upgrading Node (`nvm install --lts`) is the first thing to try.
-- **Your git repository root is `/Users/t`** (your whole home folder), not this project — and it
-  currently has unrelated pending file deletions from a different project (`Neo-Urban`). I didn't
-  touch git at all during this build. Worth sorting out before you start committing this project.
+## Offline Support
 
-## Environment variables
+### How It Works
 
-Never commit real secrets. See `backend/.env.example` and `mobile/.env.example`. You'll need to
-supply, when ready: a MongoDB Atlas connection string, JWT secrets (`openssl rand -hex 32`), and
-later a Gemini API key for Phase 2.
+1. **Queue Creation**: When offline, new tasks/transactions are queued locally (AsyncStorage)
+2. **Idempotency Keys**: Each queued item gets a unique client-generated idempotency key
+3. **Auto Sync**: Automatically syncs when:
+   - App starts (if online)
+   - Device goes from offline to online
+4. **Duplicate Prevention**: Backend recognizes idempotency key and returns original record
+
+### Cached Data
+
+- **Home Dashboard**: Last successful load cached, shown with offline banner
+- **Other Screens**: Not cached (next feature if needed)
+
+### Limitations
+
+Currently supports:
+- Creating tasks (new tasks only, not edits)
+- Creating transactions (new transactions only)
+
+Not yet supported:
+- Editing/deleting items offline
+- Full offline browsing of existing data
+- Pull-to-refresh while offline
+
+## Security
+
+### Authentication
+
+- **Mobile Number + MPIN**: No OTP required
+- **JWT Tokens**: Access (15min) + Refresh (30d)
+- **Data Isolation**: Each user only sees their own data (verified in tests)
+
+### Financial Security
+
+- **Confirmation Flow**: Required for money-related actions (when enabled)
+- **Amount Validation**: Prevents negative amounts
+- **Transaction Idempotency**: Prevents double-charging on retries
+
+### API Security
+
+- **Validation**: All inputs validated with Zod schemas
+- **Rate Limiting**: Prevents brute force attacks
+- **CORS**: Restricted to configured origins
+- **Helmet Headers**: Security headers on all responses
+
+### AI Safety
+
+- **Backend-controlled**: Gemini API key never exposed to mobile app
+- **Tool-calling Safety**: Backend validates all tool calls before executing
+- **Confirmation Required**: User must confirm financial actions from AI
+
+### Database Security
+
+- **No Plaintext**: Passwords hashed with bcryptjs
+- **Connection Encryption**: MongoDB Atlas uses TLS
+- **Backup**: Handled by MongoDB Atlas
+
+## Troubleshooting
+
+### Backend Issues
+
+**Port 4000 already in use**:
+```bash
+# Kill process on port 4000
+lsof -ti:4000 | xargs kill -9
+# Or use different port
+PORT=5000 npm run dev
+```
+
+**MongoDB connection failed**:
+- If `MONGO_URI` is empty, it should use in-memory DB
+- If set but failing, check Atlas credentials and IP whitelist
+- Check firewall/proxy settings
+
+**JWT validation errors**:
+- Regenerate secrets: `openssl rand -hex 32`
+- Ensure secrets are identical on all server instances
+- Clear old tokens in mobile app (logout/login)
+
+**Tests fail with rate limiting**:
+- Automatic: Rate limiters are skipped in test mode
+- Manual test: Wait 1 hour or delete test data between runs
+
+### Mobile App Issues
+
+**Expo start hangs**:
+- Kill all Node processes: `killall node`
+- Clear cache: `npm install -g expo-cli@latest` and `rm -rf node_modules`
+- Restart metro bundler
+
+**Build fails with ENOSPC**:
+- Disk space issue (especially Android builds)
+- Clean gradle: `rm -rf ~/.gradle` (on macOS/Linux)
+- Clean expo: `rm -rf .expo node_modules && npm install`
+
+**Backend unreachable from device/emulator**:
+- Check `EXPO_PUBLIC_API_URL` is correct for your target:
+  - iOS simulator: `localhost:4000`
+  - Android emulator: `10.0.2.2:4000`
+  - Physical device: Use your computer's LAN IP
+- Ensure backend is running: `curl http://localhost:4000/health`
+- Check firewall allows the port
+
+**Speech recognition not working**:
+- Requires dev-client build (not Expo Go)
+- Run: `npx expo run:android` or `npx expo run:ios`
+- Check microphone permissions in app settings
+
+### Database Issues
+
+**In-memory DB data disappears**:
+- Expected behavior: In-memory DB (`MONGO_URI` empty) doesn't persist between restarts
+- For persistence, set `MONGO_URI` to MongoDB Atlas connection string
+
+**MongoDB Atlas connection refused**:
+- Check IP whitelist includes your current IP (or 0.0.0.0/0 for dev)
+- Verify username/password in connection string
+- Check network connectivity
+
+### Deployment Issues
+
+**Render deployment fails**:
+- Check build logs in Render dashboard
+- Ensure all required secrets are set (not in render.yaml)
+- Verify `Dockerfile` and source files haven't changed
+
+**Health check fails in production**:
+- Ensure backend can reach MongoDB Atlas
+- Check `NODE_ENV=production` is set
+- Verify required env vars are configured
+
+## Contributing
+
+### Development Workflow
+
+1. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Make your changes**:
+   - Backend: TypeScript with Zod validation
+   - Mobile: React Native with TypeScript
+   - Write tests for new features
+   - Update this README if needed
+
+3. **Run tests**:
+   ```bash
+   # Backend
+   cd backend && npm test
+   
+   # Mobile
+   cd mobile && npm test
+   ```
+
+4. **Type-check**:
+   ```bash
+   # Backend
+   cd backend && npm run typecheck
+   
+   # Mobile
+   cd mobile && npx tsc --noEmit
+   ```
+
+5. **Commit with clear messages**:
+   ```bash
+   git commit -m "feat: add new feature" -m "Detailed description of changes"
+   ```
+
+6. **Push and create a pull request**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+### Code Standards
+
+- **Language**: TypeScript for backend and mobile
+- **Formatting**: Follow existing code style
+- **Testing**: Write tests for features and bug fixes
+- **Validation**: Use Zod for all input validation
+- **Error Handling**: Return structured error responses
+- **Documentation**: Comment complex logic
+
+### Project Rules
+
+- **No OTP**: Mobile number registration uses MPIN only
+- **No Sensitive Data in Git**: Never commit `.env` files with real secrets
+- **No Raw DB Access from Mobile**: All DB access through backend API
+- **Idempotent Operations**: APIs should handle duplicate requests safely
+- **Data Isolation**: Users only see their own data and family data
+
+## License
+
+This project is provided as-is. Ensure compliance with any third-party dependencies' licenses before using in production.
+
+---
+
+## Quick Reference
+
+### Command Cheat Sheet
+
+```bash
+# Backend
+cd backend
+npm install          # Install dependencies
+npm run dev          # Start dev server
+npm run build        # Build for production
+npm test             # Run tests
+npm run typecheck    # Check TypeScript
+
+# Mobile
+cd mobile
+npm install          # Install dependencies
+npx expo start       # Start Expo server
+npx expo run:android # Build & run on Android
+npx expo run:ios     # Build & run on iOS
+npm test             # Run tests
+
+# Local Server
+cd local-server
+npm install          # Install dependencies
+npm start            # Start server
+PORT=3001 npm start  # Start on custom port
+
+# Useful utilities
+openssl rand -hex 32 # Generate JWT secret
+npm run build && docker build -t we-three-api . # Build Docker image
+```
+
+### Default URLs
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| Backend API | http://localhost:4000 | REST API |
+| Health Check | http://localhost:4000/health | Liveness probe |
+| Local Server | http://localhost:3000 | Optional local AI |
+| MongoDB (Local) | (in-memory) | Development DB |
+
+### Key Files
+
+- `backend/.env.example` - Backend configuration template
+- `mobile/.env.example` - Mobile app configuration template
+- `backend/Dockerfile` - Production Docker build
+- `render.yaml` - Render deployment blueprint
+- `backend/jest.config.js` - Test configuration
+- `backend/tsconfig.json` - TypeScript configuration
+
+---
+
+For issues, questions, or suggestions, please refer to the original project documentation or create an issue in the repository.
