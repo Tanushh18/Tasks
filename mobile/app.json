@@ -52,7 +52,7 @@
         "android.permission.READ_CONTACTS",
         "android.permission.WRITE_CONTACTS"
       ],
-      "package": "com.anonymous.dailytasksreminder"
+      "package": "com.tanush.wethree"
     },
     "web": {
       "favicon": "./assets/favicon.png"
