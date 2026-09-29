@@ -105,14 +105,14 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
 export const refresh = asyncHandler(async (req: Request, res: Response) => {
   const { refreshToken } = req.body as { refreshToken: string };
-  const { userId, expiresAt } = verifyRefreshToken(refreshToken);
+  const { userId, lifetimeSeconds } = verifyRefreshToken(refreshToken);
 
   const user = await User.findById(userId);
   if (!user || !(await isLiveRefreshToken(user, refreshToken))) {
     throw ApiError.unauthorized("Session expired, please log in again");
   }
 
-  const tokens = await refreshSession(user, refreshToken, expiresAt);
+  const tokens = await refreshSession(user, refreshToken, lifetimeSeconds);
   res.json(tokens);
 });
 

@@ -5,6 +5,7 @@ import { Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as authApi from "../../api/auth";
 import { useAuth } from "../../auth/AuthContext";
+import { getBiometricCapability, promptBiometric } from "../../auth/useBiometrics";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ConfirmationSheet } from "../../components/ConfirmationSheet";
@@ -30,11 +31,13 @@ type DeleteStage = null | "confirm" | "final";
 
 export function SettingsScreen({ navigation }: Props) {
   const { colors, spacing, radius, typography, touchTarget } = useTheme();
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout, updateUser, biometricEnabled, enableBiometric, disableBiometric } = useAuth();
 
   const [busy, setBusy] = useState(false);
   const [deleteStage, setDeleteStage] = useState<DeleteStage>(null);
   const [confirmingLogout, setConfirmingLogout] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricLabel, setBiometricLabel] = useState("Biometrics");
 
   const [localServerUrl, setLocalServerUrlState] = useState("");
   const [testingLocalServer, setTestingLocalServer] = useState(false);
@@ -47,6 +50,9 @@ export function SettingsScreen({ navigation }: Props) {
     (async () => {
       setLocalServerUrlState(await getLocalServerUrl());
       setPendingScansCount((await listPendingScans()).length);
+      const cap = await getBiometricCapability();
+      setBiometricAvailable(cap.available);
+      setBiometricLabel(cap.label);
     })();
   }, []);
 
@@ -263,6 +269,30 @@ export function SettingsScreen({ navigation }: Props) {
       <View style={{ marginTop: spacing.xl }}>
         <SectionHeader title="Sign in" />
       </View>
+
+      {biometricAvailable ? (
+        <ToggleRow
+          label={`${biometricLabel} unlock`}
+          detail={`Use ${biometricLabel} instead of your MPIN on launch`}
+          value={biometricEnabled}
+          onValueChange={async (next) => {
+            if (next) {
+              // Confirm with biometric before enabling
+              const ok = await promptBiometric(`Confirm with ${biometricLabel} to enable`).catch(() => false);
+              if (!ok) {
+                Alert.alert("Not enabled", "Biometric authentication was not confirmed.");
+                return;
+              }
+              await enableBiometric().catch((e: unknown) => {
+                Alert.alert("Could not enable", e instanceof Error ? e.message : "Unknown error");
+              });
+            } else {
+              await disableBiometric();
+            }
+          }}
+        />
+      ) : null}
+
       <SettingRow label="Log out" icon="log-out-outline" onPress={() => setConfirmingLogout(true)} />
       <SettingRow
         label="Delete account"

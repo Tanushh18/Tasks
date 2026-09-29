@@ -4,6 +4,7 @@ import type { User } from "../types/models";
 const ACCESS_TOKEN_KEY = "dt_access_token";
 const REFRESH_TOKEN_KEY = "dt_refresh_token";
 const USER_KEY = "dt_cached_user";
+const BIOMETRIC_KEY = "dt_biometric_enabled";
 
 export interface TokenPair {
   accessToken: string;
@@ -52,4 +53,17 @@ export async function loadUser(): Promise<User | null> {
 /** Clears cached user on logout. */
 export async function clearUser(): Promise<void> {
   await SecureStore.deleteItemAsync(USER_KEY);
+}
+
+export async function saveBiometricEnabled(enabled: boolean): Promise<void> {
+  await SecureStore.setItemAsync(BIOMETRIC_KEY, enabled ? "1" : "0");
+}
+
+export async function loadBiometricEnabled(): Promise<boolean> {
+  const val = await SecureStore.getItemAsync(BIOMETRIC_KEY);
+  return val === "1";
+}
+
+export async function clearBiometricEnabled(): Promise<void> {
+  await SecureStore.deleteItemAsync(BIOMETRIC_KEY);
 }

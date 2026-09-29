@@ -59,18 +59,22 @@ export function verifyAccessToken(token: string): { userId: string } {
   }
 }
 
-export function verifyRefreshToken(token: string): { userId: string; expiresAt: number } {
+export function verifyRefreshToken(token: string): { userId: string; lifetimeSeconds: number } {
   try {
     const payload = jwt.verify(token, env.jwtRefreshSecret) as jwt.JwtPayload;
     if (!payload.sub) throw new Error("missing sub");
-    return { userId: payload.sub, expiresAt: payload.exp ?? 0 };
+    return { userId: payload.sub, lifetimeSeconds: (payload.exp ?? 0) - (payload.iat ?? 0) };
   } catch {
     throw ApiError.unauthorized("Invalid or expired refresh token");
   }
 }
 
-/** One live refresh token per signed-in device; older devices are dropped beyond this. */
-const MAX_DEVICE_SESSIONS = 10;
+/**
+ * One live refresh token per signed-in device; the oldest are dropped beyond this. Generous on
+ * purpose: being evicted signs a device out, and each device only ever adds one entry (plus one
+ * more the single time a pre-upgrade session is moved onto a long-lived token).
+ */
+const MAX_DEVICE_SESSIONS = 20;
 
 /**
  * Refresh tokens are high-entropy JWTs, so a fast sha256 fingerprint is enough to recognise one —
@@ -108,11 +112,13 @@ export async function isLiveRefreshToken(user: UserDocument, token: string): Pro
  * the presented one is materially shorter-lived than what the server would issue today (i.e. a
  * session created under the old 30-day setting), and the old token stays valid alongside it.
  */
-export async function refreshSession(user: UserDocument, presented: string, expiresAt: number) {
+export async function refreshSession(user: UserDocument, presented: string, lifetimeSeconds: number) {
   const candidate = signRefreshToken(String(user._id));
-  const candidateExpiry = (jwt.decode(candidate) as jwt.JwtPayload | null)?.exp ?? 0;
+  const candidatePayload = jwt.decode(candidate) as jwt.JwtPayload | null;
+  const candidateLifetime = (candidatePayload?.exp ?? 0) - (candidatePayload?.iat ?? 0);
   const oneDay = 24 * 60 * 60;
-  if (candidateExpiry - expiresAt > oneDay) {
+  // Issue a new token only if the presented one was minted under a shorter-lived config
+  if (candidateLifetime - lifetimeSeconds > oneDay) {
     return issueTokenPair(String(user._id));
   }
   return { accessToken: signAccessToken(String(user._id)), refreshToken: presented };

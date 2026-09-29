@@ -10,7 +10,15 @@ import {
   restoreSession,
   setSessionTokens,
 } from "./sessionStore";
-import { saveUser, loadUser, clearUser } from "./tokenStorage";
+import {
+  saveUser,
+  loadUser,
+  clearUser,
+  saveBiometricEnabled,
+  loadBiometricEnabled,
+  clearBiometricEnabled,
+} from "./tokenStorage";
+import { getBiometricCapability } from "./useBiometrics";
 
 interface AuthContextValue {
   user: User | null;
@@ -29,6 +37,16 @@ interface AuthContextValue {
   justRegistered: boolean;
   /** Called once the first-time setup screen is dismissed, to let the user into the main app. */
   clearJustRegistered: () => void;
+  /** True when the session is restored but biometric verification is still pending. */
+  isBiometricLocked: boolean;
+  /** Whether biometric unlock is enabled for this device. */
+  biometricEnabled: boolean;
+  /** Marks the session as unlocked after a successful biometric prompt. */
+  unlockWithBiometric: () => void;
+  /** Enable biometric unlock (call after confirming with the user). */
+  enableBiometric: () => Promise<void>;
+  /** Disable biometric unlock. */
+  disableBiometric: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -41,9 +59,9 @@ function tokensSurvive(): boolean {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  // Only ever set true by a successful `register()` call below, so restoring an existing
-  // session (app relaunch) or logging in never triggers the first-time setup screen.
   const [justRegistered, setJustRegistered] = useState(false);
+  const [isBiometricLocked, setIsBiometricLocked] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
 
   // Every setUser goes through here so the storage scope can never drift from the signed-in user:
   // locally cached data (offline queue, dashboard cache) is keyed by it, and a stale scope would
@@ -65,13 +83,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const tokens = await restoreSession();
       if (tokens) {
-        const cachedUser = await loadUser();
+        const [cachedUser, bioEnabled] = await Promise.all([loadUser(), loadBiometricEnabled()]);
+        setBiometricEnabled(bioEnabled);
         if (cachedUser) {
           // Open straight into the app from the saved session — no waiting on the server, which
           // can take 30s+ to wake up. The profile is refreshed quietly in the background; if the
           // server ever refuses the session, the API client signs the user out through the
           // session-expired handler above. A network failure changes nothing.
           applyUser(cachedUser);
+          if (bioEnabled) {
+            // Session is live but needs biometric verification before entering the app.
+            setIsBiometricLocked(true);
+          }
           setIsLoading(false);
           authApi
             .fetchMe()
@@ -133,6 +156,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     await endSession();
     await clearUser();
+    await clearBiometricEnabled();
+    setBiometricEnabled(false);
+    setIsBiometricLocked(false);
     applyUser(null);
   }, [applyUser]);
 
@@ -170,6 +196,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setJustRegistered(false);
   }, []);
 
+  const unlockWithBiometric = useCallback(() => {
+    setIsBiometricLocked(false);
+  }, []);
+
+  const enableBiometric = useCallback(async () => {
+    const cap = await getBiometricCapability();
+    if (!cap.available) throw new Error("Biometrics not available on this device");
+    await saveBiometricEnabled(true);
+    setBiometricEnabled(true);
+  }, []);
+
+  const disableBiometric = useCallback(async () => {
+    await clearBiometricEnabled();
+    setBiometricEnabled(false);
+  }, []);
+
   const needsMpinChange = Boolean(user?.mustChangeMpin);
 
   const value = useMemo(
@@ -186,6 +228,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearMustChangeMpin,
       justRegistered,
       clearJustRegistered,
+      isBiometricLocked,
+      biometricEnabled,
+      unlockWithBiometric,
+      enableBiometric,
+      disableBiometric,
     }),
     [
       user,
@@ -199,6 +246,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearMustChangeMpin,
       justRegistered,
       clearJustRegistered,
+      isBiometricLocked,
+      biometricEnabled,
+      unlockWithBiometric,
+      enableBiometric,
+      disableBiometric,
     ]
   );
 
