@@ -92,8 +92,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [applyUser]);
 
   const refreshUser = useCallback(async () => {
-    const me = await authApi.fetchMe();
-    setUser(me);
+    try {
+      const me = await authApi.fetchMe();
+      setUser(me);
+    } catch (err) {
+      const isUnauthorized =
+        err &&
+        typeof err === "object" &&
+        "response" in err &&
+        (err as any).response?.status === 401;
+      if (isUnauthorized) {
+        await endSession();
+      }
+    }
   }, []);
 
   const updateUser = useCallback((next: User) => setUser(next), []);

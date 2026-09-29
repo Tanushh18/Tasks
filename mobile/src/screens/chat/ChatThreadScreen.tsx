@@ -69,8 +69,6 @@ export function ChatThreadScreen({ route, navigation }: Props) {
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
     } catch (err) {
       setDraft(text);
-      // eslint-disable-next-line no-alert
-      console.warn(getApiErrorMessage(err));
     } finally {
       setSending(false);
     }

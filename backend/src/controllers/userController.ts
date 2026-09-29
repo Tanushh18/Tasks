@@ -1,13 +1,14 @@
 import type { Request, Response } from "express";
 import { User } from "../models/User";
 import { asyncHandler } from "../utils/asyncHandler";
+import { escapeRegex } from "../services/rules/text";
 
 export const searchUsers = asyncHandler(async (req: Request, res: Response) => {
   const { query } = req.query as unknown as { query?: string };
 
   const users = await User.find({
     // No query means "everyone else" — the family roster, not a search.
-    ...(query ? { name: { $regex: query, $options: "i" } } : {}),
+    ...(query ? { name: { $regex: escapeRegex(query), $options: "i" } } : {}),
     _id: { $ne: req.userId },
     blocked: { $ne: true },
   })

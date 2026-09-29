@@ -90,7 +90,6 @@ class BluetoothMeshService {
       await BLEAdvertiser.scanByService(SERVICE_UUID, { scanMode: 2 /* SCAN_MODE_LOW_LATENCY */ });
       this.beginRunning();
     } catch (err) {
-      console.warn("Bluetooth mesh: failed to start", err);
       this.setStatus("unsupported");
     }
   }
