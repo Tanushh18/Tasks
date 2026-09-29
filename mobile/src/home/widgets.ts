@@ -1,6 +1,6 @@
 import { getJson, setJson } from "../offline/storage";
 
-export type WidgetId = "today" | "money" | "comingUp" | "activity";
+export type WidgetId = "today" | "money" | "comingUp" | "activity" | "leads";
 
 export interface WidgetDefinition {
   id: WidgetId;
@@ -13,11 +13,12 @@ export interface WidgetDefinition {
 export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
   { id: "today", label: "Today", description: "Tasks, reminders and money due today" },
   { id: "money", label: "Money this month", description: "In, out and net for this month" },
+  { id: "leads", label: "Active leads", description: "Your lead pipeline at a glance" },
   { id: "comingUp", label: "Coming up", description: "Your next few reminders" },
   { id: "activity", label: "Family activity", description: "What your family has been up to" },
 ];
 
-const DEFAULT_ORDER: WidgetId[] = ["today", "money", "comingUp", "activity"];
+const DEFAULT_ORDER: WidgetId[] = ["today", "money", "leads", "comingUp", "activity"];
 const STORAGE_KEY = "dt_home_widget_prefs";
 
 export interface WidgetPrefs {
@@ -32,9 +33,15 @@ const DEFAULT_PREFS: WidgetPrefs = { order: DEFAULT_ORDER, hidden: [] };
 function sanitize(prefs: WidgetPrefs): WidgetPrefs {
   const known = new Set(WIDGET_DEFINITIONS.map((w) => w.id));
   const order = prefs.order.filter((id) => known.has(id));
-  for (const id of DEFAULT_ORDER) {
-    if (!order.includes(id)) order.push(id);
-  }
+  DEFAULT_ORDER.forEach((id, defaultIndex) => {
+    if (order.includes(id)) return;
+    // A widget added in a later release lands next to the widget that precedes it by default,
+    // not at the very bottom — otherwise anyone with saved preferences would never see it.
+    const previous = DEFAULT_ORDER.slice(0, defaultIndex)
+      .reverse()
+      .find((earlier) => order.includes(earlier));
+    order.splice(previous ? order.indexOf(previous) + 1 : 0, 0, id);
+  });
   const hidden = prefs.hidden.filter((id) => known.has(id));
   return { order, hidden };
 }

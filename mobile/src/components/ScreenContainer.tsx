@@ -1,6 +1,7 @@
 import React from "react";
 import { RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
+import { bypassCacheBriefly } from "../offline/httpCache";
 import { useResponsive } from "../theme/useResponsive";
 import { useTheme } from "../theme/useTheme";
 
@@ -54,7 +55,17 @@ export function ScreenContainer({
           contentContainerStyle={styles.flexGrow}
           keyboardShouldPersistTaps="handled"
           refreshControl={
-            onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined
+            onRefresh ? (
+              <RefreshControl
+                refreshing={Boolean(refreshing)}
+                onRefresh={() => {
+                  // A deliberate pull means "check the server now", not "show me what's saved".
+                  bypassCacheBriefly();
+                  onRefresh();
+                }}
+                tintColor={colors.primary}
+              />
+            ) : undefined
           }
         >
           {content}

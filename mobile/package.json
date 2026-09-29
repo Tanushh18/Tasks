@@ -28,6 +28,7 @@
     "expo-speech-recognition": "^56.0.1",
     "expo-status-bar": "~57.0.1",
     "expo-task-manager": "~57.0.16",
+    "expo-updates": "^57.0.24",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.2",
@@ -60,6 +61,9 @@
   "private": true,
   "jest": {
     "preset": "jest-expo",
+    "setupFiles": [
+      "<rootDir>/jest.setup.js"
+    ],
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/.expo/"

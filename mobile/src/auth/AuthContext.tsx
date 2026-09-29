@@ -3,7 +3,14 @@ import * as authApi from "../api/auth";
 import { discardLegacyQueue } from "../offline/offlineQueue";
 import { setStorageScope } from "../offline/scope";
 import type { User } from "../types/models";
-import { endSession, registerSessionExpiredHandler, restoreSession, setSessionTokens } from "./sessionStore";
+import {
+  endSession,
+  getRefreshToken,
+  registerSessionExpiredHandler,
+  restoreSession,
+  setSessionTokens,
+} from "./sessionStore";
+import { saveUser, loadUser, clearUser } from "./tokenStorage";
 
 interface AuthContextValue {
   user: User | null;
@@ -26,6 +33,11 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/** False once the API client has discarded the tokens because the server refused them. */
+function tokensSurvive(): boolean {
+  return getRefreshToken() !== null;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,7 +54,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    registerSessionExpiredHandler(() => applyUser(null));
+    registerSessionExpiredHandler(() => {
+      void clearUser();
+      applyUser(null);
+    });
 
     (async () => {
       // One-time cleanup of the shared, pre-namespacing queue.
@@ -50,12 +65,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const tokens = await restoreSession();
       if (tokens) {
+        const cachedUser = await loadUser();
+        if (cachedUser) {
+          // Open straight into the app from the saved session — no waiting on the server, which
+          // can take 30s+ to wake up. The profile is refreshed quietly in the background; if the
+          // server ever refuses the session, the API client signs the user out through the
+          // session-expired handler above. A network failure changes nothing.
+          applyUser(cachedUser);
+          setIsLoading(false);
+          authApi
+            .fetchMe()
+            .then(async (me) => {
+              if (!tokensSurvive()) return;
+              applyUser(me);
+              await saveUser(me);
+            })
+            .catch(() => undefined);
+          return;
+        }
+
+        // First launch after upgrading (no saved profile yet): the server has to be asked once.
         try {
           const me = await authApi.fetchMe();
           applyUser(me);
+          await saveUser(me);
         } catch {
-          await endSession();
-          applyUser(null);
+          if (!tokensSurvive()) {
+            await clearUser();
+            applyUser(null);
+          } else {
+            // Signed in, but unreachable right now and nothing saved locally to show. Keep the
+            // tokens and let the login screen take over rather than discarding the session.
+            applyUser(null);
+          }
         }
       }
       setIsLoading(false);
@@ -66,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (name: string, mobileNumber: string, mpin: string, confirmMpin: string) => {
       const result = await authApi.register(name, mobileNumber, mpin, confirmMpin);
       await setSessionTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+      await saveUser(result.user);
       setJustRegistered(true);
       applyUser(result.user);
     },
@@ -76,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (mobileNumber: string, mpin: string) => {
       const result = await authApi.login(mobileNumber, mpin);
       await setSessionTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+      await saveUser(result.user);
       applyUser(result.user);
     },
     [applyUser]
@@ -83,11 +127,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await authApi.logout();
+      await authApi.logout(getRefreshToken());
     } catch {
       // even if the server call fails, clear the local session
     }
     await endSession();
+    await clearUser();
     applyUser(null);
   }, [applyUser]);
 
@@ -95,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const me = await authApi.fetchMe();
       setUser(me);
+      await saveUser(me);
     } catch (err) {
       const isUnauthorized =
         err &&
@@ -107,10 +153,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const updateUser = useCallback((next: User) => setUser(next), []);
+  const updateUser = useCallback((next: User) => {
+    setUser(next);
+    void saveUser(next).catch(() => undefined);
+  }, []);
 
   const clearMustChangeMpin = useCallback(() => {
-    setUser((prev) => (prev ? { ...prev, mustChangeMpin: false } : prev));
+    setUser((prev) => {
+      const next = prev ? { ...prev, mustChangeMpin: false } : prev;
+      if (next) void saveUser(next).catch(() => undefined);
+      return next;
+    });
   }, []);
 
   const clearJustRegistered = useCallback(() => {

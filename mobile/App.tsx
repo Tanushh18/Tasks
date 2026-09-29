@@ -8,11 +8,13 @@ import { FeatureFlagsProvider, useFeatureFlags } from "./src/features/FeatureFla
 import { startLocationTracking } from "./src/location/backgroundLocationTask";
 import { useNotificationResponseHandler } from "./src/notifications/useNotificationResponseHandler";
 import { useOfflineSync } from "./src/offline/useOfflineSync";
+import { useOtaUpdates } from "./src/updates/useOtaUpdates";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 
 function AppContent() {
   useNotificationResponseHandler();
   useOfflineSync();
+  useOtaUpdates();
 
   const { isAuthenticated } = useAuth();
   const { flags } = useFeatureFlags();

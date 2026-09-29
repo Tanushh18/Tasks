@@ -1,5 +1,4 @@
 import type { Request, Response } from "express";
-import bcrypt from "bcryptjs";
 import { User } from "../models/User";
 import { env } from "../config/env";
 import { Task } from "../models/Task";
@@ -12,8 +11,10 @@ import {
   assertValidMobileNumber,
   clearFailedAttempts,
   hashMpin,
+  isLiveRefreshToken,
   isLocked,
   issueTokenPair,
+  refreshSession,
   registerFailedAttempt,
   remainingLockSeconds,
   revokeRefreshToken,
@@ -104,25 +105,23 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 
 export const refresh = asyncHandler(async (req: Request, res: Response) => {
   const { refreshToken } = req.body as { refreshToken: string };
-  const { userId } = verifyRefreshToken(refreshToken);
+  const { userId, expiresAt } = verifyRefreshToken(refreshToken);
 
   const user = await User.findById(userId);
-  if (!user?.refreshTokenHash) {
+  if (!user || !(await isLiveRefreshToken(user, refreshToken))) {
     throw ApiError.unauthorized("Session expired, please log in again");
   }
 
-  const matches = await bcrypt.compare(refreshToken, user.refreshTokenHash);
-  if (!matches) {
-    throw ApiError.unauthorized("Session expired, please log in again");
-  }
-
-  const tokens = await issueTokenPair(String(user._id));
+  const tokens = await refreshSession(user, refreshToken, expiresAt);
   res.json(tokens);
 });
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
   if (req.userId) {
-    await revokeRefreshToken(req.userId);
+    // A device that sends its own refresh token signs out alone; without one, every device is
+    // signed out (the previous behaviour, kept for older app builds).
+    const { refreshToken } = (req.body ?? {}) as { refreshToken?: string };
+    await revokeRefreshToken(req.userId, refreshToken);
   }
   res.status(204).send();
 });

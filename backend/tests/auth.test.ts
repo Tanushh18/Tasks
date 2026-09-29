@@ -84,4 +84,51 @@ describe("auth", () => {
     const refreshRes = await request(app).post("/api/auth/refresh").send({ refreshToken });
     expect(refreshRes.status).toBe(401);
   });
+
+  it("keeps the same refresh token across silent refreshes so a lost response can't sign the user out", async () => {
+    const { refreshToken } = await registerUser(app, "9876500011", "4821");
+    for (let i = 0; i < 3; i += 1) {
+      const res = await request(app).post("/api/auth/refresh").send({ refreshToken });
+      expect(res.status).toBe(200);
+      expect(res.body.refreshToken).toBe(refreshToken);
+      expect(res.body.accessToken).toBeTruthy();
+    }
+  });
+
+  it("keeps every device signed in, and logging one out leaves the others", async () => {
+    const first = await registerUser(app, "9876500012", "4821");
+    const secondLogin = await request(app).post("/api/auth/login").send({ mobileNumber: "9876500012", mpin: "4821" });
+    const secondRefresh = secondLogin.body.refreshToken as string;
+
+    // Signing in on a second device must not invalidate the first.
+    expect((await request(app).post("/api/auth/refresh").send({ refreshToken: first.refreshToken })).status).toBe(200);
+    expect((await request(app).post("/api/auth/refresh").send({ refreshToken: secondRefresh })).status).toBe(200);
+
+    // Logging out the first device with its own token leaves the second one alone.
+    await authed(app, first.token).post("/api/auth/logout").send({ refreshToken: first.refreshToken });
+    expect((await request(app).post("/api/auth/refresh").send({ refreshToken: first.refreshToken })).status).toBe(401);
+    expect((await request(app).post("/api/auth/refresh").send({ refreshToken: secondRefresh })).status).toBe(200);
+  });
+});
+
+describe("idempotent writes", () => {
+  it("replays the stored response instead of creating a duplicate", async () => {
+    const { token } = await registerUser(app, "9876500013", "4821");
+    const send = () =>
+      authed(app, token)
+        .post("/api/notes")
+        .set("Idempotency-Key", "11111111-2222-3333-4444-555555555555")
+        .send({ title: "Buy milk", body: "2 litres" });
+
+    const first = await send();
+    expect(first.status).toBe(201);
+    // The record is written just after the response is sent.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const second = await send();
+    expect(second.status).toBe(201);
+    expect(second.body).toEqual(first.body);
+
+    const list = await authed(app, token).get("/api/notes");
+    expect(list.body.notes).toHaveLength(1);
+  });
 });

@@ -25,6 +25,7 @@ export type FeatureName =
   | "location"
   | "notes"
   | "contacts"
+  | "leads"
   | "ai";
 
 interface FeatureColor {
@@ -41,6 +42,7 @@ export const lightFeatureColors: Record<FeatureName, FeatureColor> = {
   location: { solid: "#C2410C", muted: "#FCEDE6" },
   notes: { solid: "#A16207", muted: "#FAF2E1" },
   contacts: { solid: "#BE185D", muted: "#FCE8F0" },
+  leads: { solid: "#047857", muted: "#E3F5EC" },
   ai: { solid: "#7C3AED", muted: "#F1EAFE" },
 };
 
@@ -51,6 +53,7 @@ export const darkFeatureColors: Record<FeatureName, FeatureColor> = {
   location: { solid: "#FDBA74", muted: "#3A2517" },
   notes: { solid: "#FDE047", muted: "#332B10" },
   contacts: { solid: "#F9A8D4", muted: "#3A1B2B" },
+  leads: { solid: "#6EE7B7", muted: "#12332A" },
   ai: { solid: "#C4B5FD", muted: "#2A2140" },
 };
 

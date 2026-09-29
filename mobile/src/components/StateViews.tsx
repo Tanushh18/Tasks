@@ -7,9 +7,22 @@ import { Button } from "./Button";
 export function LoadingState({ label = "Just a moment…" }: { label?: string }) {
   const { colors, spacing, typography } = useTheme();
   return (
-    <View style={styles.center} accessibilityRole="progressbar" accessibilityLabel={label}>
-      <ActivityIndicator color={colors.primary} />
-      <Text style={[typography.body, { color: colors.textMuted, marginTop: spacing.sm }]}>{label}</Text>
+    <View
+      style={[styles.centerFlex, { justifyContent: "center", backgroundColor: colors.background }]}
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+    >
+      <View style={styles.centerContent}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text
+          style={[
+            typography.body,
+            { color: colors.textMuted, marginTop: spacing.md, textAlign: "center" },
+          ]}
+        >
+          {label}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -31,6 +44,12 @@ export function ErrorState({
   const { colors, spacing, typography } = useTheme();
   return (
     <View style={styles.center}>
+      <View
+        style={[styles.emptyIcon, { backgroundColor: colors.dangerMuted, marginBottom: spacing.lg }]}
+        accessibilityElementsHidden
+      >
+        <Ionicons name="cloud-offline-outline" size={32} color={colors.danger} />
+      </View>
       <Text
         style={[typography.body, { color: colors.text, textAlign: "center", marginBottom: spacing.lg }]}
       >
@@ -94,6 +113,17 @@ export function EmptyState({
 }
 
 const styles = StyleSheet.create({
+  /** Fills the available space so the loader sits in the middle of the screen, not near the top. */
+  centerFlex: {
+    flex: 1,
+    alignItems: "center",
+    minHeight: 240,
+    paddingHorizontal: 16,
+  },
+  centerContent: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
   center: {
     alignItems: "center",
     justifyContent: "center",
