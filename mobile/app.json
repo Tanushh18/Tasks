@@ -101,6 +101,12 @@
       "expo-sharing"
     ],
     "owner": "tanushhhhh18",
+    "updates": {
+      "url": "https://u.expo.dev/d78e8fde-9b25-4197-a1fc-238021fae096"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "extra": {
       "eas": {
         "projectId": "d78e8fde-9b25-4197-a1fc-238021fae096"

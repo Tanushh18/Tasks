@@ -10,6 +10,7 @@
       "android": {
         "buildType": "apk"
       },
+      "channel": "development",
       "env": {
         "EXPO_PUBLIC_API_URLS": "https://tasks-ac4u.onrender.com/api"
       }
@@ -19,12 +20,14 @@
       "android": {
         "buildType": "apk"
       },
+      "channel": "preview",
       "env": {
         "EXPO_PUBLIC_API_URLS": "https://tasks-ac4u.onrender.com/api"
       }
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_URLS": "https://tasks-ac4u.onrender.com/api"
       }

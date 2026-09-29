@@ -4,17 +4,37 @@ import { useAuth } from "../auth/AuthContext";
 import { LoadingState } from "../components/StateViews";
 import { useTheme } from "../theme/useTheme";
 import { FirstTimeSetupScreen } from "../screens/auth/FirstTimeSetupScreen";
+import { BiometricLockScreen } from "../screens/auth/BiometricLockScreen";
 import { AuthNavigator } from "./AuthNavigator";
 import { ForceMpinChangeNavigator } from "./ForceMpinChangeNavigator";
 import { MainTabs } from "./MainTabs";
 import { navigationRef } from "./navigationRef";
 
 export function RootNavigator() {
-  const { isAuthenticated, isLoading, needsMpinChange, justRegistered, clearJustRegistered } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading,
+    needsMpinChange,
+    justRegistered,
+    clearJustRegistered,
+    isBiometricLocked,
+    unlockWithBiometric,
+    logout,
+  } = useAuth();
   const { isDark, colors } = useTheme();
 
   if (isLoading) {
     return <LoadingState label="Loading…" />;
+  }
+
+  // Biometric gate: session is live but not yet verified on this launch.
+  if (isAuthenticated && isBiometricLocked) {
+    return (
+      <BiometricLockScreen
+        onUnlocked={unlockWithBiometric}
+        onUseMpin={() => void logout()}
+      />
+    );
   }
 
   return (

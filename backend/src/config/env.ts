@@ -24,7 +24,8 @@ export const env = {
     process.env.NODE_ENV === "production" ? undefined : "dev-refresh-secret-change-me"
   ),
   jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? "15m",
-  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "30d",
+  // Sessions are meant to last until the user signs out, so the default is effectively "never".
+  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "3650d",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.6-flash",
   adminMobileNumbers: (

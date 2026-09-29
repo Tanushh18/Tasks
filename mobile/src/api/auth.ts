@@ -22,8 +22,9 @@ export async function login(mobileNumber: string, mpin: string): Promise<AuthRes
   return data;
 }
 
-export async function logout(): Promise<void> {
-  await apiClient.post("/auth/logout");
+export async function logout(refreshToken?: string | null): Promise<void> {
+  // Sending this device's own refresh token signs out only this device, not the user's others.
+  await apiClient.post("/auth/logout", refreshToken ? { refreshToken } : undefined);
 }
 
 export async function fetchMe(): Promise<User> {

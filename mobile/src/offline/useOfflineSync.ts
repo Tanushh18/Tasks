@@ -1,5 +1,8 @@
 import NetInfo from "@react-native-community/netinfo";
 import { useEffect, useRef } from "react";
+import { sendQueuedWrite } from "../api/client";
+import { bypassCacheBriefly } from "./httpCache";
+import { flushHttpQueue } from "./httpQueue";
 import { flushQueue } from "./offlineQueue";
 
 /** Small module-level pub/sub other screens can use to refetch once the queue has flushed after
@@ -31,7 +34,13 @@ export function useOfflineSync(): void {
       wasOnline.current = isOnline;
 
       if (cameBackOnline || firstCheckOnline) {
-        void flushQueue().then(() => notifyReconnectSubscribers());
+        // Anything shown while offline came from the on-device copy, so refetch for real once the
+        // queued writes have landed. (First launch already online is left to the normal
+        // fresh-cache rules — no need to force a server call just for opening the app.)
+        void Promise.all([flushQueue(), flushHttpQueue(sendQueuedWrite)]).then(() => {
+          if (cameBackOnline) bypassCacheBriefly();
+          notifyReconnectSubscribers();
+        });
       }
     });
     return unsubscribe;

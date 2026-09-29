@@ -5,7 +5,11 @@ const userSchema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 80 },
     mobileNumber: { type: String, required: true, unique: true, index: true, trim: true },
     mpinHash: { type: String, required: true },
+    // Legacy single bcrypt hash — still honoured so sessions issued before multi-device support
+    // keep working until they rotate onto a long-lived token.
     refreshTokenHash: { type: String, default: null },
+    // sha256 fingerprints of every live refresh token (one per signed-in device, newest last).
+    refreshTokenFingerprints: { type: [String], default: [] },
     failedLoginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },
     lastLoginAt: { type: Date, default: null },

@@ -4,6 +4,7 @@ import { getApiErrorMessage } from "../api/client";
 import * as financeApi from "../api/finance";
 import * as tasksApi from "../api/tasks";
 import { cancelTaskReminder, scheduleTaskReminder } from "../notifications/notificationService";
+import { getHttpFailedCount, getHttpQueueCount, onHttpQueueChanged } from "./httpQueue";
 import { getStorageScope, requireScopedKey, scopedKey } from "./scope";
 import { getJson, removeJson, setJson } from "./storage";
 
@@ -123,6 +124,10 @@ export function subscribeToQueueChanges(cb: () => void): () => void {
   };
 }
 
+// Writes queued by the generic record queue (httpQueue.ts) count as pending too, so the sync
+// indicator and Sync Center reflect everything waiting to upload, not just tasks and money.
+onHttpQueueChanged(notifyQueueChanged);
+
 export function isSyncing(): boolean {
   return syncing;
 }
@@ -221,7 +226,7 @@ export async function enqueueTransactionDelete(transactionId: string): Promise<v
 }
 
 export async function getPendingCount(): Promise<number> {
-  return (await getQueue()).length;
+  return (await getQueue()).length + (await getHttpQueueCount());
 }
 
 export async function listPending(): Promise<QueuedItem[]> {
@@ -244,7 +249,7 @@ export async function listFailed(): Promise<FailedItem[]> {
 }
 
 export async function getFailedCount(): Promise<number> {
-  return (await getFailed()).length;
+  return (await getFailed()).length + (await getHttpFailedCount());
 }
 
 /** One human-readable line per queue item kind, for the Sync Center list. */

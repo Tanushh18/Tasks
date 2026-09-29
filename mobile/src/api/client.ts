@@ -1,5 +1,39 @@
-import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
+import axios, { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
+import * as Crypto from "expo-crypto";
 import { getAccessToken, getRefreshToken, notifySessionExpired, setSessionTokens } from "../auth/sessionStore";
+import {
+  getCachedResponse,
+  isBypassing,
+  isCacheableUrl,
+  markCacheStale,
+  putCachedResponse,
+} from "../offline/httpCache";
+import { isQueueableWrite, isUnreachableError, queueWrite } from "../offline/httpQueue";
+
+/** Per-request flags the interceptors below use to talk to each other. */
+type ClientConfig = InternalAxiosRequestConfig & {
+  _retried?: boolean;
+  _serversTried?: number;
+  /** The reply came from the on-device cache, so it must not be written back (it would look fresh). */
+  _fromCache?: boolean;
+  /** Set when replaying a queued write, so a second failure isn't queued again. */
+  _skipQueue?: boolean;
+};
+
+/** When an older copy exists locally, don't make the person wait out a cold-starting server. */
+const STALE_CACHE_TIMEOUT_MS = 8000;
+
+function methodOf(config: { method?: string }): string {
+  return (config.method ?? "get").toLowerCase();
+}
+
+function isCacheableGet(config: ClientConfig): boolean {
+  return methodOf(config) === "get" && isCacheableUrl(config.url);
+}
+
+function cachedReply(config: ClientConfig, data: unknown, note: string): AxiosResponse {
+  return { data, status: 200, statusText: note, headers: {}, config, request: {} };
+}
 
 /**
  * Backend servers in priority order. EXPO_PUBLIC_API_URLS is a comma-separated list; the single
@@ -32,11 +66,30 @@ export const apiClient = axios.create({
   timeout: 30000,
 });
 
-apiClient.interceptors.request.use((config) => {
+apiClient.interceptors.request.use(async (config: ClientConfig) => {
   config.baseURL = getActiveBaseUrl();
   const token = getAccessToken();
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  // Every POST carries an idempotency key so a retry (timeout, failover, offline replay) can't
+  // create the same record twice — the backend answers a repeat with the original response.
+  if (methodOf(config) === "post" && config.headers && !config.headers["Idempotency-Key"]) {
+    config.headers["Idempotency-Key"] = Crypto.randomUUID();
+  }
+
+  if (isCacheableGet(config) && config.url) {
+    const cached = await getCachedResponse(config.url, config.params);
+    if (cached) {
+      if (cached.fresh && !isBypassing()) {
+        // No server call at all — this is what makes opening a recently-visited screen instant.
+        config._fromCache = true;
+        config.adapter = async (adapterConfig) => cachedReply(adapterConfig as ClientConfig, cached.data, "OK (on-device)");
+      } else {
+        config.timeout = Math.min(config.timeout ?? STALE_CACHE_TIMEOUT_MS, STALE_CACHE_TIMEOUT_MS);
+      }
+    }
   }
   return config;
 });
@@ -49,19 +102,29 @@ apiClient.interceptors.request.use((config) => {
 // forcing a full re-login far more often than the 30-day refresh token should ever require.
 const NO_REFRESH_RETRY_URLS = ["/auth/login", "/auth/register", "/auth/refresh"];
 
-let refreshPromise: Promise<string | null> | null = null;
+type RefreshResult =
+  | { status: "ok"; accessToken: string }
+  /** The server looked at the refresh token and refused it — the only case that ends the session. */
+  | { status: "rejected" }
+  /** Couldn't get an answer (offline, server down, cold start). The session must survive this. */
+  | { status: "unreachable" };
 
-async function refreshAccessToken(): Promise<string | null> {
+let refreshPromise: Promise<RefreshResult> | null = null;
+
+async function refreshAccessToken(): Promise<RefreshResult> {
   const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
+  if (!refreshToken) return { status: "rejected" };
 
   try {
-    const response = await axios.post(`${getActiveBaseUrl()}/auth/refresh`, { refreshToken });
+    const response = await axios.post(`${getActiveBaseUrl()}/auth/refresh`, { refreshToken }, { timeout: 30000 });
     const tokens = response.data as { accessToken: string; refreshToken: string };
     await setSessionTokens(tokens);
-    return tokens.accessToken;
-  } catch {
-    return null;
+    return { status: "ok", accessToken: tokens.accessToken };
+  } catch (err) {
+    // Signing someone out because their signal dropped mid-refresh would break "log in once, stay
+    // logged in". Only an explicit refusal from the server counts.
+    const refused = axios.isAxiosError(err) && err.response && [400, 401, 403, 404].includes(err.response.status);
+    return refused ? { status: "rejected" } : { status: "unreachable" };
   }
 }
 
@@ -88,11 +151,21 @@ function isServerDown(error: AxiosError): boolean {
 }
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const config = response.config as ClientConfig;
+    if (!config._fromCache) {
+      if (isCacheableGet(config) && config.url) {
+        // Fire-and-forget: a slow disk write must never delay the screen that asked.
+        void putCachedResponse(config.url, config.params, response.data).catch(() => undefined);
+      } else if (methodOf(config) !== "get" && !config.url?.startsWith("/auth")) {
+        // Something changed on the server, so every local copy is now out of date.
+        void markCacheStale().catch(() => undefined);
+      }
+    }
+    return response;
+  },
   async (error: AxiosError) => {
-    const original = error.config as
-      | (InternalAxiosRequestConfig & { _retried?: boolean; _serversTried?: number })
-      | undefined;
+    const original = error.config as ClientConfig | undefined;
     const status = error.response?.status;
 
     if (original && API_BASE_URLS.length > 1 && isServerDown(error)) {
@@ -102,6 +175,30 @@ apiClient.interceptors.response.use(
         activeServerIndex = (activeServerIndex + 1) % API_BASE_URLS.length;
         return apiClient(original);
       }
+    }
+
+    // Server unreachable or failing: keep the app usable from what's already on the phone.
+    const serverFailing = error.response ? (status ?? 0) >= 500 : error.code !== "ERR_CANCELED";
+    if (original && serverFailing && isCacheableGet(original) && original.url) {
+      const cached = await getCachedResponse(original.url, original.params);
+      if (cached) return cachedReply(original, cached.data, "OK (on-device, server unreachable)");
+    }
+
+    // A write that couldn't reach the server is saved and replayed later (see offline/httpQueue.ts).
+    if (
+      original &&
+      !original._skipQueue &&
+      methodOf(original) !== "get" &&
+      isUnreachableError(error) &&
+      isQueueableWrite(methodOf(original), original.url)
+    ) {
+      const queued = await queueWrite({
+        method: methodOf(original),
+        url: original.url as string,
+        data: original.data,
+        idempotencyKey: original.headers?.["Idempotency-Key"] as string | undefined,
+      });
+      if (queued) return cachedReply(original, queued.data, "Accepted (saved on-device, will sync)");
     }
 
     if (
@@ -117,20 +214,36 @@ apiClient.interceptors.response.use(
           refreshPromise = null;
         });
       }
-      const newAccessToken = await refreshPromise;
+      const refreshed = await refreshPromise;
 
-      if (newAccessToken) {
+      if (refreshed.status === "ok") {
         original.headers = original.headers ?? {};
-        original.headers.Authorization = `Bearer ${newAccessToken}`;
+        original.headers.Authorization = `Bearer ${refreshed.accessToken}`;
         return apiClient(original);
       }
-
-      notifySessionExpired();
+      // "unreachable" leaves the session alone; the caller just sees this request fail.
+      if (refreshed.status === "rejected") notifySessionExpired();
     }
 
     return Promise.reject(error);
   }
 );
+
+/** Replays one write from the offline queue against the live server. */
+export async function sendQueuedWrite(item: {
+  id: string;
+  method: string;
+  url: string;
+  data?: unknown;
+}): Promise<void> {
+  await apiClient.request({
+    method: item.method,
+    url: item.url,
+    data: item.data,
+    headers: { "Idempotency-Key": item.id },
+    _skipQueue: true,
+  } as unknown as InternalAxiosRequestConfig);
+}
 
 export interface ApiErrorBody {
   error: { code: string; message: string; details?: unknown };

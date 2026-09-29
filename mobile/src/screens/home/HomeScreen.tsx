@@ -10,11 +10,13 @@ import { getApiErrorMessage } from "../../api/client";
 import * as activityFeedApi from "../../api/activityFeed";
 import * as chatApi from "../../api/chat";
 import * as financeApi from "../../api/finance";
+import * as leadsApi from "../../api/leads";
 import * as tasksApi from "../../api/tasks";
 import { useAuth } from "../../auth/AuthContext";
 import { AppHeader } from "../../components/AppHeader";
 import { Card } from "../../components/Card";
 import { ConfirmationSheet } from "../../components/ConfirmationSheet";
+import { LeadStatCard } from "../../components/LeadStatCard";
 import { QuickActions, type QuickAction } from "../../components/QuickActions";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SectionHeader } from "../../components/SectionHeader";
@@ -85,6 +87,7 @@ export function HomeScreen({ navigation }: Props) {
   const [reminders, setReminders] = useState<Task[]>([]);
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [todaysTransactions, setTodaysTransactions] = useState<Transaction[]>([]);
+  const [leads, setLeads] = useState<leadsApi.Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [taskPendingDelete, setTaskPendingDelete] = useState<Task | null>(null);
@@ -114,18 +117,21 @@ export function HomeScreen({ navigation }: Props) {
     setError(null);
     try {
       const today = todayIso();
-      const [taskCounts, todayList, upcomingReminders, financeSummary, todayTx] = await Promise.all([
+      const [taskCounts, todayList, upcomingReminders, financeSummary, todayTx, leadsList] = await Promise.all([
         tasksApi.getTaskCounts(),
         tasksApi.listTasks({ date: today, sort: "date_asc" }),
         tasksApi.getUpcomingReminders(),
         financeApi.getFinancialSummary(),
         financeApi.listTransactions({ from: today, to: today }),
+        // Best-effort: leads are a secondary widget and must never block the rest of the dashboard.
+        flags.leads ? leadsApi.listLeads().catch(() => [] as leadsApi.Lead[]) : Promise.resolve([] as leadsApi.Lead[]),
       ]);
       setCounts(taskCounts);
       setTodaysTasks(todayList);
       setReminders(upcomingReminders);
       setSummary(financeSummary);
       setTodaysTransactions(todayTx);
+      setLeads(leadsList);
       const cacheKey = scopedKey(DASHBOARD_CACHE_KEY_BASE);
       if (cacheKey) {
         await setJson(cacheKey, {
@@ -156,7 +162,7 @@ export function HomeScreen({ navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [flags.leads]);
 
   const loadActivity = useCallback(async () => {
     setActivityLoading(true);
@@ -411,6 +417,28 @@ export function HomeScreen({ navigation }: Props) {
           </View>
         );
 
+      case "leads": {
+        if (!flags.leads) return null;
+        const leadsByStatus = new Map<string, number>();
+        leads.forEach((lead) => {
+          const status = lead.status || "New";
+          leadsByStatus.set(status, (leadsByStatus.get(status) ?? 0) + 1);
+        });
+        const leadCounts = Array.from(leadsByStatus.entries())
+          .map(([status, count]) => ({ status, count }))
+          .sort((a, b) => b.count - a.count);
+
+        return (
+          <LeadStatCard
+            key={id}
+            loading={loading}
+            counts={leadCounts}
+            totalLeads={leads.length}
+            onPress={() => navigation.navigate("MoreTab", { screen: "Leads", params: undefined })}
+          />
+        );
+      }
+
       case "comingUp":
         return (
           <View style={{ marginTop: spacing.xl }} key={id}>
@@ -500,9 +528,11 @@ export function HomeScreen({ navigation }: Props) {
     }
   }
 
-  const widgetOrder = widgetPrefs
-    ? widgetPrefs.order.filter((id) => !widgetPrefs.hidden.includes(id))
-    : WIDGET_DEFINITIONS.map((w) => w.id);
+  const widgetOrder = (
+    widgetPrefs
+      ? widgetPrefs.order.filter((id) => !widgetPrefs.hidden.includes(id))
+      : WIDGET_DEFINITIONS.map((w) => w.id)
+  ).filter((id) => id !== "leads" || flags.leads);
 
   return (
     <SafeAreaView style={styles.flex} edges={["top", "left", "right"]}>

@@ -21,6 +21,7 @@
     "expo-document-picker": "~57.0.2",
     "expo-file-system": "~57.0.6",
     "expo-image-picker": "~57.0.16",
+    "expo-local-authentication": "^57.0.3",
     "expo-location": "~57.0.16",
     "expo-secure-store": "~57.0.1",
     "expo-sharing": "~57.0.21",
@@ -28,6 +29,7 @@
     "expo-speech-recognition": "^56.0.1",
     "expo-status-bar": "~57.0.1",
     "expo-task-manager": "~57.0.16",
+    "expo-updates": "^57.0.24",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.2",
@@ -60,6 +62,9 @@
   "private": true,
   "jest": {
     "preset": "jest-expo",
+    "setupFiles": [
+      "<rootDir>/jest.setup.js"
+    ],
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/.expo/"

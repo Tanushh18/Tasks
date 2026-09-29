@@ -4,6 +4,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { idempotency } from "./middleware/idempotency";
 import { apiRateLimiter } from "./middleware/rateLimiter";
 import activityFeedRoutes from "./routes/activityFeedRoutes";
 import adminRoutes from "./routes/adminRoutes";
@@ -51,6 +52,7 @@ export function createApp(): Express {
     app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
   }
   app.use(apiRateLimiter);
+  app.use("/api", idempotency);
 
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
