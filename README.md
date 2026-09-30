@@ -461,7 +461,19 @@ All configuration is via environment variables in `mobile/.env`:
 
 | Variable | Purpose |
 |----------|---------|
-| `EXPO_PUBLIC_API_URL` | Backend API base URL |
+| `EXPO_PUBLIC_API_URL` | Backend API base URL (single server, no fallover) |
+| `EXPO_PUBLIC_API_URLS` | Comma-separated list of backend URLs with automatic fallover |
+
+**Production URLs** (with automatic fallover):
+```
+EXPO_PUBLIC_API_URLS=https://tasks-g9h1.onrender.com/api, https://we-three-api.onrender.com/api
+```
+
+**Server Failover Logic**:
+- The app tries the primary server (`tasks-g9h1.onrender.com`) first
+- If it's unreachable or returns 502/503/504, the app automatically switches to the fallback (`we-three-api.onrender.com`)
+- The client stays on whichever server is working until it fails
+- Requests are queued offline if both servers fail and synced when connectivity returns
 
 ### Feature Flags
 
@@ -918,10 +930,13 @@ npm run build && docker build -t we-three-api . # Build Docker image
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Backend API | http://localhost:4000 | REST API |
+| Backend API (Production) | https://tasks-g9h1.onrender.com/api | Main REST API |
+| Backend API (Fallback) | https://we-three-api.onrender.com/api | Backup REST API |
+| Backend API (Local Dev) | http://localhost:4000 | Local REST API |
 | Health Check | http://localhost:4000/health | Liveness probe |
-| Local Server | http://localhost:3000 | Optional local AI |
+| Local Server | http://localhost:3000 | Optional local AI (OCR/voice) |
 | MongoDB (Local) | (in-memory) | Development DB |
+| MongoDB Atlas (Prod) | (configured via MONGO_URI) | Production DB |
 
 ### Key Files
 
