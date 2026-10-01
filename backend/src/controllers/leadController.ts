@@ -123,11 +123,21 @@ export async function addSource(req: Request, res: Response) {
     });
   }
 
-  const source = await LeadSource.create({
-    ownerId: req.userId,
-    url,
-    ...ref,
-  });
+  let source;
+  try {
+    source = await LeadSource.create({
+      ownerId: req.userId,
+      url,
+      ...ref,
+    });
+  } catch (err) {
+    if ((err as { code?: number }).code === 11000) {
+      return res.status(409).json({
+        error: { code: "CONFLICT", message: "This sheet is already added" },
+      });
+    }
+    throw err;
+  }
 
   let result: Record<string, unknown>;
   try {
