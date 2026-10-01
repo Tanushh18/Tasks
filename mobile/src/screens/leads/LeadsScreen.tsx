@@ -1,6 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useState } from "react";
-import { Alert, FlatList, Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { getApiErrorMessage } from "../../api/client";
 import * as api from "../../api/leads";
@@ -17,6 +30,72 @@ export function LeadsScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [editing, setEditing] = useState<api.Lead | null>(null);
+  const [form, setForm] = useState({
+    status: "",
+    category: "",
+    plot: "",
+    requirement: "",
+    address: "",
+    budget: "",
+    notes: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [statusOptions, setStatusOptions] = useState<string[]>(api.DEFAULT_STATUS_OPTIONS);
+
+  useEffect(() => {
+    api
+      .getLeadMeta()
+      .then((m) => m.statusSuggestions?.length && setStatusOptions(m.statusSuggestions))
+      .catch(() => undefined);
+  }, []);
+
+  const openEditor = (lead: api.Lead) => {
+    setForm({
+      status: lead.status || "",
+      category: lead.category || "",
+      plot: lead.plotInFarukhNagar || "",
+      requirement: lead.requirement || "",
+      address: lead.address || "",
+      budget: lead.budget || "",
+      notes: lead.notes || "",
+    });
+    setEditing(lead);
+  };
+
+  const save = async () => {
+    if (!editing) return;
+    const body: Partial<api.Lead> = {
+      status: form.status.trim(),
+      category: form.category.trim(),
+      requirement: form.requirement.trim(),
+      address: form.address.trim(),
+      budget: form.budget.trim(),
+      notes: form.notes.trim(),
+    };
+    if (form.plot.trim() !== (editing.plotInFarukhNagar || "")) body.plotInFarukhNagar = form.plot.trim();
+    setSaving(true);
+    try {
+      await api.updateLead(editing.id, body);
+      // Merge locally: if the phone was offline the save is queued and the reply has no lead in it.
+      setLeads((prev) =>
+        prev.map((l) =>
+          l.id === editing.id
+            ? {
+                ...l,
+                ...body,
+                ...(body.plotInFarukhNagar !== undefined ? { plotManual: true } : {}),
+              }
+            : l
+        )
+      );
+      setEditing(null);
+    } catch (e) {
+      Alert.alert("Couldn't save", getApiErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,9 +205,14 @@ export function LeadsScreen({ navigation }: any) {
           }
           renderItem={({ item }) => (
             <Card style={{ marginBottom: spacing.md }}>
-              <Text style={[typography.bodyStrong, { color: colors.text }]}>
-                {item.name || "Unnamed lead"}
-              </Text>
+              <Pressable onPress={() => openEditor(item)} accessibilityRole="button" accessibilityLabel={`Edit ${item.name || "lead"}`}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={[typography.bodyStrong, { color: colors.text, flex: 1 }]}>
+                  {item.name || "Unnamed lead"}
+                </Text>
+                <Ionicons name="create-outline" size={20} color={colors.primary} />
+              </View>
+              </Pressable>
               <View style={styles.phoneRow}>
                 <Text style={[typography.body, { color: colors.textMuted, marginTop: 4 }]}>
                   {item.phone}
@@ -167,11 +251,97 @@ export function LeadsScreen({ navigation }: any) {
           )}
         />
       )}
+
+      <Modal visible={!!editing} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.overlay}
+        >
+          <View style={[styles.sheet, { backgroundColor: colors.surface, borderRadius: radius.lg }]}>
+            <Text style={[typography.h2, { color: colors.text }]}>{editing?.name || "Lead"}</Text>
+            <Text style={[typography.caption, { color: colors.textMuted, marginBottom: 8 }]}>{editing?.phone}</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 460 }}>
+              <Text style={[typography.caption, { color: colors.textMuted }]}>Status / stage</Text>
+              <View style={styles.chips}>
+                {statusOptions.map((opt) => (
+                  <Pressable
+                    key={opt}
+                    onPress={() => setForm((f) => ({ ...f, status: opt }))}
+                    style={[
+                      styles.chip,
+                      { backgroundColor: form.status === opt ? colors.primary : colors.surfaceAlt },
+                    ]}
+                  >
+                    <Text style={{ color: form.status === opt ? "#fff" : colors.text, fontSize: 12 }}>{opt}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <TextInput
+                value={form.status}
+                onChangeText={(t) => setForm((f) => ({ ...f, status: t }))}
+                placeholder="Or type your own stage"
+                placeholderTextColor={colors.textFaint}
+                style={[styles.field, { color: colors.text, borderColor: colors.border }]}
+              />
+
+              <Text style={[typography.caption, { color: colors.textMuted, marginTop: 10 }]}>Category</Text>
+              <View style={styles.chips}>
+                {api.CATEGORY_OPTIONS.map((opt) => (
+                  <Pressable
+                    key={opt}
+                    onPress={() => setForm((f) => ({ ...f, category: opt }))}
+                    style={[
+                      styles.chip,
+                      { backgroundColor: form.category === opt ? colors.primary : colors.surfaceAlt },
+                    ]}
+                  >
+                    <Text style={{ color: form.category === opt ? "#fff" : colors.text, fontSize: 12 }}>{opt}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {(
+                [
+                  ["plot", "Plot in Farukh Nagar"],
+                  ["requirement", "Requirement"],
+                  ["address", "Address"],
+                  ["budget", "Budget"],
+                  ["notes", "Notes"],
+                ] as const
+              ).map(([key, label]) => (
+                <TextInput
+                  key={key}
+                  value={form[key]}
+                  onChangeText={(t) => setForm((f) => ({ ...f, [key]: t }))}
+                  placeholder={label}
+                  placeholderTextColor={colors.textFaint}
+                  multiline={key === "notes" || key === "requirement"}
+                  style={[styles.field, { color: colors.text, borderColor: colors.border, marginTop: 10 }]}
+                />
+              ))}
+            </ScrollView>
+            <View style={styles.actions}>
+              <Pressable onPress={() => setEditing(null)}>
+                <Text style={{ color: colors.textMuted }}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={save} disabled={saving}>
+                <Text style={{ color: colors.primary, fontWeight: "700" }}>{saving ? "Saving…" : "Save"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
+  sheet: { padding: 16, margin: 8 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  field: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, padding: 10, marginTop: 8, fontSize: 15 },
+  actions: { flexDirection: "row", justifyContent: "space-between", marginTop: 16 },
   phoneRow: {
     flexDirection: "row",
     alignItems: "center",

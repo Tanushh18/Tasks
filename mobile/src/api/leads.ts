@@ -73,3 +73,21 @@ export async function unshareSource(id: string, userId: string): Promise<LeadSou
   const { data } = await apiClient.delete<{ source: LeadSource }>(`/leads/sources/${id}/share/${userId}`);
   return data.source;
 }
+
+export const CATEGORY_OPTIONS = ["Construction", "Interior", "Sale / Purchase"];
+
+export const DEFAULT_STATUS_OPTIONS = [
+  "New",
+  "Called — no answer",
+  "Interested",
+  "Site visit planned",
+  "Follow-up",
+  "Quotation sent",
+  "Not interested",
+  "Converted",
+];
+
+export async function getLeadMeta(): Promise<{ statusSuggestions: string[] }> {
+  const { data } = await apiClient.get<{ statusSuggestions: string[] }>("/leads/meta");
+  return data;
+}
