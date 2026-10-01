@@ -31,7 +31,16 @@
       "env": {
         "EXPO_PUBLIC_API_URLS": "https://tasks-g9h1.onrender.com/api, https://we-three-api.onrender.com/api"
       }
+    },
+    "test": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "channel": "test",
+      "env": {
+        "EXPO_PUBLIC_API_URLS": "https://tasks-g9h1.onrender.com/api, https://we-three-api.onrender.com/api"
+      }
     }
   }
 }
-

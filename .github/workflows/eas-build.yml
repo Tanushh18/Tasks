@@ -8,6 +8,15 @@ on:
   # The push trigger above ignores changes to this file, so a fix to the workflow
   # itself can only be exercised by starting a run by hand.
   workflow_dispatch:
+    inputs:
+      profile:
+        description: "preview = real release (also publishes OTA to everyone on preview); test = test APK on its own channel, no OTA"
+        type: choice
+        options: [preview, test]
+        default: preview
+      testers:
+        description: "Comma-separated tester emails for Firebase App Distribution"
+        default: "tanushchawla16@gmail.com"
 
 jobs:
   build:
@@ -32,11 +41,11 @@ jobs:
         working-directory: mobile
         run: eas init --account tanushhhhh18 --force --non-interactive
 
-      - name: Build Android APK (preview)
+      - name: Build Android APK (${{ inputs.profile || 'preview' }})
         working-directory: mobile
         # --no-wait is removed so the job blocks until the build finishes and
         # we can fetch the resulting APK URL for Firebase distribution below.
-        run: eas build --platform android --profile preview --non-interactive --json > eas-build-output.json
+        run: eas build --platform android --profile ${{ inputs.profile || 'preview' }} --non-interactive --json > eas-build-output.json
 
       - name: Resolve build artifact URL
         working-directory: mobile
@@ -55,7 +64,9 @@ jobs:
       # the air (see mobile/src/updates/useOtaUpdates.ts). Installed builds only accept updates that
       # share their runtimeVersion (the app version in app.json), so a native change needs the APK.
       # continue-on-error: a failed publish shows as a warning but must not block APK distribution.
+      # Test builds never publish: that would push unreleased code to every installed preview app.
       - name: Publish OTA update to preview channel
+        if: ${{ (inputs.profile || 'preview') == 'preview' }}
         working-directory: mobile
         continue-on-error: true
         env:
@@ -69,6 +80,6 @@ jobs:
         with:
           appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          testers: tanushchawla16@gmail.com
+          testers: ${{ inputs.testers || 'tanushchawla16@gmail.com' }}
           file: app-preview.apk
-          releaseNotes: ${{ github.event.head_commit.message }}
+          releaseNotes: ${{ github.event.head_commit.message || format('{0} build from {1} ({2})', inputs.profile, github.ref_name, github.sha) }}
