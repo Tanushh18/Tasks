@@ -249,6 +249,9 @@ The backend exposes the following API routes (all prefixed with `/api`):
 **Vault**: `/vault-documents` (secure document storage)
 **Location**: `/location` (location sharing)
 **Leads**: `/leads` (lead management/CRM)
+  - `GET /leads`, `PATCH /leads/:id`: list and edit leads (stage, category, plot, requirement, address, budget, notes)
+  - `POST /leads/sources`, `POST /leads/sources/:id/share`, `DELETE /leads/sources/:id/share/:userId`: Google Sheet lists and sharing; everyone a list is shared with sees and edits the same leads
+  - `POST /leads/import`: add phone contacts as leads into the user's shareable "My contacts" list. The app also auto-adds contacts whose name contains the word "lead" (opt-in toggle on the Leads screen)
 **Admin**: `/admin` (admin operations)
 **Search**: `/search` (global search)
 
