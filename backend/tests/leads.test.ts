@@ -85,4 +85,57 @@ describe("shared leads", () => {
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(res.body.error).toBeDefined();
   });
+
+  it("imports phone contacts as leads, skips invalid/duplicate numbers, and shares them", async () => {
+    const alice = await registerUser(app, "9876590041", "4821", "Alice");
+    const bob = await registerUser(app, "9876590042", "4821", "Bob");
+    const a = authed(app, alice.token);
+    const b = authed(app, bob.token);
+
+    const res = await a.post("/api/leads/import").send({
+      contacts: [
+        { name: "Mohan", phone: "+91 98765 11111" },
+        { name: "Mohan again", phone: "9876511111" },
+        { name: "Landline", phone: "0124-123456" },
+        { name: "Geeta", phone: "9123411111" },
+      ],
+    });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ added: 2, existing: 1, invalid: 1 });
+
+    const leads = (await a.get("/api/leads")).body.leads;
+    expect(leads.map((l: any) => l.name).sort()).toEqual(["Geeta", "Mohan"]);
+    expect(leads[0].phone).toMatch(/^\+91\d{10}$/);
+
+    // Importing again adds nothing new.
+    const again = await a.post("/api/leads/import").send({ contacts: [{ name: "Mohan", phone: "9876511111" }] });
+    expect(again.body).toEqual({ added: 0, existing: 1, invalid: 0 });
+
+    // The "My contacts" list is a shareable source; Bob then sees and edits them.
+    const sources = (await a.get("/api/leads/sources/list")).body.sources;
+    const mine = sources.find((s: any) => s.kind === "manual");
+    expect(mine.label).toBe("My contacts");
+    expect((await a.delete(`/api/leads/sources/${mine.id}`)).status).toBe(404);
+    expect((await a.post(`/api/leads/sources/${mine.id}/share`).send({ mobileNumber: "9876590042" })).status).toBe(200);
+    const bobLeads = (await b.get("/api/leads")).body.leads;
+    expect(bobLeads).toHaveLength(2);
+    const edit = await b.patch(`/api/leads/${bobLeads[0].id}`).send({ status: "Interested" });
+    expect(edit.status).toBe(200);
+
+    // A shared member importing a number that is already tracked doesn't create a duplicate.
+    const dup = await b.post("/api/leads/import").send({ contacts: [{ name: "Mohan", phone: "9876511111" }] });
+    expect(dup.body.added).toBe(0);
+    expect((await b.get("/api/leads")).body.leads).toHaveLength(2);
+
+    // Manual leads survive a sheet sync (which archives leads with no source).
+    await a.post("/api/leads/sources").send({ url: SHEET });
+    await a.post("/api/leads/sync");
+    expect((await a.get("/api/leads")).body.leads.filter((l: any) => l.name === "Geeta")).toHaveLength(1);
+  });
+
+  it("rejects an empty import", async () => {
+    const alice = await registerUser(app, "9876590051", "4821", "Alice");
+    const res = await authed(app, alice.token).post("/api/leads/import").send({ contacts: [] });
+    expect(res.status).toBe(400);
+  });
 });

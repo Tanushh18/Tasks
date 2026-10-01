@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { Lead } from "../models/Lead";
 import { LeadSource } from "../models/LeadSource";
 import { User } from "../models/User";
-import { STATUS_SUGGESTIONS, accessibleSources, leadAccessFilter, parseLeadSourceUrl, syncSource } from "../services/leadService";
+import { STATUS_SUGGESTIONS, addManualLeads, accessibleSources, leadAccessFilter, parseLeadSourceUrl, syncSource } from "../services/leadService";
 import { escapeRegex } from "../services/rules/text";
 
 const str = (v: unknown, max: number) =>
@@ -94,6 +94,7 @@ async function serializeSource(source: any, userId: string) {
   return {
     ...rest,
     id: String(_id),
+    kind: rest.kind ?? "sheet",
     isOwner: String(ownerId) === userId,
     sharedWith: members.map((m) => ({ id: String(m._id), name: m.name, mobileNumber: m.mobileNumber })),
   };
@@ -165,7 +166,7 @@ export async function updateSource(req: Request, res: Response) {
 
   await source.save();
 
-  if (source.enabled)
+  if (source.enabled && source.kind !== "manual")
     await syncSource(source.toObject(), req.userId!, true).catch(() => {});
 
   return res.json({ source: await serializeSource(source.toObject(), req.userId!) });
@@ -208,6 +209,7 @@ export async function deleteSource(req: Request, res: Response) {
   const source = await LeadSource.findOneAndDelete({
     _id: req.params.id,
     ownerId: req.userId,
+    kind: { $ne: "manual" },
   });
 
   if (!source) return notFound(res);
@@ -227,7 +229,7 @@ export async function deleteSource(req: Request, res: Response) {
 }
 
 export async function syncAll(req: Request, res: Response) {
-  const sources = (await accessibleSources(req.userId!)).filter((s) => s.enabled);
+  const sources = (await accessibleSources(req.userId!)).filter((s) => s.enabled && s.kind !== "manual");
 
   const results = [];
   for (const source of sources)
@@ -241,4 +243,24 @@ export async function meta(_req: Request, res: Response) {
     statusSuggestions: STATUS_SUGGESTIONS,
     syncIntervalSeconds: 15,
   });
+}
+
+const MAX_IMPORT = 2000;
+
+export async function importLeads(req: Request, res: Response) {
+  const raw = Array.isArray(req.body?.contacts) ? req.body.contacts : [];
+  if (raw.length === 0 || raw.length > MAX_IMPORT) {
+    return res.status(400).json({
+      error: { code: "VALIDATION_ERROR", message: `Send between 1 and ${MAX_IMPORT} contacts` },
+    });
+  }
+  const contacts = raw.map((c: Record<string, unknown>) => ({
+    name: str(c?.name, 120),
+    phone: str(c?.phone, 40),
+    status: str(c?.status, 200),
+    category: str(c?.category, 80),
+    notes: str(c?.notes, 4000),
+  }));
+  const result = await addManualLeads(req.userId!, contacts);
+  return res.status(201).json(result);
 }

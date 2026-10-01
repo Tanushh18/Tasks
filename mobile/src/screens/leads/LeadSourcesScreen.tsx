@@ -1,20 +1,23 @@
-import React, { useCallback, useState } from "react";
-import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as api from "../../api/leads";
-import { Card } from "../../components/Card";
-import { EmptyState, ErrorState } from "../../components/StateViews";
-import { ScreenContainer } from "../../components/ScreenContainer";
 import { useAuth } from "../../auth/AuthContext";
+import { BottomSheet } from "../../components/BottomSheet";
+import { Button } from "../../components/Button";
+import { ScreenContainer } from "../../components/ScreenContainer";
+import { EmptyState, ErrorState } from "../../components/StateViews";
+import { TextField } from "../../components/TextField";
 import { useTheme } from "../../theme/useTheme";
 
 export function LeadSourcesScreen() {
-  const { colors, spacing, typography, radius } = useTheme();
+  const { colors, spacing, typography, radius, feature, touchTarget } = useTheme();
   const { user } = useAuth();
   const [sources, setSources] = useState<api.LeadSource[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [url, setUrl] = useState("");
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
@@ -43,10 +46,11 @@ export function LeadSourcesScreen() {
     }
     setBusy(true);
     try {
-      await api.addSource(url.trim(), label.trim());
+      const res = await api.addSource(url.trim(), label.trim());
+      if (res?.result?.error) Alert.alert("Sheet added, but it couldn't be read yet", String(res.result.error));
       setUrl("");
       setLabel("");
-      setVisible(false);
+      setAdding(false);
       await load();
     } catch (e) {
       Alert.alert("Couldn't add sheet", getApiErrorMessage(e));
@@ -79,181 +83,163 @@ export function LeadSourcesScreen() {
     }
   };
 
-  return (
-    <ScreenContainer>
-      <View style={styles.header}>
-        <Text style={[typography.h1, { color: colors.text }]}>Lead Sheets</Text>
-        <Pressable onPress={() => setVisible(true)}>
-          <Text style={{ color: colors.primary, fontWeight: "700" }}>Add</Text>
-        </Pressable>
-      </View>
+  const confirm = (title: string, message: string, action: () => Promise<void>) =>
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Yes", style: "destructive", onPress: () => void action() },
+    ]);
 
-      {error ? (
-        <ErrorState message={error} onRetry={load} />
-      ) : sources.length === 0 ? (
-        <EmptyState
-          title="No sheets connected"
-          subtitle="Add a Google Sheet tab to import leads."
-          icon="document-outline"
-        />
-      ) : (
-        sources.map((s) => (
-          <Card key={s.id} style={{ marginBottom: spacing.md }}>
-            <Text style={[typography.bodyStrong, { color: colors.text }]}>
-              {s.label || "Google Sheet"}
+  const removeSheet = (s: api.LeadSource) =>
+    confirm("Remove this sheet?", "Its leads stay in your list unless no other sheet has them.", async () => {
+      try {
+        await api.deleteSource(s.id);
+        await load();
+      } catch (e) {
+        Alert.alert("Couldn't remove sheet", getApiErrorMessage(e));
+      }
+    });
+
+  const renderSource = (s: api.LeadSource) => {
+    const manual = s.kind === "manual";
+    return (
+      <View
+        key={s.id}
+        style={[
+          styles.card,
+          { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md },
+        ]}
+      >
+        <View style={styles.cardTop}>
+          <View style={[styles.icon, { backgroundColor: feature.leads.muted, borderRadius: radius.md }]}>
+            <Ionicons name={manual ? "people" : "grid-outline"} size={20} color={feature.leads.solid} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
+              {s.label || (manual ? "My contacts" : "Google Sheet")}
             </Text>
-            <Text style={[typography.caption, { color: colors.textMuted, marginTop: 4 }]} numberOfLines={2}>
-              {s.url}
+            <Text style={[typography.caption, { color: colors.textMuted }]} numberOfLines={1}>
+              {manual ? "Leads added from contacts or by hand" : s.url}
             </Text>
-            <Text
-              style={[
-                typography.caption,
-                { color: s.lastError ? colors.danger : colors.textMuted, marginTop: 6 },
-              ]}
-            >
-              {s.lastError || "Syncs automatically every 15 seconds"}
-            </Text>
-            {s.isOwner ? null : (
-              <Text style={[typography.caption, { color: colors.textMuted, marginTop: 6 }]}>
-                Shared with you
-              </Text>
-            )}
+          </View>
+          {!s.isOwner ? (
+            <View style={[styles.badge, { backgroundColor: colors.surfaceAlt }]}>
+              <Text style={[typography.caption, { color: colors.textMuted }]}>Shared with you</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {s.lastError ? (
+          <Text style={[typography.caption, { color: colors.danger, marginTop: spacing.sm }]}>{s.lastError}</Text>
+        ) : !manual ? (
+          <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]}>Syncs automatically every 15 seconds</Text>
+        ) : null}
+
+        {s.sharedWith.length > 0 ? (
+          <View style={{ marginTop: spacing.md }}>
+            <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.xs }]}>Shared with</Text>
             {s.sharedWith.map((m) => (
-              <View key={m.id} style={styles.memberRow}>
-                <Text style={[typography.caption, { color: colors.text }]}>
+              <View key={m.id} style={[styles.memberRow, { borderTopColor: colors.border, minHeight: touchTarget.min }]}>
+                <Ionicons name="person-circle-outline" size={22} color={colors.textMuted} />
+                <Text style={[typography.body, { color: colors.text, flex: 1 }]} numberOfLines={1}>
                   {m.name} · {m.mobileNumber}
                 </Text>
                 {s.isOwner ? (
-                  <Pressable onPress={() => void unshare(s.id, m.id)}>
-                    <Text style={{ color: colors.danger }}>Remove</Text>
+                  <Pressable
+                    onPress={() => confirm("Stop sharing?", `${m.name} will no longer see these leads.`, () => unshare(s.id, m.id))}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Stop sharing with ${m.name}`}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close-circle" size={22} color={colors.danger} />
                   </Pressable>
                 ) : null}
               </View>
             ))}
-            {s.isOwner ? (
-              <View style={styles.memberRow}>
-                <Pressable onPress={() => setShareFor(s)}>
-                  <Text style={{ color: colors.primary, fontWeight: "700" }}>Share</Text>
-                </Pressable>
-                <Pressable
-                  onPress={async () => {
-                    try {
-                      await api.deleteSource(s.id);
-                      await load();
-                    } catch (e) {
-                      Alert.alert("Couldn't remove sheet", getApiErrorMessage(e));
-                    }
-                  }}
-                >
-                  <Text style={{ color: colors.danger }}>Remove sheet</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <Pressable
-                onPress={() => {
-                  if (user) void unshare(s.id, user.id);
-                }}
-                style={{ marginTop: 10 }}
-              >
-                <Text style={{ color: colors.danger }}>Leave sheet</Text>
-              </Pressable>
-            )}
-          </Card>
-        ))
+          </View>
+        ) : null}
+
+        <View style={[styles.buttons, { gap: spacing.sm, marginTop: spacing.md }]}>
+          {s.isOwner ? (
+            <>
+              <Button label="Share" variant="secondary" onPress={() => setShareFor(s)} style={{ flex: 1 }} />
+              {!manual ? <Button label="Remove" variant="ghost" onPress={() => removeSheet(s)} style={{ flex: 1 }} /> : null}
+            </>
+          ) : (
+            <Button
+              label="Leave"
+              variant="ghost"
+              onPress={() => {
+                if (user) confirm("Leave this list?", "You'll stop seeing these leads.", () => unshare(s.id, user.id));
+              }}
+              style={{ flex: 1 }}
+            />
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <ScreenContainer edges={["left", "right"]}>
+      <Text style={[typography.body, { color: colors.textMuted, marginBottom: spacing.md }]}>
+        Everyone a list is shared with sees and edits the same leads.
+      </Text>
+      <Button label="Add Google Sheet" onPress={() => setAdding(true)} style={{ marginBottom: spacing.lg }} />
+
+      {error ? (
+        <ErrorState message={error} onRetry={load} />
+      ) : sources.length === 0 ? (
+        <EmptyState title="No lists yet" subtitle="Add a Google Sheet tab, or add leads from your contacts." icon="document-outline" />
+      ) : (
+        sources.map(renderSource)
       )}
 
-      <Modal visible={visible} transparent animationType="slide" onRequestClose={() => setVisible(false)}>
-        <View style={styles.overlay}>
-          <View
-            style={[
-              styles.modal,
-              { backgroundColor: colors.surface, borderRadius: radius.lg },
-            ]}
-          >
-            <Text style={[typography.h2, { color: colors.text }]}>Add Google Sheet</Text>
-            <TextInput
-              value={label}
-              onChangeText={setLabel}
-              placeholder="Label (optional)"
-              placeholderTextColor={colors.textFaint}
-              style={[styles.field, { color: colors.text, borderColor: colors.border }]}
-            />
-            <TextInput
-              value={url}
-              onChangeText={setUrl}
-              placeholder="Paste Google Sheets link"
-              placeholderTextColor={colors.textFaint}
-              autoCapitalize="none"
-              style={[styles.field, { color: colors.text, borderColor: colors.border }]}
-            />
-            <View style={styles.actions}>
-              <Pressable onPress={() => setVisible(false)}>
-                <Text style={{ color: colors.textMuted }}>Cancel</Text>
-              </Pressable>
-              <Pressable onPress={add} disabled={busy}>
-                <Text style={{ color: colors.primary, fontWeight: "700" }}>
-                  {busy ? "Adding…" : "Add Sheet"}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+      <BottomSheet visible={adding} onClose={() => setAdding(false)} title="Add Google Sheet" avoidKeyboard>
+        <TextField label="Label (optional)" value={label} onChangeText={setLabel} placeholder="e.g. Facebook ads" />
+        <TextField
+          label="Google Sheets link"
+          value={url}
+          onChangeText={setUrl}
+          placeholder="https://docs.google.com/spreadsheets/d/…"
+          autoCapitalize="none"
+        />
+        <Text style={[typography.caption, { color: colors.textMuted, marginBottom: spacing.lg }]}>
+          The sheet must be shared as "Anyone with the link can view" and have a phone/mobile column.
+        </Text>
+        <View style={[styles.buttons, { gap: spacing.md }]}>
+          <Button label="Cancel" variant="secondary" onPress={() => setAdding(false)} style={{ flex: 1 }} />
+          <Button label="Add sheet" onPress={add} loading={busy} style={{ flex: 1 }} />
         </View>
-      </Modal>
-      <Modal visible={!!shareFor} transparent animationType="slide" onRequestClose={() => setShareFor(null)}>
-        <View style={styles.overlay}>
-          <View style={[styles.modal, { backgroundColor: colors.surface, borderRadius: radius.lg }]}>
-            <Text style={[typography.h2, { color: colors.text }]}>Share with</Text>
-            <TextInput
-              value={shareNumber}
-              onChangeText={setShareNumber}
-              placeholder="Mobile number of a We Three user"
-              placeholderTextColor={colors.textFaint}
-              keyboardType="phone-pad"
-              style={[styles.field, { color: colors.text, borderColor: colors.border }]}
-            />
-            <View style={styles.actions}>
-              <Pressable onPress={() => setShareFor(null)}>
-                <Text style={{ color: colors.textMuted }}>Cancel</Text>
-              </Pressable>
-              <Pressable onPress={share} disabled={busy}>
-                <Text style={{ color: colors.primary, fontWeight: "700" }}>{busy ? "Sharing…" : "Share"}</Text>
-              </Pressable>
-            </View>
-          </View>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={!!shareFor}
+        onClose={() => setShareFor(null)}
+        title="Share with"
+        subtitle={shareFor ? shareFor.label || (shareFor.kind === "manual" ? "My contacts" : "Google Sheet") : undefined}
+        avoidKeyboard
+      >
+        <TextField
+          label="Mobile number"
+          value={shareNumber}
+          onChangeText={setShareNumber}
+          placeholder="Number they use to log in to We Three"
+          keyboardType="phone-pad"
+        />
+        <View style={[styles.buttons, { gap: spacing.md }]}>
+          <Button label="Cancel" variant="secondary" onPress={() => setShareFor(null)} style={{ flex: 1 }} />
+          <Button label="Share" onPress={share} loading={busy} style={{ flex: 1 }} />
         </View>
-      </Modal>
+      </BottomSheet>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  memberRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,.35)",
-  },
-  modal: {
-    padding: 20,
-  },
-  field: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    minHeight: 50,
-    marginTop: 12,
-    fontSize: 16,
-  },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 24,
-    marginTop: 20,
-  },
+  card: { borderWidth: StyleSheet.hairlineWidth },
+  cardTop: { flexDirection: "row", alignItems: "center", gap: 12 },
+  icon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  memberRow: { flexDirection: "row", alignItems: "center", gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
+  buttons: { flexDirection: "row" },
 });

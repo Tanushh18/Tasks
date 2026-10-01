@@ -26,6 +26,7 @@ export interface LeadSource {
   lastCheckedAt?: string;
   lastSyncedAt?: string;
   lastError?: string;
+  kind: "sheet" | "manual";
   isOwner: boolean;
   sharedWith: { id: string; name: string; mobileNumber: string }[];
 }
@@ -89,5 +90,21 @@ export const DEFAULT_STATUS_OPTIONS = [
 
 export async function getLeadMeta(): Promise<{ statusSuggestions: string[] }> {
   const { data } = await apiClient.get<{ statusSuggestions: string[] }>("/leads/meta");
+  return data;
+}
+
+export interface ImportContact {
+  name: string;
+  phone: string;
+}
+
+export interface ImportResult {
+  added: number;
+  existing: number;
+  invalid: number;
+}
+
+export async function importLeads(contacts: ImportContact[]): Promise<ImportResult> {
+  const { data } = await apiClient.post<ImportResult>("/leads/import", { contacts });
   return data;
 }
