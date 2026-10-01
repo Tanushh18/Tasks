@@ -1,0 +1,32 @@
+name: Firebase Distribute (existing APK)
+
+# Sends an already-built APK to Firebase App Distribution testers without rebuilding.
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "URL of the APK to distribute (e.g. an EAS build artifact URL)"
+        required: true
+      testers:
+        description: "Comma-separated tester emails"
+        required: true
+      release_notes:
+        description: "Release notes"
+        required: false
+        default: "Latest build"
+
+jobs:
+  distribute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download APK
+        run: curl -fL --retry 3 -o app-preview.apk "${{ inputs.apk_url }}"
+
+      - name: Distribute APK to Firebase App Distribution testers
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          testers: ${{ inputs.testers }}
+          file: app-preview.apk
+          releaseNotes: ${{ inputs.release_notes }}
