@@ -168,8 +168,8 @@ export function EventsListScreen({ navigation }: Props) {
           },
         ]}
       >
-        <Ionicons name="add" size={22} color="#FFFFFF" />
-        <Text style={[typography.bodyStrong, { color: "#FFFFFF", marginLeft: spacing.xs }]}>Add event</Text>
+        <Ionicons name="add" size={22} color={colors.onPrimary} />
+        <Text style={[typography.bodyStrong, { color: colors.onPrimary, marginLeft: spacing.xs }]}>Add event</Text>
       </Pressable>
 
       <ConfirmationSheet

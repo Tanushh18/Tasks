@@ -17,17 +17,11 @@ import type { NoteChecklistItem, NoteColor } from "../../types/models";
 
 type Props = NativeStackScreenProps<NotesStackParamList, "NoteForm">;
 
-const COLOR_SWATCHES: { key: NoteColor; hex: string }[] = [
-  { key: "default", hex: "#FFFFFF" },
-  { key: "peach", hex: "#FBE3D3" },
-  { key: "sage", hex: "#E1EBD9" },
-  { key: "sky", hex: "#DDEAF3" },
-  { key: "lavender", hex: "#E7E1F2" },
-  { key: "sand", hex: "#F1E9D8" },
-];
+const NOTE_COLORS: NoteColor[] = ["default", "peach", "sage", "sky", "lavender", "sand"];
 
 export function NoteFormScreen({ navigation, route }: Props) {
-  const { colors, spacing, radius, typography } = useTheme();
+  const { colors, spacing, radius, typography, noteTints } = useTheme();
+  const swatchHex = (key: NoteColor) => (key === "default" ? colors.surface : noteTints[key]);
   const { user } = useAuth();
   const { noteId, type: initialType } = route.params ?? {};
   const isEditing = Boolean(noteId);
@@ -175,7 +169,7 @@ export function NoteFormScreen({ navigation, route }: Props) {
         <>
           <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>Color</Text>
           <View style={[styles.swatchRow, { marginBottom: spacing.lg }]}>
-            {COLOR_SWATCHES.map((swatch) => (
+            {NOTE_COLORS.map((key) => ({ key, hex: swatchHex(key) })).map((swatch) => (
               <Pressable
                 key={swatch.key}
                 onPress={() => setColor(swatch.key)}

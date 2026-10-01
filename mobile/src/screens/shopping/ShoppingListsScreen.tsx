@@ -175,8 +175,8 @@ export function ShoppingListsScreen({ navigation }: Props) {
           },
         ]}
       >
-        <Ionicons name="add" size={22} color="#FFFFFF" />
-        <Text style={[typography.bodyStrong, { color: "#FFFFFF", marginLeft: spacing.xs }]}>New list</Text>
+        <Ionicons name="add" size={22} color={colors.onPrimary} />
+        <Text style={[typography.bodyStrong, { color: colors.onPrimary, marginLeft: spacing.xs }]}>New list</Text>
       </Pressable>
 
       {creating ? (

@@ -46,7 +46,7 @@ export function ChatBubble({ role, text, senderName, createdAt }: Props) {
             },
           ]}
         >
-          <Text style={[typography.body, { color: isUser ? "#FFFFFF" : colors.text }]}>{text}</Text>
+          <Text style={[typography.body, { color: isUser ? colors.onPrimary : colors.text }]}>{text}</Text>
         </View>
         {showTimestamp && createdAt ? (
           <Text

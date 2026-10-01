@@ -13,14 +13,14 @@
  */
 
 export const lightColors = {
-  background: "#FFF9F5",
+  background: "#FAF7F5",
   surface: "#FFFFFF",
-  surfaceAlt: "#FDF1EE",
-  border: "#EFE0DC",
+  surfaceAlt: "#F6EFEC",
+  border: "#E8DEDA",
 
-  text: "#332C2D",
-  textMuted: "#6E5F61",
-  textFaint: "#9C8C8E",
+  text: "#2A2324",
+  textMuted: "#64585A",
+  textFaint: "#948689",
 
   /** Interactive primary — safe for white text. */
   primary: "#7A3E48",
@@ -31,8 +31,8 @@ export const lightColors = {
   /** Text/icon colour that sits on `primary`. */
   onPrimary: "#FFFFFF",
 
-  success: "#16A34A",
-  successMuted: "#E9F9EF",
+  success: "#15803D",
+  successMuted: "#E7F6EC",
   danger: "#DC2626",
   dangerMuted: "#FDECEC",
   warning: "#B45309",
@@ -40,7 +40,7 @@ export const lightColors = {
   onDanger: "#FFFFFF",
 
   /** Neutral placeholder fill for skeletons while data loads. */
-  skeleton: "#F0E4E0",
+  skeleton: "#EFE6E2",
   overlay: "rgba(37, 26, 28, 0.45)",
 };
 
@@ -72,4 +72,53 @@ export const darkColors: ColorPalette = {
   overlay: "rgba(0, 0, 0, 0.6)",
 };
 
+/**
+ * "Midnight": a true-black theme for OLED screens and night use. Neutral greys instead of the warm
+ * browns of `darkColors`, the same rose brand accent, and pure black behind everything so unlit
+ * pixels stay off.
+ */
+export const midnightColors: ColorPalette = {
+  background: "#000000",
+  surface: "#0F0F11",
+  surfaceAlt: "#19191C",
+  border: "#2A2A2E",
+
+  text: "#F4F4F5",
+  textMuted: "#A9A9B2",
+  textFaint: "#74747D",
+
+  primary: "#E5A3AC",
+  accent: "#C9828B",
+  primaryMuted: "#2B1C20",
+  onPrimary: "#2A1519",
+
+  success: "#4ADE80",
+  successMuted: "#0F2A1A",
+  danger: "#F87171",
+  dangerMuted: "#331616",
+  warning: "#FBBF24",
+  warningMuted: "#2E2410",
+  onDanger: "#2A1010",
+
+  skeleton: "#1C1C20",
+  overlay: "rgba(0, 0, 0, 0.72)",
+};
+
 export type ColorPalette = typeof lightColors;
+
+/** Note card backgrounds: pastels on light, deep tints on the dark themes so light text stays readable. */
+export const lightNoteTints = {
+  peach: "#FBE3D3",
+  sage: "#E1EBD9",
+  sky: "#DDEAF3",
+  lavender: "#E7E1F2",
+  sand: "#F1E9D8",
+};
+
+export const darkNoteTints: typeof lightNoteTints = {
+  peach: "#3A2A20",
+  sage: "#26301F",
+  sky: "#1E2A35",
+  lavender: "#2B2538",
+  sand: "#352E20",
+};

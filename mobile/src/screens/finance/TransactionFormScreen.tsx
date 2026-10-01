@@ -230,7 +230,7 @@ export function TransactionFormScreen({ navigation, route }: Props) {
                   { backgroundColor: accountId === a.id ? colors.primary : colors.surfaceAlt, borderRadius: radius.pill },
                 ]}
               >
-                <Text style={{ color: accountId === a.id ? "#FFFFFF" : colors.textMuted, fontWeight: "600" }}>{a.name}</Text>
+                <Text style={{ color: accountId === a.id ? colors.onPrimary : colors.textMuted, fontWeight: "600" }}>{a.name}</Text>
               </Pressable>
             ))}
           </View>

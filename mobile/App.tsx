@@ -11,6 +11,8 @@ import { useNotificationResponseHandler } from "./src/notifications/useNotificat
 import { useOfflineSync } from "./src/offline/useOfflineSync";
 import { useOtaUpdates } from "./src/updates/useOtaUpdates";
 import { RootNavigator } from "./src/navigation/RootNavigator";
+import { ThemeProvider } from "./src/theme/ThemeProvider";
+import { useTheme } from "./src/theme/useTheme";
 
 function AppContent() {
   useNotificationResponseHandler();
@@ -41,16 +43,24 @@ function AppContent() {
   return <RootNavigator />;
 }
 
+/** Status bar icons follow the theme the person picked, not just the phone's setting. */
+function ThemedStatusBar() {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? "light" : "dark"} />;
+}
+
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <FeatureFlagsProvider>
-            <AppContent />
-          </FeatureFlagsProvider>
-        </AuthProvider>
-        <StatusBar style="auto" />
+        <ThemeProvider>
+          <AuthProvider>
+            <FeatureFlagsProvider>
+              <AppContent />
+            </FeatureFlagsProvider>
+          </AuthProvider>
+          <ThemedStatusBar />
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

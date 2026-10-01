@@ -34,7 +34,7 @@ function monthRange(dateStr: string): { from: string; to: string } {
 }
 
 export function TaskCalendarScreen({ navigation }: Props) {
-  const { colors, spacing, radius, typography, feature } = useTheme();
+  const { colors, spacing, radius, typography, feature, themeName } = useTheme();
   const { flags } = useFeatureFlags();
 
   const [viewMode, setViewMode] = useState<ViewMode>("month");
@@ -243,6 +243,8 @@ export function TaskCalendarScreen({ navigation }: Props) {
         <ErrorState message={error} onRetry={() => { setLoading(true); load(visibleMonth); }} />
       ) : viewMode === "month" ? (
         <Calendar
+          // The calendar reads its theme once on mount; remount it when the app theme changes.
+          key={themeName}
           current={`${visibleMonth}-01`}
           onDayPress={(day: DateData) => setSelectedDate(day.dateString)}
           onMonthChange={(month: DateData) => {
@@ -269,7 +271,7 @@ export function TaskCalendarScreen({ navigation }: Props) {
             calendarBackground: colors.background,
             textSectionTitleColor: colors.textMuted,
             selectedDayBackgroundColor: colors.primary,
-            selectedDayTextColor: "#FFFFFF",
+            selectedDayTextColor: colors.onPrimary,
             todayTextColor: colors.primary,
             dayTextColor: colors.text,
             textDisabledColor: colors.textFaint,

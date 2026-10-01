@@ -16,7 +16,8 @@ import { pingLocalServer, type LocalHealth } from "../../localServer/client";
 import { DEFAULT_LOCAL_SERVER_URL, getLocalServerUrl, setLocalServerUrl } from "../../localServer/config";
 import { listPendingScans } from "../../localServer/pendingScans";
 import type { SettingsStackParamList } from "../../navigation/types";
-import { useTheme } from "../../theme/useTheme";
+import { darkColors, lightColors, midnightColors } from "../../theme/colors";
+import { useTheme, type ThemeMode } from "../../theme/useTheme";
 
 type Props = NativeStackScreenProps<SettingsStackParamList, "SettingsMain">;
 
@@ -161,6 +162,11 @@ export function SettingsScreen({ navigation }: Props) {
         icon="shield-checkmark-outline"
         onPress={() => navigation.navigate("PrivacyCenter")}
       />
+
+      <View style={{ marginTop: spacing.xl }}>
+        <SectionHeader title="Appearance" subtitle="Saved on this phone" />
+      </View>
+      <AppearancePicker />
 
       <View style={{ marginTop: spacing.xl }}>
         <SectionHeader title="Notifications" />
@@ -382,6 +388,63 @@ function SettingRow({
   );
 }
 
+const THEME_OPTIONS: {
+  mode: ThemeMode;
+  label: string;
+  detail: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  swatch: [string, string];
+}[] = [
+  { mode: "system", label: "Match phone", detail: "Light or dark, following your phone", icon: "phone-portrait-outline", swatch: [lightColors.background, darkColors.background] },
+  { mode: "light", label: "Light", detail: "Bright and clear for daytime", icon: "sunny-outline", swatch: [lightColors.background, lightColors.surface] },
+  { mode: "dark", label: "Dark", detail: "Soft warm dark, easy on the eyes", icon: "moon-outline", swatch: [darkColors.background, darkColors.surface] },
+  { mode: "midnight", label: "Midnight", detail: "True black, saves battery on OLED screens", icon: "contrast-outline", swatch: [midnightColors.background, midnightColors.surface] },
+];
+
+function AppearancePicker() {
+  const { colors, spacing, typography, radius, touchTarget, themeMode, setThemeMode } = useTheme();
+  return (
+    <Card style={{ marginBottom: spacing.md, paddingVertical: spacing.xs }}>
+      {THEME_OPTIONS.map((opt, i) => {
+        const selected = themeMode === opt.mode;
+        return (
+          <Pressable
+            key={opt.mode}
+            onPress={() => setThemeMode(opt.mode)}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
+            accessibilityLabel={`${opt.label}. ${opt.detail}`}
+            style={({ pressed }) => [
+              styles.row,
+              {
+                minHeight: touchTarget.large,
+                paddingVertical: spacing.sm,
+                borderTopWidth: i === 0 ? 0 : StyleSheet.hairlineWidth,
+                borderTopColor: colors.border,
+                opacity: pressed ? 0.8 : 1,
+              },
+            ]}
+          >
+            <View style={[styles.swatch, { borderRadius: radius.sm, borderColor: colors.border }]}>
+              <View style={{ flex: 1, backgroundColor: opt.swatch[0] }} />
+              <View style={{ flex: 1, backgroundColor: opt.swatch[1] }} />
+            </View>
+            <View style={styles.flex}>
+              <Text style={[typography.bodyStrong, { color: colors.text }]}>{opt.label}</Text>
+              <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>{opt.detail}</Text>
+            </View>
+            <Ionicons
+              name={selected ? "radio-button-on" : "radio-button-off"}
+              size={22}
+              color={selected ? colors.primary : colors.textFaint}
+            />
+          </Pressable>
+        );
+      })}
+    </Card>
+  );
+}
+
 function ToggleRow({
   label,
   detail,
@@ -415,4 +478,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 12 },
   chipRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   chip: { paddingHorizontal: 16, alignItems: "center", justifyContent: "center" },
+  swatch: { width: 36, height: 36, flexDirection: "row", overflow: "hidden", borderWidth: 1 },
 });

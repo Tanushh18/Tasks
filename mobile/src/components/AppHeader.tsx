@@ -62,7 +62,7 @@ export function AppHeader({ title, subtitle, actions }: Props) {
               <Ionicons name={action.icon} size={22} color={colors.text} />
               {action.badgeCount ? (
                 <View style={[styles.badge, { backgroundColor: colors.danger, borderColor: colors.background }]}>
-                  <Text style={styles.badgeText}>{action.badgeCount > 9 ? "9+" : action.badgeCount}</Text>
+                  <Text style={[styles.badgeText, { color: colors.onDanger }]}>{action.badgeCount > 9 ? "9+" : action.badgeCount}</Text>
                 </View>
               ) : null}
             </Pressable>
@@ -90,5 +90,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 4,
   },
-  badgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
+  badgeText: { fontSize: 10, fontWeight: "700" },
 });

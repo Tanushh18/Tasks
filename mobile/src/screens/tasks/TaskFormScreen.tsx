@@ -329,7 +329,7 @@ export function TaskFormScreen({ navigation, route }: Props) {
               },
             ]}
           >
-            <Text style={{ color: priority === p ? "#FFFFFF" : colors.textMuted, fontWeight: "600", textTransform: "capitalize" }}>
+            <Text style={{ color: priority === p ? colors.onPrimary : colors.textMuted, fontWeight: "600", textTransform: "capitalize" }}>
               {p}
             </Text>
           </Pressable>
@@ -349,7 +349,7 @@ export function TaskFormScreen({ navigation, route }: Props) {
               { backgroundColor: recurrence === r.key ? colors.primary : colors.surfaceAlt, borderRadius: radius.pill },
             ]}
           >
-            <Text style={{ color: recurrence === r.key ? "#FFFFFF" : colors.textMuted, fontWeight: "600" }}>{r.label}</Text>
+            <Text style={{ color: recurrence === r.key ? colors.onPrimary : colors.textMuted, fontWeight: "600" }}>{r.label}</Text>
           </Pressable>
         ))}
       </View>

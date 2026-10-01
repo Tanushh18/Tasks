@@ -121,7 +121,7 @@ export function AccountFormScreen({ navigation, route }: Props) {
             onPress={() => setType(t)}
             style={[styles.chip, { backgroundColor: type === t ? colors.primary : colors.surfaceAlt, borderRadius: radius.pill }]}
           >
-            <Text style={{ color: type === t ? "#FFFFFF" : colors.textMuted, fontWeight: "600", textTransform: "capitalize" }}>
+            <Text style={{ color: type === t ? colors.onPrimary : colors.textMuted, fontWeight: "600", textTransform: "capitalize" }}>
               {t}
             </Text>
           </Pressable>

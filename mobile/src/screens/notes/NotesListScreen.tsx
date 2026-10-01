@@ -23,18 +23,9 @@ type Props = NativeStackScreenProps<NotesStackParamList, "NotesList">;
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-/** Soft pastel tints blended over the app's warm surface, one per allowed note color. */
-const COLOR_TINTS: Record<NoteColor, string | undefined> = {
-  default: undefined,
-  peach: "#FBE3D3",
-  sage: "#E1EBD9",
-  sky: "#DDEAF3",
-  lavender: "#E7E1F2",
-  sand: "#F1E9D8",
-};
 
 export function NotesListScreen({ navigation }: Props) {
-  const { colors, spacing, radius, typography, touchTarget, shadow, feature } = useTheme();
+  const { colors, spacing, radius, typography, touchTarget, shadow, feature, noteTints } = useTheme();
   const { user } = useAuth();
 
   const [notes, setNotes] = useState<Note[]>([]);
@@ -135,7 +126,8 @@ export function NotesListScreen({ navigation }: Props) {
   function renderNote(item: Note) {
     const isOwner = item.ownerId.id === user?.id;
     const doneCount = item.items.filter((i) => i.done).length;
-    const tint = COLOR_TINTS[item.color];
+    // Pastels on light, deep tints on dark themes, so the note text stays readable.
+    const tint = item.color === "default" ? undefined : noteTints[item.color];
     const isPinned = item.pinned;
     const previewItems = item.type === "checklist" ? item.items.slice(0, 3) : [];
     return (
