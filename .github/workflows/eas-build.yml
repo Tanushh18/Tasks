@@ -58,6 +58,9 @@ jobs:
       - name: Publish OTA update to preview channel
         working-directory: mobile
         continue-on-error: true
+        env:
+          # EAS Update doesn't read eas.json build env; without this the bundle falls back to localhost.
+          EXPO_PUBLIC_API_URLS: https://tasks-g9h1.onrender.com/api, https://we-three-api.onrender.com/api
         run: |
           eas update --channel preview --message "$(git log -1 --pretty=%s)" --non-interactive
 

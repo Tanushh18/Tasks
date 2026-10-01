@@ -1,0 +1,26 @@
+name: EAS Update (OTA only)
+
+# Publishes the current JavaScript to the "preview" channel without building an APK.
+on:
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN_TANUSHCK84 }}
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci
+      - name: Publish OTA update to preview channel
+        working-directory: mobile
+        env:
+          EXPO_PUBLIC_API_URLS: https://tasks-g9h1.onrender.com/api, https://we-three-api.onrender.com/api
+        run: eas update --channel preview --message "$(git log -1 --pretty=%s)" --non-interactive

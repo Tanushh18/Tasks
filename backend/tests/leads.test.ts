@@ -68,4 +68,21 @@ describe("shared leads", () => {
     const res = await a.post(`/api/leads/sources/${added.body.source.id}/share`).send({ mobileNumber: "9000000000" });
     expect(res.status).toBe(404);
   });
+
+  it("answers 409 (not a dropped connection) when the same sheet is added twice", async () => {
+    const alice = await registerUser(app, "9876590021", "4821", "Alice");
+    const a = authed(app, alice.token);
+    expect((await a.post("/api/leads/sources").send({ url: SHEET })).status).toBe(201);
+    const again = await a.post("/api/leads/sources").send({ url: SHEET });
+    expect(again.status).toBe(409);
+    expect(again.body.error.message).toMatch(/already added/);
+  });
+
+  it("turns unexpected failures into a JSON error instead of crashing", async () => {
+    const alice = await registerUser(app, "9876590031", "4821", "Alice");
+    const a = authed(app, alice.token);
+    const res = await a.patch("/api/leads/not-an-object-id").send({ status: "x" });
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.body.error).toBeDefined();
+  });
 });
