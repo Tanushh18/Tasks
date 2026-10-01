@@ -66,6 +66,6 @@ jobs:
         with:
           appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          groups: testers
+          testers: tanushchawla16@gmail.com
           file: app-preview.apk
           releaseNotes: ${{ github.event.head_commit.message }}
