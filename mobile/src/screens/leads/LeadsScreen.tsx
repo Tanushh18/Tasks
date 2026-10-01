@@ -41,6 +41,8 @@ export function LeadsScreen({ navigation }: any) {
     notes: "",
   });
   const [saving, setSaving] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newLead, setNewLead] = useState({ name: "", phone: "" });
   const [statusOptions, setStatusOptions] = useState<string[]>(api.DEFAULT_STATUS_OPTIONS);
 
   useEffect(() => {
@@ -61,6 +63,29 @@ export function LeadsScreen({ navigation }: any) {
       notes: lead.notes || "",
     });
     setEditing(lead);
+  };
+
+  const addLead = async () => {
+    if (!newLead.phone.trim()) {
+      Alert.alert("Phone number required");
+      return;
+    }
+    setSaving(true);
+    try {
+      const r = await api.importLeads([{ name: newLead.name.trim(), phone: newLead.phone.trim() }]);
+      if (r.invalid) {
+        Alert.alert("Invalid number", "Enter a valid 10-digit Indian mobile number.");
+        return;
+      }
+      if (r.existing) Alert.alert("Already a lead", "This number is already in your leads.");
+      setNewLead({ name: "", phone: "" });
+      setAdding(false);
+      await load();
+    } catch (e) {
+      Alert.alert("Couldn't add lead", getApiErrorMessage(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const save = async () => {
@@ -153,6 +178,12 @@ export function LeadsScreen({ navigation }: any) {
           <Text style={[typography.caption, { color: colors.textMuted }]}>{leads.length} active leads</Text>
         </View>
         <View style={{ flexDirection: "row", gap: 18 }}>
+          <Pressable onPress={() => setAdding(true)} accessibilityLabel="Add a lead">
+            <Ionicons name="person-add-outline" size={24} color={colors.text} />
+          </Pressable>
+          <Pressable onPress={() => navigation.navigate("LeadImport")} accessibilityLabel="Add leads from contacts">
+            <Ionicons name="people-outline" size={24} color={colors.text} />
+          </Pressable>
           <Pressable onPress={() => navigation.navigate("LeadSources")}>
             <Ionicons name="document-text-outline" size={24} color={colors.text} />
           </Pressable>
@@ -251,6 +282,37 @@ export function LeadsScreen({ navigation }: any) {
           )}
         />
       )}
+
+      <Modal visible={adding} transparent animationType="slide" onRequestClose={() => setAdding(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.overlay}>
+          <View style={[styles.sheet, { backgroundColor: colors.surface, borderRadius: radius.lg }]}>
+            <Text style={[typography.h2, { color: colors.text }]}>Add a lead</Text>
+            <TextInput
+              value={newLead.name}
+              onChangeText={(t) => setNewLead((n) => ({ ...n, name: t }))}
+              placeholder="Name"
+              placeholderTextColor={colors.textFaint}
+              style={[styles.field, { color: colors.text, borderColor: colors.border }]}
+            />
+            <TextInput
+              value={newLead.phone}
+              onChangeText={(t) => setNewLead((n) => ({ ...n, phone: t }))}
+              placeholder="Mobile number"
+              placeholderTextColor={colors.textFaint}
+              keyboardType="phone-pad"
+              style={[styles.field, { color: colors.text, borderColor: colors.border }]}
+            />
+            <View style={styles.actions}>
+              <Pressable onPress={() => setAdding(false)}>
+                <Text style={{ color: colors.textMuted }}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={addLead} disabled={saving}>
+                <Text style={{ color: colors.primary, fontWeight: "700" }}>{saving ? "Adding…" : "Add"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       <Modal visible={!!editing} transparent animationType="slide" onRequestClose={() => setEditing(null)}>
         <KeyboardAvoidingView

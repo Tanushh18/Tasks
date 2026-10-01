@@ -100,10 +100,10 @@ export function LeadSourcesScreen() {
         sources.map((s) => (
           <Card key={s.id} style={{ marginBottom: spacing.md }}>
             <Text style={[typography.bodyStrong, { color: colors.text }]}>
-              {s.label || "Google Sheet"}
+              {s.label || (s.kind === "manual" ? "My contacts" : "Google Sheet")}
             </Text>
             <Text style={[typography.caption, { color: colors.textMuted, marginTop: 4 }]} numberOfLines={2}>
-              {s.url}
+              {s.kind === "manual" ? "Leads added from your phone contacts or by hand" : s.url}
             </Text>
             <Text
               style={[
@@ -111,7 +111,7 @@ export function LeadSourcesScreen() {
                 { color: s.lastError ? colors.danger : colors.textMuted, marginTop: 6 },
               ]}
             >
-              {s.lastError || "Syncs automatically every 15 seconds"}
+              {s.lastError || (s.kind === "manual" ? "Share this list so others can track these leads too" : "Syncs automatically every 15 seconds")}
             </Text>
             {s.isOwner ? null : (
               <Text style={[typography.caption, { color: colors.textMuted, marginTop: 6 }]}>
@@ -135,6 +135,7 @@ export function LeadSourcesScreen() {
                 <Pressable onPress={() => setShareFor(s)}>
                   <Text style={{ color: colors.primary, fontWeight: "700" }}>Share</Text>
                 </Pressable>
+                {s.kind === "manual" ? null : (
                 <Pressable
                   onPress={async () => {
                     try {
@@ -147,6 +148,7 @@ export function LeadSourcesScreen() {
                 >
                   <Text style={{ color: colors.danger }}>Remove sheet</Text>
                 </Pressable>
+                )}
               </View>
             ) : (
               <Pressable
