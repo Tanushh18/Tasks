@@ -6,16 +6,20 @@ import * as api from "../../api/leads";
 import { Card } from "../../components/Card";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import { ScreenContainer } from "../../components/ScreenContainer";
+import { useAuth } from "../../auth/AuthContext";
 import { useTheme } from "../../theme/useTheme";
 
 export function LeadSourcesScreen() {
   const { colors, spacing, typography, radius } = useTheme();
+  const { user } = useAuth();
   const [sources, setSources] = useState<api.LeadSource[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
   const [url, setUrl] = useState("");
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
+  const [shareFor, setShareFor] = useState<api.LeadSource | null>(null);
+  const [shareNumber, setShareNumber] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -48,6 +52,30 @@ export function LeadSourcesScreen() {
       Alert.alert("Couldn't add sheet", getApiErrorMessage(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const share = async () => {
+    if (!shareFor || !shareNumber.trim()) return;
+    setBusy(true);
+    try {
+      await api.shareSource(shareFor.id, shareNumber.trim());
+      setShareNumber("");
+      setShareFor(null);
+      await load();
+    } catch (e) {
+      Alert.alert("Couldn't share", getApiErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unshare = async (sourceId: string, userId: string) => {
+    try {
+      await api.unshareSource(sourceId, userId);
+      await load();
+    } catch (e) {
+      Alert.alert("Couldn't update sharing", getApiErrorMessage(e));
     }
   };
 
@@ -85,19 +113,51 @@ export function LeadSourcesScreen() {
             >
               {s.lastError || "Syncs automatically every 15 seconds"}
             </Text>
-            <Pressable
-              onPress={async () => {
-                try {
-                  await api.deleteSource(s.id);
-                  await load();
-                } catch (e) {
-                  Alert.alert("Couldn't remove sheet", getApiErrorMessage(e));
-                }
-              }}
-              style={{ marginTop: 10 }}
-            >
-              <Text style={{ color: colors.danger }}>Remove</Text>
-            </Pressable>
+            {s.isOwner ? null : (
+              <Text style={[typography.caption, { color: colors.textMuted, marginTop: 6 }]}>
+                Shared with you
+              </Text>
+            )}
+            {s.sharedWith.map((m) => (
+              <View key={m.id} style={styles.memberRow}>
+                <Text style={[typography.caption, { color: colors.text }]}>
+                  {m.name} · {m.mobileNumber}
+                </Text>
+                {s.isOwner ? (
+                  <Pressable onPress={() => void unshare(s.id, m.id)}>
+                    <Text style={{ color: colors.danger }}>Remove</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ))}
+            {s.isOwner ? (
+              <View style={styles.memberRow}>
+                <Pressable onPress={() => setShareFor(s)}>
+                  <Text style={{ color: colors.primary, fontWeight: "700" }}>Share</Text>
+                </Pressable>
+                <Pressable
+                  onPress={async () => {
+                    try {
+                      await api.deleteSource(s.id);
+                      await load();
+                    } catch (e) {
+                      Alert.alert("Couldn't remove sheet", getApiErrorMessage(e));
+                    }
+                  }}
+                >
+                  <Text style={{ color: colors.danger }}>Remove sheet</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => {
+                  if (user) void unshare(s.id, user.id);
+                }}
+                style={{ marginTop: 10 }}
+              >
+                <Text style={{ color: colors.danger }}>Leave sheet</Text>
+              </Pressable>
+            )}
           </Card>
         ))
       )}
@@ -139,11 +199,35 @@ export function LeadSourcesScreen() {
           </View>
         </View>
       </Modal>
+      <Modal visible={!!shareFor} transparent animationType="slide" onRequestClose={() => setShareFor(null)}>
+        <View style={styles.overlay}>
+          <View style={[styles.modal, { backgroundColor: colors.surface, borderRadius: radius.lg }]}>
+            <Text style={[typography.h2, { color: colors.text }]}>Share with</Text>
+            <TextInput
+              value={shareNumber}
+              onChangeText={setShareNumber}
+              placeholder="Mobile number of a We Three user"
+              placeholderTextColor={colors.textFaint}
+              keyboardType="phone-pad"
+              style={[styles.field, { color: colors.text, borderColor: colors.border }]}
+            />
+            <View style={styles.actions}>
+              <Pressable onPress={() => setShareFor(null)}>
+                <Text style={{ color: colors.textMuted }}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={share} disabled={busy}>
+                <Text style={{ color: colors.primary, fontWeight: "700" }}>{busy ? "Sharing…" : "Share"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  memberRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
