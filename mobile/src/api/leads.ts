@@ -26,6 +26,8 @@ export interface LeadSource {
   lastCheckedAt?: string;
   lastSyncedAt?: string;
   lastError?: string;
+  isOwner: boolean;
+  sharedWith: { id: string; name: string; mobileNumber: string }[];
 }
 
 export async function listLeads(search?: string, archived = false): Promise<Lead[]> {
@@ -60,4 +62,14 @@ export async function deleteSource(id: string): Promise<void> {
 export async function syncLeads(): Promise<any> {
   const { data } = await apiClient.post("/leads/sync");
   return data;
+}
+
+export async function shareSource(id: string, mobileNumber: string): Promise<LeadSource> {
+  const { data } = await apiClient.post<{ source: LeadSource }>(`/leads/sources/${id}/share`, { mobileNumber });
+  return data.source;
+}
+
+export async function unshareSource(id: string, userId: string): Promise<LeadSource> {
+  const { data } = await apiClient.delete<{ source: LeadSource }>(`/leads/sources/${id}/share/${userId}`);
+  return data.source;
 }

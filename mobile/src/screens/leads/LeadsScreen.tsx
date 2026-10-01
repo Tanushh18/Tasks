@@ -33,7 +33,12 @@ export function LeadsScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       void load();
-    }, [load])
+      // Leads are shared: quietly pick up edits made by other people on the same sheet.
+      const timer = setInterval(() => {
+        api.listLeads(search).then(setLeads).catch(() => {});
+      }, 20000);
+      return () => clearInterval(timer);
+    }, [load, search])
   );
 
   const callLead = async (phone: string | undefined | null) => {
