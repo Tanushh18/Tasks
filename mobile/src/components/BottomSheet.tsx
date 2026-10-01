@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../theme/useTheme";
 
 interface Props {
@@ -11,6 +11,8 @@ interface Props {
   children: React.ReactNode;
   /** Caps the sheet height and scrolls inside it. Off for short option menus. */
   scrollable?: boolean;
+  /** Lifts the sheet above the on-screen keyboard — for sheets with text fields. */
+  avoidKeyboard?: boolean;
 }
 
 /**
@@ -21,7 +23,7 @@ interface Props {
  * them separate means a destructive confirm can never be dismissed by the
  * same casual backdrop tap that closes a browsing sheet.
  */
-export function BottomSheet({ visible, onClose, title, subtitle, children, scrollable = true }: Props) {
+export function BottomSheet({ visible, onClose, title, subtitle, children, scrollable = true, avoidKeyboard = false }: Props) {
   const { colors, spacing, radius, typography, shadow, touchTarget } = useTheme();
 
   const content = (
@@ -62,6 +64,11 @@ export function BottomSheet({ visible, onClose, title, subtitle, children, scrol
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        enabled={avoidKeyboard}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
       <Pressable
         style={[styles.backdrop, { backgroundColor: colors.overlay }]}
         onPress={onClose}
@@ -96,6 +103,7 @@ export function BottomSheet({ visible, onClose, title, subtitle, children, scrol
           )}
         </Pressable>
       </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

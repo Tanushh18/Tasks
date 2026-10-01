@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as locationApi from "./src/api/location";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import { FeatureFlagsProvider, useFeatureFlags } from "./src/features/FeatureFlagsContext";
+import { useLeadContactSync } from "./src/leads/useLeadContactSync";
 import { startLocationTracking } from "./src/location/backgroundLocationTask";
 import { useNotificationResponseHandler } from "./src/notifications/useNotificationResponseHandler";
 import { useOfflineSync } from "./src/offline/useOfflineSync";
@@ -15,6 +16,7 @@ function AppContent() {
   useNotificationResponseHandler();
   useOfflineSync();
   useOtaUpdates();
+  useLeadContactSync();
 
   const { isAuthenticated } = useAuth();
   const { flags } = useFeatureFlags();
