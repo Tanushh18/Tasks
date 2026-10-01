@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiErrorMessage } from "../../api/client";
 import * as financeApi from "../../api/finance";
@@ -45,6 +45,7 @@ export function AccountsListScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showingOfflineData, setShowingOfflineData] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const applySummary = useCallback((summary: FinancialSummary) => {
     setAccounts(summary.accounts);
@@ -83,6 +84,12 @@ export function AccountsListScreen({ navigation }: Props) {
 
   useEffect(() => subscribeToReconnect(load), [load]);
 
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["top", "left", "right"]}>
       <AppHeader
@@ -97,132 +104,139 @@ export function AccountsListScreen({ navigation }: Props) {
         ]}
       />
 
-      <View style={{ paddingHorizontal: spacing.lg }}>
-        {showingOfflineData ? (
-          <View style={{ marginTop: spacing.lg }}>
-            <SyncBanner />
-          </View>
-        ) : null}
-
-        {/* Money in / out / net — the three figures a family actually checks, no accounting jargon. */}
-        <View style={[styles.statRow, { marginTop: spacing.lg, gap: spacing.md }]}>
-          <StatCard
-            label="Money in"
-            value={totals ? formatCurrency(totals.cashIn) : undefined}
-            icon="arrow-down-circle"
-            tone={colors.success}
-            toneMuted={colors.successMuted}
-            style={styles.flex}
-          />
-          <StatCard
-            label="Money out"
-            value={totals ? formatCurrency(totals.cashOut) : undefined}
-            icon="arrow-up-circle"
-            tone={colors.danger}
-            toneMuted={colors.dangerMuted}
-            style={styles.flex}
-          />
-        </View>
-        <StatCard
-          label="Net"
-          value={totals ? formatCurrency(totals.netFlow) : undefined}
-          detail="Money in minus money out"
-          icon="wallet"
-          tone={feature.finance.solid}
-          toneMuted={feature.finance.muted}
-          style={{ marginTop: spacing.md }}
-        />
-
-        {/* The two things people open this tab to do. */}
-        <View style={[styles.actionRow, { marginTop: spacing.lg, gap: spacing.md }]}>
-          <QuickMoneyAction
-            icon="arrow-down-circle"
-            label="Money In"
-            tone={colors.success}
-            onPress={() => navigation.navigate("TransactionForm", { type: "IN" })}
-          />
-          <QuickMoneyAction
-            icon="arrow-up-circle"
-            label="Add Expense"
-            tone={colors.danger}
-            onPress={() => navigation.navigate("TransactionForm", { type: "OUT" })}
-          />
-        </View>
-
-        <View style={{ marginTop: spacing.xl }}>
-          <SectionHeader title="Your accounts" subtitle={accounts.length > 0 ? `${accounts.length} in total` : undefined} />
-        </View>
-      </View>
-
-      {loading ? (
+      {/* The page is taller than most phones, so everything below the header scrolls. */}
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={{ paddingBottom: touchTarget.large + 48 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
+      >
         <View style={{ paddingHorizontal: spacing.lg }}>
-          <SkeletonList count={3} />
-        </View>
-      ) : error ? (
-        <ErrorState
-          message={error}
-          onRetry={() => {
-            setLoading(true);
-            load();
-          }}
-        />
-      ) : accounts.length === 0 ? (
-        <View style={{ paddingHorizontal: spacing.lg }}>
-          <Card>
-            <EmptyState
-              icon="wallet-outline"
-              tone={feature.finance.solid}
-              toneMuted={feature.finance.muted}
-              title="No accounts added"
-              subtitle="An account is just a pot to track — like Home, Cash or Savings."
-              actionLabel="Add Account"
-              onAction={() => navigation.navigate("AccountForm", undefined)}
+          {showingOfflineData ? (
+            <View style={{ marginTop: spacing.lg }}>
+              <SyncBanner />
+            </View>
+          ) : null}
+
+          {/* Money in / out / net — the three figures a family actually checks, no accounting jargon. */}
+          <View style={[styles.statRow, { marginTop: spacing.lg, gap: spacing.md }]}>
+            <StatCard
+              label="Money in"
+              value={totals ? formatCurrency(totals.cashIn) : undefined}
+              icon="arrow-down-circle"
+              tone={colors.success}
+              toneMuted={colors.successMuted}
+              style={styles.flex}
             />
-          </Card>
+            <StatCard
+              label="Money out"
+              value={totals ? formatCurrency(totals.cashOut) : undefined}
+              icon="arrow-up-circle"
+              tone={colors.danger}
+              toneMuted={colors.dangerMuted}
+              style={styles.flex}
+            />
+          </View>
+          <StatCard
+            label="Net"
+            value={totals ? formatCurrency(totals.netFlow) : undefined}
+            detail="Money in minus money out"
+            icon="wallet"
+            tone={feature.finance.solid}
+            toneMuted={feature.finance.muted}
+            style={{ marginTop: spacing.md }}
+          />
+
+          {/* The two things people open this tab to do. */}
+          <View style={[styles.actionRow, { marginTop: spacing.lg, gap: spacing.md }]}>
+            <QuickMoneyAction
+              icon="arrow-down-circle"
+              label="Money In"
+              tone={colors.success}
+              onPress={() => navigation.navigate("TransactionForm", { type: "IN" })}
+            />
+            <QuickMoneyAction
+              icon="arrow-up-circle"
+              label="Add Expense"
+              tone={colors.danger}
+              onPress={() => navigation.navigate("TransactionForm", { type: "OUT" })}
+            />
+          </View>
+
+          <View style={{ marginTop: spacing.xl }}>
+            <SectionHeader title="Your accounts" subtitle={accounts.length > 0 ? `${accounts.length} in total` : undefined} />
+          </View>
         </View>
-      ) : (
-        <FlatList
-          data={accounts}
-          keyExtractor={(item) => item.accountId}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 96, gap: spacing.md }}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => navigation.navigate("AccountDetail", { accountId: item.accountId })}
-              accessibilityRole="button"
-              accessibilityLabel={`${item.name}, balance ${formatCurrency(item.balance)}`}
-              style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-            >
-              <Card style={[styles.accountCard, shadow.card, { width: CARD_WIDTH, minHeight: touchTarget.large + 40 }]}>
-                <View
-                  style={[
-                    styles.accountIcon,
-                    { backgroundColor: feature.finance.muted, borderRadius: radius.md, marginBottom: spacing.md },
-                  ]}
-                >
-                  <Ionicons name={ACCOUNT_ICONS[item.type] ?? "pricetag"} size={20} color={feature.finance.solid} />
-                </View>
-                <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text
-                  style={[
-                    typography.h2,
-                    { color: item.balance >= 0 ? colors.success : colors.danger, marginTop: 2 },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {formatCurrency(item.balance)}
-                </Text>
-                <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]} numberOfLines={1}>
-                  {formatCurrency(item.cashIn)} in · {formatCurrency(item.cashOut)} out
-                </Text>
-              </Card>
-            </Pressable>
-          )}
-        />
-      )}
+
+        {loading ? (
+          <View style={{ paddingHorizontal: spacing.lg }}>
+            <SkeletonList count={3} />
+          </View>
+        ) : error ? (
+          <ErrorState
+            message={error}
+            onRetry={() => {
+              setLoading(true);
+              load();
+            }}
+          />
+        ) : accounts.length === 0 ? (
+          <View style={{ paddingHorizontal: spacing.lg }}>
+            <Card>
+              <EmptyState
+                icon="wallet-outline"
+                tone={feature.finance.solid}
+                toneMuted={feature.finance.muted}
+                title="No accounts added"
+                subtitle="An account is just a pot to track — like Home, Cash or Savings."
+                actionLabel="Add Account"
+                onAction={() => navigation.navigate("AccountForm", undefined)}
+              />
+            </Card>
+          </View>
+        ) : (
+          <FlatList
+            data={accounts}
+            keyExtractor={(item) => item.accountId}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md }}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => navigation.navigate("AccountDetail", { accountId: item.accountId })}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.name}, balance ${formatCurrency(item.balance)}`}
+                style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+              >
+                <Card style={[styles.accountCard, shadow.card, { width: CARD_WIDTH, minHeight: touchTarget.large + 40 }]}>
+                  <View
+                    style={[
+                      styles.accountIcon,
+                      { backgroundColor: feature.finance.muted, borderRadius: radius.md, marginBottom: spacing.md },
+                    ]}
+                  >
+                    <Ionicons name={ACCOUNT_ICONS[item.type] ?? "pricetag"} size={20} color={feature.finance.solid} />
+                  </View>
+                  <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text
+                    style={[
+                      typography.h2,
+                      { color: item.balance >= 0 ? colors.success : colors.danger, marginTop: 2 },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {formatCurrency(item.balance)}
+                  </Text>
+                  <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]} numberOfLines={1}>
+                    {formatCurrency(item.cashIn)} in · {formatCurrency(item.cashOut)} out
+                  </Text>
+                </Card>
+              </Pressable>
+            )}
+          />
+        )}
+      </ScrollView>
 
       <Pressable
         onPress={() => navigation.navigate("AccountForm", undefined)}
