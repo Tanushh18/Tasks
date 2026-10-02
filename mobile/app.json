@@ -50,7 +50,10 @@
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_ADVERTISE",
         "android.permission.READ_CONTACTS",
-        "android.permission.WRITE_CONTACTS"
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
       ],
       "package": "com.tanush.wethree"
     },

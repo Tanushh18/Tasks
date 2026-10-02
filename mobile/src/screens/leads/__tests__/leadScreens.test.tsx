@@ -27,6 +27,14 @@ jest.mock("../../../leads/contactAutoSync", () => ({
 }));
 const mockRegisterCall = jest.fn(async () => undefined);
 jest.mock("../../../leads/callFollowUp", () => ({ registerCall: (...a: unknown[]) => mockRegisterCall(...(a as [])) }));
+jest.mock("../../../leads/callOverlay", () => ({
+  overlaySupported: false,
+  getOverlaySetup: jest.fn(async () => ({ supported: false, overlay: false, phoneState: false })),
+  requestOverlaySetup: jest.fn(),
+  showTestOverlay: jest.fn(),
+  startCallWatch: jest.fn(),
+  wasOverlaySetupOffered: jest.fn(async () => true),
+}));
 jest.mock("../../../leads/adminCsvImport", () => ({ runAdminCsvImport: jest.fn() }));
 jest.mock("../../../offline/httpCache", () => ({ bypassCacheBriefly: jest.fn() }));
 

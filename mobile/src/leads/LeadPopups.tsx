@@ -13,12 +13,14 @@ import { useTheme } from "../theme/useTheme";
 import {
   QUICK_STATUSES,
   cancelNotification,
+  resolveCall,
   dueCall,
   getPendingCalls,
   saveCallOutcome,
   snoozeCall,
   type PendingCall,
 } from "./callFollowUp";
+import { canDrawOverlays, onOverlayEvent, takeQueuedOutcomes } from "./callOverlay";
 import { LEAD_TAG, dismissSuggestions, findContactSuggestions, uploadTaggedContacts, type TaggedContact } from "./contactAutoSync";
 import { emitLeadEvent, onLeadEvent } from "./leadEvents";
 
@@ -97,6 +99,42 @@ export function CallFollowUpHost() {
     const next = Math.min(...list.map((c) => c.nextAt));
     const wait = Math.min(Math.max(next - Date.now(), 1_000), 60_000) + 300;
     timer.current = setTimeout(() => void check(), keyboardOpen.current ? 5_000 : wait);
+  }, [active]);
+
+  // Answers given on the over-other-apps card (Android).
+  useEffect(() => {
+    if (!active) return;
+    const apply = async (leadId: string, status: string) => {
+      const call = (await getPendingCalls()).find((c) => c.leadId === leadId);
+      try {
+        if (call) await saveCallOutcome(call, status);
+        else {
+          await api.updateLead(leadId, { status });
+          await resolveCall(leadId);
+          emitLeadEvent("leadsChanged");
+        }
+      } catch {
+        // Offline: the call stays pending and the in-app popup asks again.
+      }
+    };
+    const flush = () => {
+      for (const o of takeQueuedOutcomes()) void apply(o.leadId, o.status);
+    };
+    flush();
+    const offs = [
+      // The event only means "something is in the queue": drain it (works with several runtimes).
+      onOverlayEvent("onOutcome", flush),
+      onOverlayEvent("onLater", (e) => void snoozeCall(e.leadId)),
+      // The card on screen is the reminder now; drop the backup notification.
+      onOverlayEvent("onCallEnded", (e) => {
+        if (canDrawOverlays()) void cancelNotification(e.leadId);
+      }),
+    ];
+    const app = AppState.addEventListener("change", (s) => s === "active" && flush());
+    return () => {
+      offs.forEach((off) => off());
+      app.remove();
+    };
   }, [active]);
 
   useEffect(() => {

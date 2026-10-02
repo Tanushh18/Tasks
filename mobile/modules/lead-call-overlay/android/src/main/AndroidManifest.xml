@@ -1,0 +1,19 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Draw the "how did the call go?" card over other apps. Granted by the user in Settings. -->
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+  <!-- Know when the call the user started from the app has ended (no numbers are read). -->
+  <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+  <application>
+    <service
+      android:name="expo.modules.leadcalloverlay.LeadCallService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Watches a phone call the user started from the app so it can ask for the lead's outcome when the call ends" />
+    </service>
+  </application>
+</manifest>

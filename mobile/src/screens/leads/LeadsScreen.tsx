@@ -2,9 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Contacts from "expo-contacts/legacy";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, FlatList, Linking, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Alert, AppState, FlatList, Linking, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as api from "../../api/leads";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../../auth/AuthContext";
 import { BottomSheet } from "../../components/BottomSheet";
 import { Button } from "../../components/Button";
@@ -15,7 +16,16 @@ import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
 import { runAdminCsvImport } from "../../leads/adminCsvImport";
-import { registerCall } from "../../leads/callFollowUp";
+import { QUICK_STATUSES, registerCall } from "../../leads/callFollowUp";
+import {
+  getOverlaySetup,
+  overlaySupported,
+  requestOverlaySetup,
+  showTestOverlay,
+  startCallWatch,
+  wasOverlaySetupOffered,
+  type OverlaySetup,
+} from "../../leads/callOverlay";
 import {
   LEAD_TAG,
   getAutoSyncStatus,
@@ -117,6 +127,7 @@ export function LeadsScreen({ navigation }: any) {
 
   const [autoAdd, setAutoAdd] = useState(false);
   const [autoStatus, setAutoStatus] = useState<AutoSyncStatus | null>(null);
+  const [overlay, setOverlay] = useState<OverlaySetup | null>(null);
 
   const listRef = useRef<FlatList<api.Lead>>(null);
   const request = useRef(0);
@@ -160,6 +171,14 @@ export function LeadsScreen({ navigation }: any) {
 
   const refreshAutoStatus = useCallback(() => {
     void getAutoSyncStatus().then(setAutoStatus);
+  }, []);
+
+  // Re-check the "pop-up over other apps" setup whenever they come back (e.g. from Settings).
+  useEffect(() => {
+    if (!overlaySupported) return;
+    void getOverlaySetup().then(setOverlay);
+    const sub = AppState.addEventListener("change", (st) => st === "active" && void getOverlaySetup().then(setOverlay));
+    return () => sub.remove();
   }, []);
 
   useFocusEffect(
@@ -213,14 +232,29 @@ export function LeadsScreen({ navigation }: any) {
       Alert.alert("Invalid number", "This lead does not have a valid phone number.");
       return;
     }
+    // First call on Android: offer the over-other-apps card once, before the dialer takes over.
+    if (overlaySupported && overlay && !(overlay.overlay && overlay.phoneState) && !(await wasOverlaySetupOffered())) {
+      Alert.alert(
+        "Ask how calls went?",
+        "After a call to a lead ends, We Three can show a small card over any app to pick the stage. It needs two permissions.",
+        [
+          { text: "Not now", style: "cancel", onPress: () => void requestOverlaySetupLater().then(() => void callLead(lead)) },
+          { text: "Set up", onPress: () => void requestOverlaySetup().then(setOverlay) },
+        ]
+      );
+      return;
+    }
     try {
       // Remember the call so the app asks for the outcome when they're back.
       await registerCall(lead).catch(() => undefined);
+      if (overlay?.overlay && overlay.phoneState) startCallWatch({ leadId: lead.id, name: lead.name, phone: lead.phone }, QUICK_STATUSES);
       await Linking.openURL(`tel:+${digits}`);
     } catch {
       Alert.alert("Unable to open dialer", "No phone app is available to handle this number.");
     }
   };
+
+  const requestOverlaySetupLater = () => AsyncStorage.setItem("leads.callOverlay.asked", "1").catch(() => undefined);
 
   const whatsappLead = async (phone: string) => {
     const digits = digitsFor(phone);
@@ -456,6 +490,36 @@ export function LeadsScreen({ navigation }: any) {
           accessibilityLabel="Auto-add contacts tagged lead"
         />
       </View>
+
+      {overlay?.supported ? (
+        <View
+          style={[
+            styles.autoRow,
+            { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.sm },
+          ]}
+        >
+          <Ionicons name="albums-outline" size={20} color={feature.leads.solid} />
+          <View style={{ flex: 1 }}>
+            <Text style={[typography.captionStrong, { color: colors.text }]}>Call pop-up over other apps</Text>
+            <Text style={[typography.caption, { color: overlay.overlay && overlay.phoneState ? colors.success : colors.textMuted }]}>
+              {overlay.overlay && overlay.phoneState
+                ? "On: after a call, pick the stage from any app"
+                : !overlay.phoneState
+                  ? "Needs phone-call status permission"
+                  : 'Needs "Display over other apps"'}
+            </Text>
+          </View>
+          {overlay.overlay && overlay.phoneState ? (
+            <Pressable onPress={showTestOverlay} accessibilityRole="button" accessibilityLabel="Show a test pop-up" hitSlop={8}>
+              <Text style={[typography.captionStrong, { color: colors.primary }]}>Test</Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => void requestOverlaySetup().then(setOverlay)} accessibilityRole="button" accessibilityLabel="Set up call pop-up" hitSlop={8}>
+              <Text style={[typography.captionStrong, { color: colors.primary }]}>Set up</Text>
+            </Pressable>
+          )}
+        </View>
+      ) : null}
 
       <View style={{ marginTop: spacing.md }}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Search name, phone, stage or notes" />

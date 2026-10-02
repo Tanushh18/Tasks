@@ -97,6 +97,12 @@ The application consists of three components:
 #### Additional Features
 - **Polls**: Create family polls and voting
 - **Lead Management**: Track and manage leads (CRM-like functionality)
+  - 10 leads per page, opening on "New". Every card shows when the lead was added and who last updated it.
+  - Edit a lead's name and mobile behind the pencil button. The update sheet shows stage and notes, and other fields only when asked for.
+  - "Not interested" leads are deleted automatically after 30 days.
+  - Call follow-up: after calling a lead from the app, a popup asks how it went. ✕ means remind later: again after 2 min, 15 min, then hourly, at most 5 times, quiet 9 pm–9 am. A notification with stage buttons is the fallback. On Android, once "Display over other apps" and phone-status permissions are granted, a card appears over any app as soon as the call ends (`mobile/modules/lead-call-overlay`).
+  - Contacts with "lead" anywhere in the name are added automatically (toggle), or offered in a "matching contacts found" popup.
+  - Admin (8130483894) only: link a Google Sheet (every tab) and import CSV files. Large batches can also be loaded with the [bulk import API](#bulk-lead-import).
 - **Vault Documents**: Secure document storage
 - **Location Sharing**: Share real-time location with family
 - **Notifications Center**: Consolidated notification management

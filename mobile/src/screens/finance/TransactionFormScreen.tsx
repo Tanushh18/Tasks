@@ -80,19 +80,32 @@ export function TransactionFormScreen({ navigation, route }: Props) {
 
   async function handleSave() {
     const numericAmount = Number(amount);
-    if (!accountId) {
-      setError("Choose which account this belongs to.");
-      return;
-    }
     if (!numericAmount || numericAmount <= 0) {
       setError("Enter an amount greater than zero.");
+      return;
+    }
+    let targetAccountId = accountId;
+    if (!targetAccountId && accounts.length === 0 && !loading) {
+      // First entry ever: there's nothing to choose from, so make a default account instead of a dead end.
+      try {
+        const created = await financeApi.createAccount({ name: "Personal", type: "personal" });
+        setAccounts([created]);
+        setAccountId(created.id);
+        targetAccountId = created.id;
+      } catch (err) {
+        setError(getApiErrorMessage(err, "Could not create an account for this entry."));
+        return;
+      }
+    }
+    if (!targetAccountId) {
+      setError("Choose which account this belongs to.");
       return;
     }
     setError(null);
     setSaving(true);
 
     const input = {
-      accountId,
+      accountId: targetAccountId,
       type,
       amount: numericAmount,
       category: category.trim() || "General",
