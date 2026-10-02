@@ -17,8 +17,8 @@ export const createVehicleDocumentSchema = z.object({
   customLabel: z.string().trim().max(60).optional(),
   expiresAt: z.string().datetime().optional().nullable(),
   reminderEnabled: z.boolean().optional().default(true),
-  fileData: z.string().optional(),
-  fileName: z.string().optional(),
+  fileData: z.string().nullable().optional(),
+  fileName: z.string().nullable().optional(),
   notes: z.string().max(1000).optional().default(""),
 });
 

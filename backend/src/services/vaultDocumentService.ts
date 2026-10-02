@@ -1,5 +1,6 @@
 import { VaultDocument, type VaultDocumentDocument, type VaultDocumentCategory } from "../models/VaultDocument";
 import { ApiError } from "../utils/ApiError";
+import { isDataUrl, removeFile, storeFile } from "./cloudinaryService";
 
 function scopedQuery(userId: string) {
   return { $or: [{ ownerId: userId }, { sharedWith: userId }] };
@@ -25,10 +26,13 @@ export async function getDocument(userId: string, id: string): Promise<VaultDocu
 }
 
 export async function createDocument(userId: string, input: VaultDocumentInput): Promise<VaultDocumentDocument> {
+  const stored = await storeFile(input.fileData, "vault");
   return VaultDocument.create({
     title: input.title,
     category: input.category ?? "other",
-    fileData: input.fileData,
+    fileData: stored.url,
+    filePublicId: stored.publicId,
+    fileResourceType: stored.resourceType,
     expiresAt: input.expiresAt ?? null,
     notes: input.notes ?? "",
     ownerId: userId,
@@ -53,7 +57,14 @@ export async function updateDocument(
   const doc = await getOwnedDocument(userId, id);
   if (input.title !== undefined) doc.title = input.title;
   if (input.category !== undefined) doc.category = input.category;
-  if (input.fileData !== undefined) doc.fileData = input.fileData;
+  // Only a new data URL is a new file — a client echoing back the existing https URL changes nothing.
+  if (input.fileData !== undefined && isDataUrl(input.fileData)) {
+    const stored = await storeFile(input.fileData, "vault");
+    await removeFile(doc.filePublicId, doc.fileResourceType);
+    doc.fileData = stored.url;
+    doc.filePublicId = stored.publicId;
+    doc.fileResourceType = stored.resourceType;
+  }
   if (input.expiresAt !== undefined) doc.expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
   if (input.notes !== undefined) doc.notes = input.notes;
   if (input.sharedWith !== undefined) doc.sharedWith = input.sharedWith as unknown as VaultDocumentDocument["sharedWith"];
@@ -64,4 +75,5 @@ export async function updateDocument(
 export async function deleteDocument(userId: string, id: string): Promise<void> {
   const doc = await getOwnedDocument(userId, id);
   await VaultDocument.deleteOne({ _id: doc._id });
+  await removeFile(doc.filePublicId, doc.fileResourceType);
 }

@@ -3,6 +3,7 @@ import React from "react";
 import { AccountDetailScreen } from "../screens/finance/AccountDetailScreen";
 import { AccountFormScreen } from "../screens/finance/AccountFormScreen";
 import { AccountsListScreen } from "../screens/finance/AccountsListScreen";
+import { ExportReportScreen } from "../screens/finance/ExportReportScreen";
 import { FinanceInsightsScreen } from "../screens/finance/FinanceInsightsScreen";
 import { GroupDetailScreen } from "../screens/finance/GroupDetailScreen";
 import { GroupExpenseFormScreen } from "../screens/finance/GroupExpenseFormScreen";
@@ -22,6 +23,11 @@ export function FinanceNavigator() {
       <Stack.Screen name="AccountForm" component={AccountFormScreen} options={{ headerShown: true, title: "" }} />
       <Stack.Screen name="TransactionForm" component={TransactionFormScreen} options={{ headerShown: true, title: "" }} />
       <Stack.Screen name="Insights" component={FinanceInsightsScreen} options={{ headerShown: true, title: "" }} />
+      <Stack.Screen
+        name="ExportReport"
+        component={ExportReportScreen}
+        options={{ headerShown: true, title: "Export & email" }}
+      />
       <Stack.Screen name="GroupsList" component={GroupsListScreen} />
       <Stack.Screen name="GroupForm" component={GroupFormScreen} options={{ headerShown: true, title: "" }} />
       <Stack.Screen name="GroupDetail" component={GroupDetailScreen} options={{ headerShown: true }} />

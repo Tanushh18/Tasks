@@ -264,7 +264,7 @@ export function HomeScreen({ navigation }: Props) {
         icon: "chatbubbles",
         tone: feature.chat.solid,
         toneMuted: feature.chat.muted,
-        onPress: () => navigation.navigate("FamilyTab", { screen: "ChatList" }),
+        onPress: () => navigation.navigate("MoreTab", { screen: "Family", params: { screen: "ChatList" } }),
       });
     }
     if (flags.location) {
@@ -274,9 +274,91 @@ export function HomeScreen({ navigation }: Props) {
         icon: "location",
         tone: feature.location.solid,
         toneMuted: feature.location.muted,
-        onPress: () => navigation.navigate("FamilyTab", { screen: "LocationSharing" }),
+        onPress: () => navigation.navigate("MoreTab", { screen: "Family", params: { screen: "LocationSharing" } }),
       });
     }
+
+    // Jump-off points to the modules people open most, so they're one tap from Home
+    // instead of two or three taps deep in More.
+    if (flags.leads) {
+      actions.push({
+        key: "leads",
+        label: "Lead Tracker",
+        icon: "trending-up",
+        tone: feature.leads.solid,
+        toneMuted: feature.leads.muted,
+        onPress: () => navigation.navigate("LeadsTab"),
+      });
+    }
+    if (flags.vehicleManagement) {
+      actions.push({
+        key: "vehicles",
+        label: "Vehicles",
+        icon: "car",
+        tone: feature.tasks.solid,
+        toneMuted: feature.tasks.muted,
+        onPress: () => navigation.navigate("MoreTab", { screen: "Vehicles", params: { screen: "VehicleList" } }),
+      });
+    }
+    if (flags.documentVault) {
+      actions.push({
+        key: "vault",
+        label: "Document Vault",
+        icon: "folder-open",
+        tone: feature.notes.solid,
+        toneMuted: feature.notes.muted,
+        onPress: () => navigation.navigate("MoreTab", { screen: "Vault", params: { screen: "VaultList" } }),
+      });
+    }
+    if (flags.shoppingLists) {
+      actions.push({
+        key: "shopping",
+        label: "Shopping List",
+        icon: "cart",
+        tone: feature.contacts.solid,
+        toneMuted: feature.contacts.muted,
+        onPress: () => navigation.navigate("MoreTab", { screen: "ShoppingLists" }),
+      });
+    }
+    if (flags.familyEvents) {
+      actions.push({
+        key: "events",
+        label: "Family Events",
+        icon: "calendar",
+        tone: feature.location.solid,
+        toneMuted: feature.location.muted,
+        onPress: () => navigation.navigate("MoreTab", { screen: "EventsList" }),
+      });
+    }
+    if (flags.emergencyInfo) {
+      actions.push({
+        key: "emergency",
+        label: "Emergency Info",
+        icon: "medkit",
+        tone: feature.location.solid,
+        toneMuted: feature.location.muted,
+        onPress: () =>
+          navigation.navigate("MoreTab", { screen: "EmergencyInfo", params: { screen: "EmergencyInfoMain" } }),
+      });
+    }
+    if (flags.contacts || flags.chat || flags.location) {
+      actions.push({
+        key: "family",
+        label: "Family",
+        icon: "people",
+        tone: feature.chat.solid,
+        toneMuted: feature.chat.muted,
+        onPress: () => navigation.navigate("MoreTab", { screen: "Family", params: { screen: "FamilyHub" } }),
+      });
+    }
+    actions.push({
+      key: "money-insights",
+      label: "Money Insights",
+      icon: "pie-chart",
+      tone: feature.finance.solid,
+      toneMuted: feature.finance.muted,
+      onPress: () => navigation.navigate("FinanceTab", { screen: "Insights" }),
+    });
 
     return actions;
   }, [flags, feature, navigation]);
@@ -434,7 +516,7 @@ export function HomeScreen({ navigation }: Props) {
             loading={loading}
             counts={leadCounts}
             totalLeads={leads.length}
-            onPress={() => navigation.navigate("MoreTab", { screen: "Leads", params: undefined })}
+            onPress={() => navigation.navigate("LeadsTab")}
           />
         );
       }

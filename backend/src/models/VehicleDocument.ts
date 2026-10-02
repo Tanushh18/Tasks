@@ -9,12 +9,13 @@ const vehicleDocumentSchema = new Schema(
     customLabel: { type: String, trim: true, maxlength: 60 },
     expiresAt: { type: Date, default: null },
     reminderEnabled: { type: Boolean, default: true },
-    // Documents are photographed/scanned client-side and stored as a base64 data URL,
-    // matching how ocrService already handles images in this app (no multer/disk
-    // storage exists yet) — a small JSON+base64 payload rather than a new file pipeline.
+    // The app sends the file as a base64 data URL; the service uploads it to Cloudinary and
+    // stores the https URL here (the raw data URL is kept only if Cloudinary isn't configured).
     // Unlike VaultDocument, a vehicle document entry can exist with just an expiry date
     // and no attached file, so this is optional.
     fileData: { type: String },
+    filePublicId: { type: String, default: null },
+    fileResourceType: { type: String, default: null },
     fileName: { type: String },
     notes: { type: String, default: "", maxlength: 1000 },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },

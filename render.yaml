@@ -23,6 +23,19 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      # Cloudinary stores uploaded documents/photos. If unset, uploads fall back to MongoDB base64.
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # Outgoing email for "Email my money report". Without these the app offers Download Excel only.
+      # Apps Script mailer. The URL alone can't send mail: the script also checks MAIL_WEBHOOK_SECRET.
+      - key: MAIL_WEBHOOK_URL
+        value: https://script.google.com/macros/s/AKfycbxyT4x3lYdTQzG31HZn2D14KZb-lzbkemDtV2Ef5GFHr-6Jm2-otgv0XFWO5mVCp3SI/exec
+      - key: MAIL_WEBHOOK_SECRET
+        sync: false
       # Must be IDENTICAL on every server the app can fail over to, or a login made on one
       # server is rejected by the other. Copy the same values from backend/.env.
       - key: JWT_ACCESS_SECRET

@@ -6,10 +6,12 @@ const vaultDocumentSchema = new Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: 120 },
     category: { type: String, enum: CATEGORIES, default: "other" },
-    // Documents are photographed/scanned client-side and stored as a base64 data URL,
-    // matching how ocrService already handles images in this app (no multer/disk
-    // storage exists yet) — a small JSON+base64 payload rather than a new file pipeline.
+    // The app sends the file as a base64 data URL; the service uploads it to Cloudinary and
+    // stores the https URL here (the raw data URL is kept only if Cloudinary isn't configured).
     fileData: { type: String, required: true },
+    // Set when fileData is a Cloudinary URL (older documents still hold the base64 data URL).
+    filePublicId: { type: String, default: null },
+    fileResourceType: { type: String, default: null },
     expiresAt: { type: Date, default: null },
     notes: { type: String, default: "", maxlength: 1000 },
     ownerId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },

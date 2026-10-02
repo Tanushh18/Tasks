@@ -248,7 +248,7 @@ export function SearchScreen({ navigation }: Props) {
                   title={contact.name}
                   subtitle={contact.number}
                   onPress={() =>
-                    navigation.navigate("FamilyTab", { screen: "ContactForm", params: { contactId: contact.id } })
+                    navigation.navigate("MoreTab", { screen: "Family", params: { screen: "ContactForm", params: { contactId: contact.id } } })
                   }
                 />
               ))}

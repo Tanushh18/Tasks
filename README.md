@@ -235,6 +235,8 @@ The backend exposes the following API routes (all prefixed with `/api`):
 **Tasks**: `/tasks` (CRUD + calendar view)
 **Reminders**: `/reminders` (get upcoming reminders)
 **Finance**: `/finance/accounts`, `/finance/transactions` (account management, transactions)
+  - `POST /finance/accounts/:id/settle` `{ "upTo": "YYYY-MM-DD" | null }` closes (settles) everything on or before that date; `null` reopens. Settled entries can't be edited, and `GET /finance/transactions?settled=exclude|only` returns open or settled entries.
+  - `POST /finance/export` returns an Excel report as base64 JSON; `POST /finance/export/email` mails it (`recipients`, optional `message`). Both take `accountIds`, `from`, `to`, `type`, `settled`.
 **Contacts**: `/contacts` (CRUD)
 **Events**: `/events` (family events)
 **Chat**: `/chat` (message history, threads)
@@ -455,6 +457,9 @@ All configuration is via environment variables in `backend/.env`:
 | `JWT_REFRESH_EXPIRES_IN` | 30d | Refresh token expiry |
 | `CORS_ORIGIN` | * | CORS allowed origins |
 | `GEMINI_API_KEY` | (optional) | Google Gemini API key |
+| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | (optional) | Cloudinary account for document/photo uploads; if unset, files stay as base64 in MongoDB |
+| `CLOUDINARY_UPLOAD_FOLDER` | tasks-app | Folder inside Cloudinary |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM` | (optional) | SMTP account used to email money reports |
 | `GEMINI_MODEL` | gemini-3.6-flash | Gemini model to use |
 | `ADMIN_MOBILE_NUMBERS` | (optional) | Comma-separated admin phone numbers |
 

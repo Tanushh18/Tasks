@@ -1,6 +1,7 @@
 import { Vehicle, type VehicleRecord } from "../models/Vehicle";
 import { VehicleDocument } from "../models/VehicleDocument";
 import { ApiError } from "../utils/ApiError";
+import { removeFile } from "./cloudinaryService";
 
 export function scopedQuery(userId: string) {
   return { $or: [{ ownerId: userId }, { sharedWith: userId }] };
@@ -52,6 +53,8 @@ export async function updateVehicle(
 
 export async function deleteVehicle(userId: string, id: string): Promise<void> {
   const vehicle = await getOwnedVehicle(userId, id);
+  const documents = await VehicleDocument.find({ vehicleId: vehicle._id });
   await VehicleDocument.deleteMany({ vehicleId: vehicle._id });
+  await Promise.all(documents.map((doc) => removeFile(doc.filePublicId, doc.fileResourceType)));
   await Vehicle.deleteOne({ _id: vehicle._id });
 }
