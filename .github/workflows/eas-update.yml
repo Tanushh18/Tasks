@@ -1,8 +1,13 @@
 name: EAS Update (OTA only)
 
-# Publishes the current JavaScript to the "preview" channel without building an APK.
+# Publishes the current JavaScript to an EAS channel (default "preview") without building an APK.
 on:
   workflow_dispatch:
+    inputs:
+      channel:
+        description: EAS channel to publish to (preview, test, production)
+        required: false
+        default: preview
 
 jobs:
   update:
@@ -19,8 +24,8 @@ jobs:
       - name: Install dependencies
         working-directory: mobile
         run: npm ci
-      - name: Publish OTA update to preview channel
+      - name: Publish OTA update
         working-directory: mobile
         env:
           EXPO_PUBLIC_API_URLS: https://tasks-g9h1.onrender.com/api, https://we-three-api.onrender.com/api
-        run: eas update --channel preview --message "$(git log -1 --pretty=%s)" --non-interactive
+        run: eas update --channel "${{ inputs.channel || 'preview' }}" --message "$(git log -1 --pretty=%s)" --non-interactive
