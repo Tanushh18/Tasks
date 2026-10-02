@@ -20,6 +20,7 @@ import { subscribeToReconnect } from "../../offline/useOfflineSync";
 import { useTheme } from "../../theme/useTheme";
 import type { AccountSummary, FinancialSummary } from "../../types/models";
 import { formatCurrency } from "../../utils/currency";
+import { formatDateLabel } from "../../utils/date";
 
 type Props = NativeStackScreenProps<FinanceStackParamList, "AccountsList">;
 
@@ -101,6 +102,11 @@ export function AccountsListScreen({ navigation }: Props) {
             onPress: () => navigation.navigate("GroupsList"),
           },
           { icon: "stats-chart", label: "See where your money went", onPress: () => navigation.navigate("Insights") },
+          {
+            icon: "download-outline",
+            label: "Export to Excel or email a report",
+            onPress: () => navigation.navigate("ExportReport", undefined),
+          },
         ]}
       />
 
@@ -231,6 +237,11 @@ export function AccountsListScreen({ navigation }: Props) {
                   <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]} numberOfLines={1}>
                     {formatCurrency(item.cashIn)} in · {formatCurrency(item.cashOut)} out
                   </Text>
+                  {item.settledUpTo ? (
+                    <Text style={[typography.caption, { color: colors.textFaint, marginTop: 2 }]} numberOfLines={1}>
+                      Settled till {formatDateLabel(item.settledUpTo)}
+                    </Text>
+                  ) : null}
                 </Card>
               </Pressable>
             )}

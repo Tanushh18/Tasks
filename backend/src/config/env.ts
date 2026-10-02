@@ -26,6 +26,18 @@ export const env = {
   jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? "15m",
   // Sessions are meant to last until the user signs out, so the default is effectively "never".
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? "3650d",
+  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME ?? "",
+  cloudinaryApiKey: process.env.CLOUDINARY_API_KEY ?? "",
+  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET ?? "",
+  cloudinaryFolder: process.env.CLOUDINARY_UPLOAD_FOLDER ?? "tasks-app",
+  // Google Apps Script web app that sends the email (see docs/apps-script-mailer.gs).
+  mailWebhookUrl: process.env.MAIL_WEBHOOK_URL ?? "",
+  mailWebhookSecret: process.env.MAIL_WEBHOOK_SECRET ?? "",
+  smtpHost: process.env.SMTP_HOST ?? "",
+  smtpPort: Number(process.env.SMTP_PORT ?? 587),
+  smtpUser: process.env.SMTP_USER ?? "",
+  smtpPass: process.env.SMTP_PASS ?? "",
+  mailFrom: process.env.MAIL_FROM ?? process.env.SMTP_USER ?? "",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.6-flash",
   adminMobileNumbers: (

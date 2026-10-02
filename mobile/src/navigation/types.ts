@@ -24,6 +24,7 @@ export type FinanceStackParamList = {
   AccountForm: { accountId?: string } | undefined;
   TransactionForm: { accountId?: string; transactionId?: string; type?: "IN" | "OUT" } | undefined;
   Insights: undefined;
+  ExportReport: { accountId?: string } | undefined;
   GroupsList: undefined;
   GroupForm: { groupId?: string } | undefined;
   GroupDetail: { groupId: string; name: string };
@@ -106,7 +107,7 @@ export type PollsStackParamList = {
 
 export type MoreStackParamList = {
   MoreMain: undefined;
-  Leads: undefined;
+  Family: NavigatorScreenParams<FamilyStackParamList>;
   Assistant: { autoListen?: boolean } | undefined;
   Settings: NavigatorScreenParams<SettingsStackParamList>;
   Notes: NavigatorScreenParams<NotesStackParamList>;
@@ -134,6 +135,6 @@ export type MainTabParamList = {
   HomeTab: NavigatorScreenParams<HomeStackParamList>;
   TasksTab: NavigatorScreenParams<TasksStackParamList>;
   FinanceTab: NavigatorScreenParams<FinanceStackParamList>;
-  FamilyTab: NavigatorScreenParams<FamilyStackParamList>;
+  LeadsTab: undefined;
   MoreTab: NavigatorScreenParams<MoreStackParamList>;
 };

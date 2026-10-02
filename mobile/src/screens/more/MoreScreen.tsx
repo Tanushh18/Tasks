@@ -15,6 +15,8 @@ export function MoreScreen({ navigation }: Props) {
   const { colors, spacing, typography } = useTheme();
   const { user } = useAuth();
   const { flags } = useFeatureFlags();
+  // Family is the way into contacts, chat and location — hidden when all three are off.
+  const showFamily = flags.contacts || flags.chat || flags.location;
 
   return (
     <ScreenContainer>
@@ -22,8 +24,12 @@ export function MoreScreen({ navigation }: Props) {
         More
       </Text>
 
-      {flags.leads ? (
-        <MoreRow icon="people-outline" label="Lead Tracker" onPress={() => navigation.navigate("Leads")} />
+      {showFamily ? (
+        <MoreRow
+          icon="people-outline"
+          label="Family"
+          onPress={() => navigation.navigate("Family", { screen: "FamilyHub", params: undefined })}
+        />
       ) : null}
       {flags.assistant ? (
         <MoreRow icon="mic-outline" label="Assistant" onPress={() => navigation.navigate("Assistant", undefined)} />

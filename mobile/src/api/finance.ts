@@ -31,6 +31,46 @@ export async function deleteAccount(id: string): Promise<void> {
   await apiClient.delete(`/finance/accounts/${id}`);
 }
 
+/** Closes (settles) every entry on or before `upTo`; pass null to reopen the whole account. */
+export async function settleAccount(id: string, upTo: string | null): Promise<FinanceAccount> {
+  const { data } = await apiClient.post<{ account: FinanceAccount }>(`/finance/accounts/${id}/settle`, { upTo });
+  return data.account;
+}
+
+export type SettledMode = "all" | "only" | "exclude";
+
+export interface ExportOptions {
+  /** Empty / omitted = every account. */
+  accountIds?: string[];
+  from?: string;
+  to?: string;
+  type?: TransactionType;
+  settled?: SettledMode;
+}
+
+export interface ExportResult {
+  fileName: string;
+  mimeType: string;
+  base64: string;
+  entryCount: number;
+  cashIn: number;
+  cashOut: number;
+}
+
+export async function buildExport(options: ExportOptions): Promise<ExportResult> {
+  const { data } = await apiClient.post<ExportResult>("/finance/export", options, { timeout: 60000 });
+  return data;
+}
+
+export async function emailExport(
+  options: ExportOptions & { recipients: string; message?: string }
+): Promise<{ sent: boolean; entryCount: number }> {
+  const { data } = await apiClient.post<{ sent: boolean; entryCount: number }>("/finance/export/email", options, {
+    timeout: 60000,
+  });
+  return data;
+}
+
 export interface TransactionInput {
   accountId: string;
   type: TransactionType;
@@ -50,6 +90,8 @@ export interface TransactionFilters {
   to?: string;
   category?: string;
   search?: string;
+  /** "exclude" = open entries only, "only" = settled (archived) entries only. */
+  settled?: SettledMode;
   limit?: number;
 }
 

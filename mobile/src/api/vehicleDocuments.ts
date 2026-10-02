@@ -22,8 +22,9 @@ export interface VehicleDocumentInput {
   customLabel?: string;
   expiresAt?: string | null;
   reminderEnabled?: boolean;
-  fileData?: string;
-  fileName?: string;
+  /** A new data URL replaces the file; null removes it. */
+  fileData?: string | null;
+  fileName?: string | null;
   notes?: string;
 }
 

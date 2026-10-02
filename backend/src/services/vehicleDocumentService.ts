@@ -5,6 +5,7 @@ import {
 } from "../models/VehicleDocument";
 import { Vehicle } from "../models/Vehicle";
 import { ApiError } from "../utils/ApiError";
+import { isDataUrl, removeFile, storeFile } from "./cloudinaryService";
 import { scopedQuery } from "./vehicleService";
 
 export interface VehicleDocumentInput {
@@ -12,8 +13,9 @@ export interface VehicleDocumentInput {
   customLabel?: string;
   expiresAt?: string | null;
   reminderEnabled?: boolean;
-  fileData?: string;
-  fileName?: string;
+  /** A new data URL replaces the file; null/"" removes it. */
+  fileData?: string | null;
+  fileName?: string | null;
   notes?: string;
 }
 
@@ -50,14 +52,17 @@ export async function createDocument(
   input: VehicleDocumentInput
 ): Promise<VehicleDocumentDocument> {
   const vehicle = await getOwnedVehicle(userId, vehicleId);
+  const stored = input.fileData && isDataUrl(input.fileData) ? await storeFile(input.fileData, "vehicles") : null;
   return VehicleDocument.create({
     vehicleId: vehicle._id,
     type: input.type ?? "other",
     customLabel: input.customLabel,
     expiresAt: input.expiresAt ?? null,
     reminderEnabled: input.reminderEnabled ?? true,
-    fileData: input.fileData,
-    fileName: input.fileName,
+    fileData: stored?.url ?? input.fileData ?? undefined,
+    filePublicId: stored?.publicId ?? null,
+    fileResourceType: stored?.resourceType ?? null,
+    fileName: input.fileName ?? undefined,
     notes: input.notes ?? "",
     ownerId: userId,
   });
@@ -76,8 +81,22 @@ export async function updateDocument(
   if (input.customLabel !== undefined) doc.customLabel = input.customLabel;
   if (input.expiresAt !== undefined) doc.expiresAt = input.expiresAt ? new Date(input.expiresAt) : null;
   if (input.reminderEnabled !== undefined) doc.reminderEnabled = input.reminderEnabled;
-  if (input.fileData !== undefined) doc.fileData = input.fileData;
-  if (input.fileName !== undefined) doc.fileName = input.fileName;
+  if (input.fileData !== undefined && isDataUrl(input.fileData)) {
+    const stored = await storeFile(input.fileData, "vehicles");
+    await removeFile(doc.filePublicId, doc.fileResourceType);
+    doc.fileData = stored.url;
+    doc.filePublicId = stored.publicId;
+    doc.fileResourceType = stored.resourceType;
+  }
+  if (input.fileData === null || input.fileData === "") {
+    await removeFile(doc.filePublicId, doc.fileResourceType);
+    doc.fileData = undefined;
+    doc.filePublicId = null;
+    doc.fileResourceType = null;
+    doc.fileName = undefined;
+  } else if (input.fileName !== undefined) {
+    doc.fileName = input.fileName ?? undefined;
+  }
   if (input.notes !== undefined) doc.notes = input.notes;
   await doc.save();
   return doc;
@@ -88,4 +107,5 @@ export async function deleteDocument(userId: string, vehicleId: string, id: stri
   const doc = await VehicleDocument.findOne({ _id: id, vehicleId });
   if (!doc) throw ApiError.notFound("Document not found");
   await VehicleDocument.deleteOne({ _id: doc._id });
+  await removeFile(doc.filePublicId, doc.fileResourceType);
 }

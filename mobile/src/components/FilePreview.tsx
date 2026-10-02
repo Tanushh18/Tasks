@@ -15,7 +15,7 @@ interface Props {
 export function FilePreview({ dataUrl, fileName }: Props) {
   const { colors, spacing, radius, typography } = useTheme();
   const [viewing, setViewing] = useState(false);
-  const mimeType = mimeTypeFromDataUrl(dataUrl);
+  const mimeType = mimeTypeFromDataUrl(dataUrl, fileName);
   const isImage = mimeType?.startsWith("image/") ?? false;
 
   if (isImage) {

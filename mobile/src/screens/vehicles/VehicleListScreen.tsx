@@ -107,6 +107,15 @@ export function VehicleListScreen({ navigation }: Props) {
                 ) : null}
               </Pressable>
               <Pressable
+                onPress={() => navigation.navigate("VehicleForm", { vehicleId: vehicle.id })}
+                hitSlop={8}
+                style={{ marginLeft: spacing.sm, minWidth: touchTarget.min, alignItems: "center" }}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${vehicle.name}`}
+              >
+                <Ionicons name="create-outline" size={20} color={colors.primary} />
+              </Pressable>
+              <Pressable
                 onPress={() => setPendingDelete(vehicle)}
                 hitSlop={8}
                 style={{ marginLeft: spacing.sm, minWidth: touchTarget.min, alignItems: "center" }}

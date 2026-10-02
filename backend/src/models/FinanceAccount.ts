@@ -11,6 +11,9 @@ const financeAccountSchema = new Schema(
       default: "custom",
     },
     archived: { type: Boolean, default: false, index: true },
+    // Everything in this account dated on or before this day (YYYY-MM-DD) is settled — closed
+    // for edits and moved out of the open list, but still viewable and exportable. null = nothing settled.
+    settledUpTo: { type: String, default: null },
   },
   { timestamps: true }
 );

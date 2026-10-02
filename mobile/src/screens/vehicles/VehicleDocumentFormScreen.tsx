@@ -45,6 +45,8 @@ export function VehicleDocumentFormScreen({ navigation, route }: Props) {
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [fileData, setFileData] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  // Set when an already-saved file is removed, so the save sends `null` rather than omitting it.
+  const [fileRemoved, setFileRemoved] = useState(false);
   const [notes, setNotes] = useState("");
   const [localNotificationId, setLocalNotificationId] = useState<string | null>(null);
   const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(false);
@@ -75,6 +77,7 @@ export function VehicleDocumentFormScreen({ navigation, route }: Props) {
     if (!picked) return;
     setFileData(picked.dataUrl);
     setFileName(picked.fileName);
+    setFileRemoved(false);
   }
 
   function handlePickPress() {
@@ -112,8 +115,8 @@ export function VehicleDocumentFormScreen({ navigation, route }: Props) {
       customLabel: customLabel.trim(),
       expiresAt: expiresAtIso,
       reminderEnabled,
-      fileData: fileData ?? undefined,
-      fileName: fileName ?? undefined,
+      fileData: fileRemoved && !fileData ? null : fileData ?? undefined,
+      fileName: fileRemoved && !fileData ? null : fileName ?? undefined,
       notes,
     };
 
@@ -249,6 +252,19 @@ export function VehicleDocumentFormScreen({ navigation, route }: Props) {
         style={{ marginBottom: spacing.lg }}
         accessibilityLabel={fileData ? "Replace attached file" : "Attach file"}
       />
+      {fileData ? (
+        <Button
+          label="Remove file"
+          variant="danger"
+          onPress={() => {
+            setFileData(null);
+            setFileName(null);
+            setFileRemoved(true);
+          }}
+          style={{ marginBottom: spacing.lg }}
+          accessibilityLabel="Remove attached file"
+        />
+      ) : null}
 
       <TextField label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional" multiline />
 

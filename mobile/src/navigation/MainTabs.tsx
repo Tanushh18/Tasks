@@ -5,9 +5,9 @@ import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFeatureFlags } from "../features/FeatureFlagsContext";
 import { useTheme } from "../theme/useTheme";
-import { FamilyNavigator } from "./FamilyNavigator";
 import { FinanceNavigator } from "./FinanceNavigator";
 import { HomeNavigator } from "./HomeNavigator";
+import { LeadsNavigator } from "./LeadsNavigator";
 import { MoreNavigator } from "./MoreNavigator";
 import { TasksNavigator } from "./TasksNavigator";
 import type { MainTabParamList } from "./types";
@@ -21,7 +21,7 @@ const ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof Ionicons
   HomeTab: "home",
   TasksTab: "checkbox",
   FinanceTab: "wallet",
-  FamilyTab: "people",
+  LeadsTab: "trending-up",
   MoreTab: "ellipsis-horizontal-circle",
 };
 
@@ -29,7 +29,7 @@ const OUTLINE_ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof 
   HomeTab: "home-outline",
   TasksTab: "checkbox-outline",
   FinanceTab: "wallet-outline",
-  FamilyTab: "people-outline",
+  LeadsTab: "trending-up-outline",
   MoreTab: "ellipsis-horizontal-circle-outline",
 };
 
@@ -50,10 +50,9 @@ export function MainTabs() {
   const bottomInset =
     insets.bottom > 0 ? insets.bottom : Platform.OS === "android" ? ANDROID_NAV_BUTTONS_HEIGHT : spacing.sm;
 
-  // The Family tab is the way into contacts, chat and location — if an admin
-  // has turned all three off there's nothing behind it, so it disappears
-  // rather than opening an empty screen (spec §3).
-  const showFamilyTab = flags.contacts || flags.chat || flags.location;
+  // Leads has the slot Family used to have (Family now lives under More). An admin who has
+  // turned the Lead Tracker off removes the tab rather than leaving an empty screen (spec §3).
+  const showLeadsTab = flags.leads;
 
   return (
     <Tab.Navigator
@@ -81,8 +80,8 @@ export function MainTabs() {
       <Tab.Screen name="HomeTab" component={HomeNavigator} options={{ title: "Home" }} />
       <Tab.Screen name="TasksTab" component={TasksNavigator} options={{ title: "Tasks" }} />
       <Tab.Screen name="FinanceTab" component={FinanceNavigator} options={{ title: "Money" }} />
-      {showFamilyTab ? (
-        <Tab.Screen name="FamilyTab" component={FamilyNavigator} options={{ title: "Family" }} />
+      {showLeadsTab ? (
+        <Tab.Screen name="LeadsTab" component={LeadsNavigator} options={{ title: "Leads" }} />
       ) : null}
       <Tab.Screen name="MoreTab" component={MoreNavigator} options={{ title: "More" }} />
     </Tab.Navigator>

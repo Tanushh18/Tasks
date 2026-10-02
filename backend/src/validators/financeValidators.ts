@@ -37,6 +37,7 @@ export const listTransactionsQuerySchema = z.object({
   to: dateStr.optional(),
   category: z.string().optional(),
   search: z.string().optional(),
+  settled: z.enum(["all", "only", "exclude"]).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional().default(50),
 });
 
@@ -57,4 +58,30 @@ export const monthlyTrendQuerySchema = z.object({
 
 export const assignTransactionSchema = z.object({
   toUserId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid user id"),
+});
+
+export const settleAccountSchema = z.object({
+  // null reopens the account (nothing settled).
+  upTo: dateStr.nullable(),
+});
+
+const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid account id");
+
+export const exportSchema = z.object({
+  accountIds: z.array(objectId).max(100).optional(),
+  from: dateStr.optional(),
+  to: dateStr.optional(),
+  type: z.enum(["IN", "OUT"]).optional(),
+  settled: z.enum(["all", "only", "exclude"]).optional().default("all"),
+});
+
+const emailList = z
+  .string()
+  .transform((value) => value.split(/[,;\s]+/).filter(Boolean))
+  .pipe(z.array(z.string().email("Enter a valid email address")).min(1, "Enter an email address").max(5));
+
+export const emailExportSchema = exportSchema.extend({
+  // Not `to`: that is already the end of the date range.
+  recipients: emailList,
+  message: z.string().max(500).optional(),
 });

@@ -84,6 +84,8 @@ export interface FinanceAccount {
   description: string;
   type: AccountType;
   archived: boolean;
+  /** Everything dated on or before this day (YYYY-MM-DD) is settled — closed, but still viewable. */
+  settledUpTo: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -145,6 +147,9 @@ export interface AccountSummary {
   cashIn: number;
   cashOut: number;
   balance: number;
+  settledUpTo?: string | null;
+  /** Balance of entries still open (after the settled period). */
+  unsettledBalance?: number;
 }
 
 export interface FinancialSummary {

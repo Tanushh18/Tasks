@@ -5,9 +5,11 @@ import React, { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiErrorMessage } from "../../api/client";
+import * as vehiclesApi from "../../api/vehicles";
 import * as vehicleDocumentsApi from "../../api/vehicleDocuments";
 import type { VehicleDocument, VehicleDocumentType } from "../../api/vehicleDocuments";
 import { Card } from "../../components/Card";
+import { ConfirmationSheet } from "../../components/ConfirmationSheet";
 import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import type { VehicleStackParamList } from "../../navigation/types";
@@ -33,18 +35,26 @@ function formatExpiry(expiresAt: string | null): { label: string; soon: boolean 
 }
 
 export function VehicleDetailScreen({ navigation, route }: Props) {
-  const { vehicleId, name } = route.params;
+  const { vehicleId, name: initialName } = route.params;
   const { colors, spacing, radius, typography, touchTarget, shadow } = useTheme();
 
   const [documents, setDocuments] = useState<VehicleDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState(initialName);
+  const [pendingDelete, setPendingDelete] = useState<VehicleDocument | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const result = await vehicleDocumentsApi.listVehicleDocuments(vehicleId);
+      const [result, vehicle] = await Promise.all([
+        vehicleDocumentsApi.listVehicleDocuments(vehicleId),
+        // The name can be edited from here, so re-read it rather than trusting the route param.
+        vehiclesApi.getVehicle(vehicleId).catch(() => null),
+      ]);
       setDocuments(result);
+      if (vehicle) setName(vehicle.name);
     } catch (err) {
       setError(getApiErrorMessage(err, "We couldn't load this vehicle's documents."));
     } finally {
@@ -59,12 +69,37 @@ export function VehicleDetailScreen({ navigation, route }: Props) {
     }, [load])
   );
 
+  const confirmDelete = useCallback(async () => {
+    const doc = pendingDelete;
+    if (!doc) return;
+    setDeleting(true);
+    try {
+      await vehicleDocumentsApi.deleteVehicleDocument(vehicleId, doc.id);
+      setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+      setPendingDelete(null);
+    } catch (err) {
+      setPendingDelete(null);
+      setError(getApiErrorMessage(err, "We couldn't delete that document."));
+    } finally {
+      setDeleting(false);
+    }
+  }, [pendingDelete, vehicleId]);
+
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["left", "right"]}>
-      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
-        <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
+      <View style={[styles.titleRow, { paddingHorizontal: spacing.lg, paddingTop: spacing.md }]}>
+        <Text accessibilityRole="header" style={[typography.h1, styles.flex, { color: colors.text }]}>
           {name}
         </Text>
+        <Pressable
+          onPress={() => navigation.navigate("VehicleForm", { vehicleId })}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Edit vehicle ${name}`}
+          style={{ minWidth: touchTarget.min, minHeight: touchTarget.min, alignItems: "center", justifyContent: "center" }}
+        >
+          <Ionicons name="create-outline" size={22} color={colors.primary} />
+        </Pressable>
       </View>
 
       {loading ? (
@@ -123,6 +158,15 @@ export function VehicleDetailScreen({ navigation, route }: Props) {
                     <Ionicons name="notifications-outline" size={18} color={colors.primary} style={{ marginRight: spacing.sm }} />
                   ) : null}
                   <Ionicons name="chevron-forward" size={20} color={colors.textFaint} />
+                  <Pressable
+                    onPress={() => setPendingDelete(doc)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete document ${label}`}
+                    style={{ marginLeft: spacing.sm, minWidth: touchTarget.min, alignItems: "center" }}
+                  >
+                    <Ionicons name="trash-outline" size={20} color={colors.textFaint} />
+                  </Pressable>
                 </Card>
               </Pressable>
             );
@@ -151,12 +195,24 @@ export function VehicleDetailScreen({ navigation, route }: Props) {
           <Text style={[typography.bodyStrong, { color: colors.onPrimary, marginLeft: spacing.xs }]}>Add document</Text>
         </Pressable>
       ) : null}
+
+      <ConfirmationSheet
+        visible={pendingDelete !== null}
+        title="Delete this document?"
+        message="This can't be undone. The attached file will be deleted too."
+        confirmLabel="Delete"
+        destructive
+        busy={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  titleRow: { flexDirection: "row", alignItems: "center" },
   card: { flexDirection: "row", alignItems: "center" },
   fab: { position: "absolute", right: 20, bottom: 20, flexDirection: "row", alignItems: "center", justifyContent: "center" },
 });

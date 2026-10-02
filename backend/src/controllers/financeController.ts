@@ -1,6 +1,9 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import * as financeService from "../services/financeService";
+import { buildFinanceWorkbook, exportFileName, exportSummaryText, XLSX_MIME } from "../services/exportService";
+import { sendMail } from "../services/mailService";
+import { User } from "../models/User";
 import type { FinanceAccountDocument } from "../models/FinanceAccount";
 import type { TransactionDocument } from "../models/Transaction";
 
@@ -11,6 +14,7 @@ function serializeAccount(account: FinanceAccountDocument) {
     description: account.description,
     type: account.type,
     archived: account.archived,
+    settledUpTo: account.settledUpTo ?? null,
     createdAt: account.createdAt,
     updatedAt: account.updatedAt,
   };
@@ -108,4 +112,41 @@ export const getMonthlyTrend = asyncHandler(async (req: Request, res: Response) 
   const { accountId, months } = req.query as { accountId?: string; months?: number };
   const trend = await financeService.getMonthlyTrend(req.userId!, { accountId, months });
   res.json({ trend });
+});
+
+export const settleAccount = asyncHandler(async (req: Request, res: Response) => {
+  const account = await financeService.settleAccount(req.userId!, req.params.id, req.body.upTo);
+  res.json({ account: serializeAccount(account) });
+});
+
+async function buildExport(req: Request) {
+  const filters = req.body as financeService.ExportFilters;
+  const [data, user] = await Promise.all([financeService.getExportData(req.userId!, filters), User.findById(req.userId)]);
+  const buffer = await buildFinanceWorkbook(data, filters, user?.name ?? "");
+  return { filters, data, buffer, fileName: exportFileName(filters) };
+}
+
+/** Excel report as base64 JSON, so the app's normal auth/failover handling applies and it can share the file. */
+export const exportReport = asyncHandler(async (req: Request, res: Response) => {
+  const { data, buffer, fileName } = await buildExport(req);
+  res.json({
+    fileName,
+    mimeType: XLSX_MIME,
+    base64: buffer.toString("base64"),
+    entryCount: data.transactions.length,
+    cashIn: data.cashIn,
+    cashOut: data.cashOut,
+  });
+});
+
+export const emailReport = asyncHandler(async (req: Request, res: Response) => {
+  const { filters, data, buffer, fileName } = await buildExport(req);
+  const message = typeof req.body.message === "string" && req.body.message.trim() ? `${req.body.message.trim()}\n\n` : "";
+  await sendMail({
+    to: req.body.recipients,
+    subject: "Money report",
+    text: `${message}${exportSummaryText(data, filters)}\n\nThe full details are in the attached Excel file.`,
+    attachments: [{ filename: fileName, content: buffer, contentType: XLSX_MIME }],
+  });
+  res.json({ sent: true, recipients: req.body.recipients, entryCount: data.transactions.length });
 });

@@ -73,11 +73,39 @@ export function labelForMimeType(mimeType: string | null): string {
   return "File";
 }
 
-/** Extracts the mime type from a `data:<mime>;base64,...` URL, or null if it can't be parsed. */
-export function mimeTypeFromDataUrl(dataUrl: string | null): string | null {
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  heic: "image/heic",
+  gif: "image/gif",
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+/** True for a stored file that lives on Cloudinary (or any server) rather than inline as base64. */
+export function isRemoteUrl(value: string | null | undefined): boolean {
+  return typeof value === "string" && /^https?:\/\//i.test(value);
+}
+
+/**
+ * Mime type of a stored file. Older files are `data:<mime>;base64,...` URLs; newer ones are
+ * https Cloudinary URLs, where the type comes from the file name / URL extension, and anything
+ * under Cloudinary's `/image/upload/` path is a photo.
+ */
+export function mimeTypeFromDataUrl(dataUrl: string | null, fileName?: string | null): string | null {
   if (!dataUrl) return null;
   const match = /^data:([^;]+);base64,/.exec(dataUrl);
-  return match ? match[1] : null;
+  if (match) return match[1];
+  if (!isRemoteUrl(dataUrl)) return null;
+  const candidates = [fileName ?? "", dataUrl.split("?")[0]];
+  for (const candidate of candidates) {
+    const ext = /\.([a-z0-9]+)$/i.exec(candidate)?.[1]?.toLowerCase();
+    if (ext && MIME_BY_EXTENSION[ext]) return MIME_BY_EXTENSION[ext];
+  }
+  return dataUrl.includes("/image/upload/") ? "image/jpeg" : null;
 }
 
 export type FilePickerSource = "camera" | "library" | "document";

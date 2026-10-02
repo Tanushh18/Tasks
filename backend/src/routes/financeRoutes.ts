@@ -6,9 +6,12 @@ import {
   assignTransactionSchema,
   createAccountSchema,
   createTransactionSchema,
+  emailExportSchema,
+  exportSchema,
   idParamSchema,
   listTransactionsQuerySchema,
   monthlyTrendQuerySchema,
+  settleAccountSchema,
   summaryQuerySchema,
   updateAccountSchema,
   updateTransactionSchema,
@@ -26,6 +29,14 @@ router.put(
   financeController.updateAccount
 );
 router.delete("/accounts/:id", validateRequest({ params: idParamSchema }), financeController.deleteAccount);
+router.post(
+  "/accounts/:id/settle",
+  validateRequest({ params: idParamSchema, body: settleAccountSchema }),
+  financeController.settleAccount
+);
+
+router.post("/export", validateRequest({ body: exportSchema }), financeController.exportReport);
+router.post("/export/email", validateRequest({ body: emailExportSchema }), financeController.emailReport);
 
 router.get(
   "/transactions",

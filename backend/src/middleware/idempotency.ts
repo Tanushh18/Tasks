@@ -10,7 +10,7 @@ const MAX_KEY_LENGTH = 100;
  */
 export function idempotency(req: Request, res: Response, next: NextFunction): void {
   const key = req.header("Idempotency-Key");
-  if (!key || req.method !== "POST" || key.length > MAX_KEY_LENGTH || req.path.startsWith("/auth")) {
+  if (!key || req.method !== "POST" || key.length > MAX_KEY_LENGTH || req.path.startsWith("/auth") || req.path.includes("/export")) {
     next();
     return;
   }

@@ -100,7 +100,7 @@ export function NotificationsCenterScreen({ navigation }: Props) {
         title: conversation.name,
         subtitle: `${conversation.unreadCount} unread message${conversation.unreadCount === 1 ? "" : "s"}: ${conversation.lastMessage}`,
         onPress: () =>
-          navigation.navigate("FamilyTab", { screen: "ChatThread", params: { userId: conversation.userId, name: conversation.name } }),
+          navigation.navigate("MoreTab", { screen: "Family", params: { screen: "ChatThread", params: { userId: conversation.userId, name: conversation.name } } }),
       });
     }
 
