@@ -14,6 +14,9 @@ beforeAll(async () => {
       `Refusing to run tests against a non-local database (host: ${host}). Tests truncate every collection.`
     );
   }
+
+  // Unique indexes are built in the background on connect; wait for them so duplicate checks are real.
+  await Promise.all(mongoose.modelNames().map((name) => mongoose.model(name).init()));
 }, 60000);
 
 afterEach(async () => {

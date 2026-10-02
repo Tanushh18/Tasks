@@ -3,7 +3,13 @@ const leadSchema = new Schema({
   ownerId:{type:Schema.Types.ObjectId,ref:"User",required:true,index:true}, phone:{type:String,required:true},
   name:{type:String,default:""}, plotInFarukhNagar:{type:String,default:""}, plotManual:{type:Boolean,default:false},
   category:{type:String,default:""}, status:{type:String,default:""}, requirement:{type:String,default:""}, address:{type:String,default:""},
-  budget:{type:String,default:""}, notes:{type:String,default:""}, sourceIds:{type:[Schema.Types.ObjectId],default:[]}, sheetDate:Date, archived:{type:Boolean,default:false}
+  budget:{type:String,default:""}, notes:{type:String,default:""}, sourceIds:{type:[Schema.Types.ObjectId],default:[]}, sheetDate:Date, archived:{type:Boolean,default:false},
+  // Extra numbers / email / read-only context (tower, flat, dealer…) picked up from imported sheets.
+  alternatePhones:{type:[String],default:[]}, email:{type:String,default:""}, info:{type:String,default:""},
+  // Who last changed the lead and when the stage last changed; drives "Updated by X at …" on the card.
+  updatedById:{type:Schema.Types.ObjectId,ref:"User",default:null}, updatedByName:{type:String,default:""}, statusUpdatedAt:{type:Date,default:null},
+  // Set while the stage is "Not interested"; the cleanup job deletes the lead 30 days after this.
+  notInterestedAt:{type:Date,default:null,index:true}
 },{timestamps:true});
-leadSchema.index({ownerId:1,phone:1},{unique:true}); leadSchema.index({ownerId:1,archived:1,sheetDate:-1});
+leadSchema.index({ownerId:1,phone:1},{unique:true}); leadSchema.index({ownerId:1,archived:1,sheetDate:-1}); leadSchema.index({archived:1,createdAt:-1}); leadSchema.index({sourceIds:1});
 export type LeadDocument=HydratedDocument<InferSchemaType<typeof leadSchema>>; export const Lead=model("Lead",leadSchema);

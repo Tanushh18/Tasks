@@ -30,6 +30,7 @@ describe("feature flags", () => {
       familyGoals: true,
       polls: true,
       weeklySummary: true,
+      leads: true,
     });
   });
 

@@ -6,6 +6,7 @@ import { FinanceAccount } from "../models/FinanceAccount";
 import { Transaction } from "../models/Transaction";
 import { ApiError } from "../utils/ApiError";
 import { asyncHandler } from "../utils/asyncHandler";
+import { isAdminUser } from "../middleware/auth";
 import {
   assertValidMpin,
   assertValidMobileNumber,
@@ -45,7 +46,7 @@ function toPublicUser(user: {
     notificationsEnabled: user.notificationsEnabled,
     confirmFinancialActions: user.confirmFinancialActions,
     speakAssistantReplies: user.speakAssistantReplies,
-    isAdmin: user.isAdmin,
+    isAdmin: isAdminUser(user),
     mustChangeMpin: user.mustChangeMpin,
     weeklySummaryEnabled: user.weeklySummaryEnabled,
     createdAt: user.createdAt,

@@ -251,9 +251,13 @@ The backend exposes the following API routes (all prefixed with `/api`):
 **Vault**: `/vault-documents` (secure document storage)
 **Location**: `/location` (location sharing)
 **Leads**: `/leads` (lead management/CRM)
-  - `GET /leads`, `PATCH /leads/:id`: list and edit leads (stage, category, plot, requirement, address, budget, notes)
-  - `POST /leads/sources`, `POST /leads/sources/:id/share`, `DELETE /leads/sources/:id/share/:userId`: Google Sheet lists and sharing; everyone a list is shared with sees and edits the same leads
-  - `POST /leads/import`: add phone contacts as leads into the user's shareable "My contacts" list. The app also auto-adds contacts whose name contains the word "lead" (opt-in toggle on the Leads screen)
+  - `GET /leads?page=1&limit=10&status=New&search=`: one page of leads (newest first) plus `total`, `totalPages` and `stageCounts`. `status=all` shows every stage. Without `page` the full list is returned (older app versions).
+  - `PATCH /leads/:id`: edit name, mobile, stage, category, plot, requirement, address, budget, notes. Records `updatedByName` / `updatedAt`. Setting the stage to "Not interested" starts a 30-day timer, after which the lead is deleted automatically.
+  - `POST /leads/sources` (admin only), `POST /leads/sources/:id/share`, `DELETE /leads/sources/:id/share/:userId`: Google Sheet lists and sharing. Everyone a list is shared with sees and edits the same leads. A sheet link without `#gid=` syncs every tab.
+  - `POST /leads/import`: add phone contacts as leads into the user's shareable "My contacts" list. The app also auto-adds contacts with "lead" anywhere in the name.
+  - `POST /leads/lookup`: which of the given numbers are already leads (used by the contact-suggestion popup).
+  - `POST /leads/admin/import` (admin only): the in-app CSV / sheet import. Same body as the bulk import below.
+  - `POST /leads/bulk-import` (**no sign-in**): see [Bulk lead import](#bulk-lead-import).
 **Admin**: `/admin` (admin operations)
 **Search**: `/search` (global search)
 
@@ -557,6 +561,53 @@ curl -X POST http://localhost:4000/api/assistant/message \
     "message": "What is my total spending this month?"
   }'
 ```
+
+### Bulk lead import
+
+`POST /api/leads/bulk-import` needs **no sign-in**. Use it to load large batches of leads from a script or curl. Leads go into the account of `ownerMobile`, which defaults to the admin, `8130483894`. That account must already exist. Each import becomes a list named by `label`; re-running the same label is safe.
+
+What it cleans up:
+- It finds the header row even below banner rows, and works with any column order.
+- It reads every Indian mobile in a cell (`98100 12345 / 98111 22222`, `+91-…`, `0…`). Landline-only rows are skipped.
+- It joins the 1st and 2nd applicant names.
+- It drops placeholder rows such as "IN-Stock" or "File Missing".
+- It keeps one lead per number across all tabs and files.
+- It never overwrites a name or notes someone typed in the app.
+- Tower, flat, dealer and similar columns are kept as read-only `info` on the lead.
+
+Body (JSON). Send one of `sheetUrl`, `csv`, `files` or `rows`:
+
+| Field | Meaning |
+|---|---|
+| `sheetUrl` | Google Sheet link, shared as "Anyone with the link can view". Without `#gid=` every tab is read. |
+| `tabs` | Optional: only these tab names or gids, e.g. `["Main Sheet","T 10"]` |
+| `allTabs` | `true` reads every tab even if the link has a `#gid=` |
+| `csv` | Raw CSV text (`fileName` optional) |
+| `files` | `[{ "name": "a.csv", "csv": "..." }, ...]` |
+| `rows` | `[{ "name": "...", "phone": "...", ... }]` |
+| `label` | List name, default "Google Sheet import" / "CSV import" |
+| `ownerMobile` | Whose leads these become (default `8130483894`) |
+| `dryRun` | `true` = report what would happen, write nothing |
+| `includeDeleted` | `true` = also re-add numbers the 30-day cleanup deleted |
+| `allRejected` | `true` = return up to 500 rejected rows instead of 50 |
+
+```bash
+# 1. Preview (writes nothing)
+curl -X POST https://we-three-api.onrender.com/api/leads/bulk-import \
+  -H "Content-Type: application/json" \
+  -d '{"sheetUrl":"https://docs.google.com/spreadsheets/d/<id>/edit","label":"Central Park II buyers","dryRun":true}'
+
+# 2. Import for real (same body without dryRun)
+curl -X POST https://we-three-api.onrender.com/api/leads/bulk-import \
+  -H "Content-Type: application/json" \
+  -d '{"sheetUrl":"https://docs.google.com/spreadsheets/d/<id>/edit","label":"Central Park II buyers"}'
+
+# Upload a CSV file directly (options go in the query string)
+curl -X POST "https://we-three-api.onrender.com/api/leads/bulk-import?label=My%20CSV" \
+  -H "Content-Type: text/csv" --data-binary @leads.csv
+```
+
+The response has `summary` (`added`, `updated`, `noValidMobile`, `placeholders`, `duplicateRows`, …), a per-tab report in `tabs`, `rejected` rows with the reason, and a `sample` of parsed leads.
 
 For complete API documentation, refer to individual route files in `backend/src/routes/`.
 

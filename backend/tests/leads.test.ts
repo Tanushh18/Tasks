@@ -2,6 +2,8 @@ import { createApp } from "../src/app";
 import { authed, registerUser } from "./helpers";
 
 const app = createApp();
+// Linking a Google Sheet is admin-only; this number is always an admin.
+const ADMIN = "8130483894";
 
 const CSV = ["name,phone,campaign", "Ravi,9876543210,Construction", "Sita,9123456780,Interior"].join("\n");
 const SHEET = "https://docs.google.com/spreadsheets/d/abc123/edit#gid=0";
@@ -16,7 +18,7 @@ describe("shared leads", () => {
   });
 
   it("stores sheet leads in the database and shares them with another user", async () => {
-    const alice = await registerUser(app, "9876590001", "4821", "Alice");
+    const alice = await registerUser(app, ADMIN, "4821", "Alice");
     const bob = await registerUser(app, "9876590002", "4821", "Bob");
     const stranger = await registerUser(app, "9876590003", "4821", "Stranger");
     const a = authed(app, alice.token);
@@ -62,7 +64,7 @@ describe("shared leads", () => {
   });
 
   it("rejects sharing with an unknown number", async () => {
-    const alice = await registerUser(app, "9876590011", "4821", "Alice");
+    const alice = await registerUser(app, ADMIN, "4821", "Alice");
     const a = authed(app, alice.token);
     const added = await a.post("/api/leads/sources").send({ url: SHEET });
     const res = await a.post(`/api/leads/sources/${added.body.source.id}/share`).send({ mobileNumber: "9000000000" });
@@ -70,7 +72,7 @@ describe("shared leads", () => {
   });
 
   it("answers 409 (not a dropped connection) when the same sheet is added twice", async () => {
-    const alice = await registerUser(app, "9876590021", "4821", "Alice");
+    const alice = await registerUser(app, ADMIN, "4821", "Alice");
     const a = authed(app, alice.token);
     expect((await a.post("/api/leads/sources").send({ url: SHEET })).status).toBe(201);
     const again = await a.post("/api/leads/sources").send({ url: SHEET });
@@ -87,7 +89,7 @@ describe("shared leads", () => {
   });
 
   it("imports phone contacts as leads, skips invalid/duplicate numbers, and shares them", async () => {
-    const alice = await registerUser(app, "9876590041", "4821", "Alice");
+    const alice = await registerUser(app, ADMIN, "4821", "Alice");
     const bob = await registerUser(app, "9876590042", "4821", "Bob");
     const a = authed(app, alice.token);
     const b = authed(app, bob.token);

