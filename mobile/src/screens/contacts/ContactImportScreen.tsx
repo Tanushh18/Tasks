@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as Contacts from "expo-contacts";
+import * as Contacts from "expo-contacts/legacy";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";

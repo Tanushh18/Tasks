@@ -6,6 +6,7 @@ import * as locationApi from "./src/api/location";
 import { refreshServerList } from "./src/api/registry";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import { FeatureFlagsProvider, useFeatureFlags } from "./src/features/FeatureFlagsContext";
+import { CallFollowUpHost, ContactSuggestionsHost } from "./src/leads/LeadPopups";
 import { useLeadContactSync } from "./src/leads/useLeadContactSync";
 import { startLocationTracking } from "./src/location/backgroundLocationTask";
 import { useNotificationResponseHandler } from "./src/notifications/useNotificationResponseHandler";
@@ -44,7 +45,14 @@ function AppContent() {
     })();
   }, [isAuthenticated, flags.location]);
 
-  return <RootNavigator />;
+  return (
+    <>
+      <RootNavigator />
+      {/* Lead popups sit above every screen. */}
+      <CallFollowUpHost />
+      <ContactSuggestionsHost />
+    </>
+  );
 }
 
 /** Status bar icons follow the theme the person picked, not just the phone's setting. */

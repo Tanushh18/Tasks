@@ -64,6 +64,24 @@ export async function pickDocumentFile(): Promise<PickedFile | null> {
   }
 }
 
+/** Lets the person pick a .csv file and returns its text, or null if cancelled. */
+export async function pickCsvFile(): Promise<{ text: string; fileName: string } | null> {
+  const result = await DocumentPicker.getDocumentAsync({
+    // Some Android file managers label CSVs as plain text or Excel; accept those too.
+    type: ["text/csv", "text/comma-separated-values", "text/plain", "application/vnd.ms-excel", "application/csv"],
+    copyToCacheDirectory: true,
+  });
+  if (result.canceled || !result.assets?.[0]) return null;
+  const asset = result.assets[0];
+  try {
+    const text = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
+    return { text, fileName: asset.name ?? "leads.csv" };
+  } catch {
+    Alert.alert("Couldn't read file", "Please pick a .csv file (in Google Sheets: File → Download → CSV).");
+    return null;
+  }
+}
+
 /** Human label for a mime type, used when no filename is available. */
 export function labelForMimeType(mimeType: string | null): string {
   if (!mimeType) return "File";

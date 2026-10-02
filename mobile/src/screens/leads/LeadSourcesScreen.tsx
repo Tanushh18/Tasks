@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as api from "../../api/leads";
 import { useAuth } from "../../auth/AuthContext";
@@ -10,6 +10,7 @@ import { Button } from "../../components/Button";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
+import { runAdminCsvImport } from "../../leads/adminCsvImport";
 import { useTheme } from "../../theme/useTheme";
 
 export function LeadSourcesScreen() {
@@ -20,7 +21,11 @@ export function LeadSourcesScreen() {
   const [adding, setAdding] = useState(false);
   const [url, setUrl] = useState("");
   const [label, setLabel] = useState("");
+  const [allTabs, setAllTabs] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  // Linking sheets and importing files are admin tools; the server enforces this too.
+  const isAdmin = api.isLeadAdmin(user);
   const [shareFor, setShareFor] = useState<api.LeadSource | null>(null);
   const [shareNumber, setShareNumber] = useState("");
 
@@ -46,7 +51,7 @@ export function LeadSourcesScreen() {
     }
     setBusy(true);
     try {
-      const res = await api.addSource(url.trim(), label.trim());
+      const res = await api.addSource(url.trim(), label.trim(), allTabs);
       if (res?.result?.error) Alert.alert("Sheet added, but it couldn't be read yet", String(res.result.error));
       setUrl("");
       setLabel("");
@@ -101,6 +106,14 @@ export function LeadSourcesScreen() {
 
   const renderSource = (s: api.LeadSource) => {
     const manual = s.kind === "manual";
+    const imported = s.kind === "import";
+    const subtitle = manual
+      ? "Leads added from contacts or by hand"
+      : imported
+        ? "Imported list"
+        : s.isOwner
+          ? `${s.allTabs ? "Every tab · " : ""}${s.url ?? ""}`
+          : "Shared list";
     return (
       <View
         key={s.id}
@@ -111,14 +124,14 @@ export function LeadSourcesScreen() {
       >
         <View style={styles.cardTop}>
           <View style={[styles.icon, { backgroundColor: feature.leads.muted, borderRadius: radius.md }]}>
-            <Ionicons name={manual ? "people" : "grid-outline"} size={20} color={feature.leads.solid} />
+            <Ionicons name={manual ? "people" : imported ? "cloud-upload-outline" : "grid-outline"} size={20} color={feature.leads.solid} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
-              {s.label || (manual ? "My contacts" : "Google Sheet")}
+              {s.label || (manual ? "My contacts" : imported ? "Imported leads" : "Google Sheet")}
             </Text>
             <Text style={[typography.caption, { color: colors.textMuted }]} numberOfLines={1}>
-              {manual ? "Leads added from contacts or by hand" : s.url}
+              {subtitle}
             </Text>
           </View>
           {!s.isOwner ? (
@@ -128,10 +141,12 @@ export function LeadSourcesScreen() {
           ) : null}
         </View>
 
-        {s.lastError ? (
+        {s.isOwner && s.lastError ? (
           <Text style={[typography.caption, { color: colors.danger, marginTop: spacing.sm }]}>{s.lastError}</Text>
-        ) : !manual ? (
-          <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]}>Syncs automatically every 15 seconds</Text>
+        ) : s.isOwner && s.kind === "sheet" ? (
+          <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]}>
+            {s.allTabs ? "Syncs automatically every 5 minutes" : "Syncs automatically every 15 seconds"}
+          </Text>
         ) : null}
 
         {s.sharedWith.length > 0 ? (
@@ -184,12 +199,27 @@ export function LeadSourcesScreen() {
       <Text style={[typography.body, { color: colors.textMuted, marginBottom: spacing.md }]}>
         Everyone a list is shared with sees and edits the same leads.
       </Text>
-      <Button label="Add Google Sheet" onPress={() => setAdding(true)} style={{ marginBottom: spacing.lg }} />
+      {isAdmin ? (
+        <View style={[styles.buttons, { gap: spacing.sm, marginBottom: spacing.lg }]}>
+          <Button label="Add Google Sheet" onPress={() => setAdding(true)} style={{ flex: 1 }} />
+          <Button
+            label="Import CSV"
+            variant="secondary"
+            loading={importing}
+            onPress={() => runAdminCsvImport(setImporting).then(load)}
+            style={{ flex: 1 }}
+          />
+        </View>
+      ) : null}
 
       {error ? (
         <ErrorState message={error} onRetry={load} />
       ) : sources.length === 0 ? (
-        <EmptyState title="No lists yet" subtitle="Add a Google Sheet tab, or add leads from your contacts." icon="document-outline" />
+        <EmptyState
+          title="No lists yet"
+          subtitle={isAdmin ? "Add a Google Sheet, import a CSV, or add leads from your contacts." : "Add leads from your contacts, then share your list here."}
+          icon="document-outline"
+        />
       ) : (
         sources.map(renderSource)
       )}
@@ -203,8 +233,15 @@ export function LeadSourcesScreen() {
           placeholder="https://docs.google.com/spreadsheets/d/…"
           autoCapitalize="none"
         />
+        <View style={[styles.switchRow, { marginBottom: spacing.md }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[typography.bodyStrong, { color: colors.text }]}>Read every tab</Text>
+            <Text style={[typography.caption, { color: colors.textMuted }]}>Off = only the tab in the link</Text>
+          </View>
+          <Switch value={allTabs} onValueChange={setAllTabs} accessibilityLabel="Read every tab" />
+        </View>
         <Text style={[typography.caption, { color: colors.textMuted, marginBottom: spacing.lg }]}>
-          The sheet must be shared as "Anyone with the link can view" and have a phone/mobile column.
+          Share the sheet as "Anyone with the link can view". Any column order works. Rows without a valid mobile number are skipped.
         </Text>
         <View style={[styles.buttons, { gap: spacing.md }]}>
           <Button label="Cancel" variant="secondary" onPress={() => setAdding(false)} style={{ flex: 1 }} />
@@ -242,4 +279,5 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   memberRow: { flexDirection: "row", alignItems: "center", gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
   buttons: { flexDirection: "row" },
+  switchRow: { flexDirection: "row", alignItems: "center", gap: 12 },
 });

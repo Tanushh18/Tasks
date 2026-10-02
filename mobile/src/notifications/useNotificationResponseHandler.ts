@@ -1,5 +1,6 @@
 import notifee, { EventType } from "@notifee/react-native";
 import { useEffect } from "react";
+import { FOLLOWUP_KIND } from "../leads/callFollowUp";
 import { navigateToTask } from "../navigation/navigationRef";
 import { handleNotificationActionEvent } from "./handleNotificationEvent";
 import { ACTION_OPEN } from "./notificationService";
@@ -18,6 +19,10 @@ export function useNotificationResponseHandler(): void {
     });
 
     const unsubscribe = notifee.onForegroundEvent(async (event) => {
+      if (event.detail.notification?.data?.kind === FOLLOWUP_KIND) {
+        await handleNotificationActionEvent(event);
+        return;
+      }
       const taskId = event.detail.notification?.data?.taskId as string | undefined;
 
       if (shouldOpenTask(event.type, event.detail.pressAction?.id) && taskId) {

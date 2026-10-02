@@ -1,10 +1,14 @@
 import notifee, { type Event, EventType } from "@notifee/react-native";
 import * as tasksApi from "../api/tasks";
+import { handleFollowUpNotificationEvent } from "../leads/callFollowUp";
 import { ACTION_COMPLETE, ACTION_SNOOZE, snoozeReminder } from "./notificationService";
 
 /** Shared by both the foreground and background event handlers. Only performs API mutations —
  * navigation is handled separately (background handlers can't touch the UI/navigator at all). */
-export async function handleNotificationActionEvent({ type, detail }: Event): Promise<void> {
+export async function handleNotificationActionEvent(event: Event): Promise<void> {
+  // Lead follow-up notifications ("update the stage") have their own buttons.
+  if (await handleFollowUpNotificationEvent(event).catch(() => true)) return;
+  const { type, detail } = event;
   if (type !== EventType.ACTION_PRESS) return;
 
   const taskId = detail.notification?.data?.taskId as string | undefined;

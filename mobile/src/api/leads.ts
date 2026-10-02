@@ -14,6 +14,30 @@ export interface Lead {
   notes: string;
   archived: boolean;
   sheetDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  updatedByName?: string;
+  statusUpdatedAt?: string | null;
+  notInterestedAt?: string | null;
+  alternatePhones?: string[];
+  email?: string;
+  /** Read-only context from an imported sheet (tower, flat, dealer…). */
+  info?: string;
+}
+
+export interface StageCount {
+  stage: string;
+  count: number;
+}
+
+export interface LeadPage {
+  leads: Lead[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  totalAll: number;
+  stageCounts: StageCount[];
 }
 
 export interface LeadSource {
@@ -26,7 +50,8 @@ export interface LeadSource {
   lastCheckedAt?: string;
   lastSyncedAt?: string;
   lastError?: string;
-  kind: "sheet" | "manual";
+  kind: "sheet" | "manual" | "import";
+  allTabs?: boolean;
   isOwner: boolean;
   sharedWith: { id: string; name: string; mobileNumber: string }[];
 }
@@ -36,6 +61,21 @@ export async function listLeads(search?: string, archived = false): Promise<Lead
     params: { search: search || undefined, archived: archived || undefined },
   });
   return data.leads;
+}
+
+export const PAGE_SIZE = 10;
+
+/** One page of leads. `status` "all" shows every stage; "New" includes leads with no stage yet. */
+export async function listLeadsPage(opts: { page: number; status: string; search?: string; limit?: number }): Promise<LeadPage> {
+  const { data } = await apiClient.get<LeadPage>("/leads", {
+    params: {
+      page: opts.page,
+      limit: opts.limit ?? PAGE_SIZE,
+      status: opts.status,
+      search: opts.search || undefined,
+    },
+  });
+  return data;
 }
 
 export async function updateLead(id: string, body: Partial<Lead>): Promise<Lead> {
@@ -48,10 +88,10 @@ export async function listSources(): Promise<LeadSource[]> {
   return data.sources;
 }
 
-export async function addSource(url: string, label = ""): Promise<any> {
+export async function addSource(url: string, label = "", allTabs = false): Promise<any> {
   const { data } = await apiClient.post<{ source: LeadSource; result: any }>(
     "/leads/sources",
-    { url, label }
+    { url, label, allTabs }
   );
   return data;
 }
@@ -88,8 +128,14 @@ export const DEFAULT_STATUS_OPTIONS = [
   "Converted",
 ];
 
-export async function getLeadMeta(): Promise<{ statusSuggestions: string[] }> {
-  const { data } = await apiClient.get<{ statusSuggestions: string[] }>("/leads/meta");
+export interface LeadMeta {
+  statusSuggestions: string[];
+  notInterestedTtlDays?: number;
+  isAdmin?: boolean;
+}
+
+export async function getLeadMeta(): Promise<LeadMeta> {
+  const { data } = await apiClient.get<LeadMeta>("/leads/meta");
   return data;
 }
 
@@ -108,3 +154,51 @@ export async function importLeads(contacts: ImportContact[]): Promise<ImportResu
   const { data } = await apiClient.post<ImportResult>("/leads/import", { contacts });
   return data;
 }
+
+/** Which of these numbers are already leads (normalised as +91XXXXXXXXXX). */
+export async function lookupLeadPhones(phones: string[]): Promise<string[]> {
+  const { data } = await apiClient.post<{ existing: string[] }>("/leads/lookup", { phones });
+  return data?.existing ?? [];
+}
+
+export interface BulkImportSummary {
+  rows: number;
+  validUnique: number;
+  noValidMobile: number;
+  placeholders: number;
+  duplicateRows: number;
+  sharedWithYouAlready: number;
+  added: number;
+  updated: number;
+  skippedDeleted: number;
+}
+
+export interface BulkImportResponse {
+  dryRun: boolean;
+  source: { id: string; label: string } | null;
+  summary: BulkImportSummary;
+  tabs: { tab: string; rows: number; valid: number; noPhone: number; placeholder: number; duplicates: number }[];
+  rejected: { tab: string; row: number; name: string; reason: string; raw: string }[];
+}
+
+/** Admin only: import a CSV file's text or a Google Sheet link (every tab) into the admin's leads. */
+export async function adminImport(body: {
+  csv?: string;
+  fileName?: string;
+  sheetUrl?: string;
+  label?: string;
+  dryRun?: boolean;
+}): Promise<BulkImportResponse> {
+  const { data } = await apiClient.post<BulkImportResponse>("/leads/admin/import", body, { timeout: 180_000 });
+  return data;
+}
+
+const LEAD_ADMIN_MOBILE = "8130483894";
+
+/** Mirrors the server: the admin flag, or the leads admin's number. The server enforces it either way. */
+export function isLeadAdmin(user: { isAdmin?: boolean; mobileNumber?: string } | null | undefined): boolean {
+  if (!user) return false;
+  return !!user.isAdmin || (user.mobileNumber ?? "").replace(/\D/g, "").slice(-10) === LEAD_ADMIN_MOBILE;
+}
+
+export const isNotInterestedStatus = (status: string) => /not\s*int[e]?rest/i.test(status);

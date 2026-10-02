@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as Contacts from "expo-contacts";
+import * as Contacts from "expo-contacts/legacy";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
