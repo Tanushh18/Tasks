@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as locationApi from "./src/api/location";
+import { refreshServerList } from "./src/api/registry";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import { FeatureFlagsProvider, useFeatureFlags } from "./src/features/FeatureFlagsContext";
 import { useLeadContactSync } from "./src/leads/useLeadContactSync";
@@ -13,6 +14,9 @@ import { useOtaUpdates } from "./src/updates/useOtaUpdates";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { ThemeProvider } from "./src/theme/ThemeProvider";
 import { useTheme } from "./src/theme/useTheme";
+
+// Pick up the latest server list from the Stashr registry (background; never blocks start-up).
+void refreshServerList();
 
 function AppContent() {
   useNotificationResponseHandler();

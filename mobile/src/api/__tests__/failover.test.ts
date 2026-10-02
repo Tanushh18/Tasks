@@ -91,3 +91,20 @@ describe("apiClient server failover", () => {
     expect(calls).toBe(1);
   });
 });
+
+describe("applyServerList (registry)", () => {
+  it("puts registry URLs first, keeps the build-time ones as backup, and keeps the active server if still listed", () => {
+    const { applyServerList } = require("../client") as typeof import("../client");
+    applyServerList(["https://new.test/api/", "https://backup.test/api"]);
+    expect(API_BASE_URLS).toEqual(["https://new.test/api", "https://backup.test/api", "https://primary.test/api"]);
+    // the earlier tests left the client on backup.test, which is still listed
+    expect(getActiveBaseUrl()).toBe("https://backup.test/api");
+  });
+
+  it("ignores an empty list", () => {
+    const { applyServerList } = require("../client") as typeof import("../client");
+    const before = [...API_BASE_URLS];
+    applyServerList([]);
+    expect(API_BASE_URLS).toEqual(before);
+  });
+});
