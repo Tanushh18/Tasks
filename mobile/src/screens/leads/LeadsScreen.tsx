@@ -706,8 +706,7 @@ export function LeadsScreen({ navigation }: any) {
               { backgroundColor: colors.primary, borderRadius: radius.pill, minHeight: touchTarget.min, opacity: pressed ? 0.8 : 1 },
             ]}
           >
-            <Ionicons name="call" size={16} color={colors.onPrimary} />
-            <Text style={[typography.captionStrong, { color: colors.onPrimary }]}>Call</Text>
+            <Ionicons name="call" size={20} color={colors.onPrimary} />
           </Pressable>
           <Pressable
             onPress={() => void whatsappLead(item.phone)}
@@ -718,8 +717,7 @@ export function LeadsScreen({ navigation }: any) {
               { backgroundColor: colors.successMuted, borderRadius: radius.pill, minHeight: touchTarget.min, opacity: pressed ? 0.8 : 1 },
             ]}
           >
-            <Ionicons name="logo-whatsapp" size={16} color={colors.success} />
-            <Text style={[typography.captionStrong, { color: colors.success }]}>WhatsApp</Text>
+            <Ionicons name="logo-whatsapp" size={20} color={colors.success} />
           </Pressable>
           <Pressable
             onPress={() => openEditor(item)}
@@ -730,8 +728,7 @@ export function LeadsScreen({ navigation }: any) {
               { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, minHeight: touchTarget.min, opacity: pressed ? 0.8 : 1 },
             ]}
           >
-            <Ionicons name="checkmark-done-outline" size={16} color={colors.text} />
-            <Text style={[typography.captionStrong, { color: colors.text }]}>Update</Text>
+            <Ionicons name="checkmark-done-outline" size={20} color={colors.text} />
           </Pressable>
           <Pressable
             onPress={() => openRename(item)}
@@ -740,10 +737,10 @@ export function LeadsScreen({ navigation }: any) {
             hitSlop={4}
             style={({ pressed }) => [
               styles.iconBtn,
-              { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, width: touchTarget.min, height: touchTarget.min, opacity: pressed ? 0.8 : 1 },
+              { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, minHeight: touchTarget.min, opacity: pressed ? 0.8 : 1 },
             ]}
           >
-            <Ionicons name="pencil" size={16} color={colors.text} />
+            <Ionicons name="pencil" size={20} color={colors.text} />
           </Pressable>
           {isAdmin ? (
             <Pressable
@@ -753,10 +750,10 @@ export function LeadsScreen({ navigation }: any) {
               hitSlop={4}
               style={({ pressed }) => [
                 styles.iconBtn,
-                { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, width: touchTarget.min, height: touchTarget.min, opacity: pressed ? 0.8 : 1 },
+                { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, minHeight: touchTarget.min, opacity: pressed ? 0.8 : 1 },
               ]}
             >
-              <Ionicons name="trash-outline" size={16} color={colors.danger} />
+              <Ionicons name="trash-outline" size={20} color={colors.danger} />
             </Pressable>
           ) : null}
         </View>
@@ -941,8 +938,8 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, maxWidth: 170 },
   cardActions: { flexDirection: "row", alignItems: "center" },
-  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 8 },
-  iconBtn: { alignItems: "center", justifyContent: "center" },
+  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center" },
+  iconBtn: { flex: 1, alignItems: "center", justifyContent: "center" },
   dropdown: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: StyleSheet.hairlineWidth },
   dropdownRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   pager: { flexDirection: "row", alignItems: "center" },
