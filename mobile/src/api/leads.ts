@@ -84,6 +84,10 @@ export async function updateLead(id: string, body: Partial<Lead>): Promise<Lead>
   return data.lead;
 }
 
+export async function deleteLead(id: string): Promise<void> {
+  await apiClient.delete(`/leads/${id}`);
+}
+
 export async function listSources(): Promise<LeadSource[]> {
   const { data } = await apiClient.get<{ sources: LeadSource[] }>("/leads/sources/list");
   return data.sources;

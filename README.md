@@ -259,6 +259,7 @@ The backend exposes the following API routes (all prefixed with `/api`):
 **Location**: `/location` (location sharing)
 **Leads**: `/leads` (lead management/CRM)
   - `GET /leads?page=1&limit=10&status=New&search=&sourceId=`: one page of leads (newest first) plus `total`, `totalPages` and `stageCounts`. `status=all` shows every stage. `sourceId` limits it to one list (Meta leads, Calling data…); leave it out or send `all` for every list combined. Without `page` the full list is returned (older app versions).
+  - `DELETE /leads/:id` (admin only): deletes a lead and remembers its number so sheet syncs do not re-add it. The trash button on each lead card (admin only) uses it.
   - `PATCH /leads/:id`: edit name, mobile, stage, category, plot, requirement, address, budget, notes. Records `updatedByName` / `updatedAt`. Setting the stage to "Not interested" starts a 30-day timer, after which the lead is deleted automatically.
   - `POST /leads/sources` (admin only), `POST /leads/sources/:id/share`, `DELETE /leads/sources/:id/share/:userId`: Google Sheet lists and sharing. Everyone a list is shared with sees and edits the same leads. A sheet link without `#gid=` syncs every tab.
   - `POST /leads/import`: add phone contacts as leads into the user's shareable "My contacts" list. The app also auto-adds contacts with "lead" anywhere in the name.

@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { Types } from "mongoose";
 import { Lead } from "../models/Lead";
 import { LeadSource } from "../models/LeadSource";
+import { LeadTombstone } from "../models/LeadTombstone";
 import { User } from "../models/User";
 import { fetchSheet, objectsToRows, parseCsv, parseTabs } from "../services/leadImport";
 import {
@@ -180,6 +181,21 @@ export async function updateLead(req: Request, res: Response) {
     throw err;
   }
   return res.json({ lead: serializeLead(lead.toObject()) });
+}
+
+/** Admin only. Removes the lead and remembers its number so a sheet sync doesn't bring it back. */
+export async function deleteLead(req: Request, res: Response) {
+  if (!req.isAdmin) return adminOnly(res);
+  if (!Types.ObjectId.isValid(req.params.id)) return notFound(res, "Lead not found");
+  const access = await leadAccessFilter(req.userId!);
+  const lead = await Lead.findOneAndDelete({ _id: req.params.id, ...access });
+  if (!lead) return notFound(res, "Lead not found");
+  await LeadTombstone.updateOne(
+    { ownerId: lead.ownerId, phone: lead.phone },
+    { $set: { deletedAt: new Date() } },
+    { upsert: true }
+  );
+  return res.status(204).send();
 }
 
 async function serializeSource(source: any, userId: string) {

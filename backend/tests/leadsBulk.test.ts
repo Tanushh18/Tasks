@@ -237,6 +237,25 @@ describe("lead list by source", () => {
   });
 });
 
+describe("deleting a lead", () => {
+  it("is admin only and keeps a sheet from re-adding the lead", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const bob = await registerUser(app, "9876591003", "4821", "Bob");
+    const a = authed(app, admin.token);
+    await a.post("/api/leads/admin/import").send({ csv: SIMPLE_CSV, label: "Owners" });
+    const leads = (await a.get("/api/leads?page=1&status=all")).body.leads;
+    const target = leads[0];
+    expect((await authed(app, bob.token).delete(`/api/leads/${target.id}`)).status).toBe(403);
+    expect((await a.delete(`/api/leads/${target.id}`)).status).toBe(204);
+    expect((await a.delete(`/api/leads/${target.id}`)).status).toBe(404);
+    expect((await a.delete("/api/leads/nope")).status).toBe(404);
+    expect((await a.get("/api/leads?page=1&status=all")).body.total).toBe(1);
+    const again = await a.post("/api/leads/admin/import").send({ csv: SIMPLE_CSV, label: "Owners" });
+    expect(again.body.summary.skippedDeleted).toBe(1);
+    expect((await a.get("/api/leads?page=1&status=all")).body.total).toBe(1);
+  });
+});
+
 describe("lead list, edits and cleanup", () => {
   async function seed(count: number) {
     const admin = await registerUser(app, ADMIN, "4821", "Admin");

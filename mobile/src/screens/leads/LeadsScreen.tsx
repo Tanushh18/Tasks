@@ -362,6 +362,28 @@ export function LeadsScreen({ navigation }: any) {
     }
   };
 
+  const confirmDelete = (lead: api.Lead) => {
+    Alert.alert(
+      "Delete this lead?",
+      `${lead.name || "Unnamed lead"} (${lead.phone}) will be removed for everyone and won't come back from the sheet.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () =>
+            void api
+              .deleteLead(lead.id)
+              .then(() => {
+                emitLeadEvent("leadsChanged");
+                void load({ quiet: true, fresh: true });
+              })
+              .catch((e) => Alert.alert("Couldn't delete", getApiErrorMessage(e, "Please try again."))),
+        },
+      ]
+    );
+  };
+
   const openRename = (lead: api.Lead) => {
     setIdentity({ name: lead.name || "", phone: (lead.phone || "").replace(/^\+91/, "") });
     setRenaming(lead);
@@ -723,6 +745,20 @@ export function LeadsScreen({ navigation }: any) {
           >
             <Ionicons name="pencil" size={16} color={colors.text} />
           </Pressable>
+          {isAdmin ? (
+            <Pressable
+              onPress={() => confirmDelete(item)}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${item.name || "lead"}`}
+              hitSlop={4}
+              style={({ pressed }) => [
+                styles.iconBtn,
+                { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, width: touchTarget.min, height: touchTarget.min, opacity: pressed ? 0.8 : 1 },
+              ]}
+            >
+              <Ionicons name="trash-outline" size={16} color={colors.danger} />
+            </Pressable>
+          ) : null}
         </View>
       </Pressable>
     );

@@ -19,6 +19,7 @@ router.post("/import", c.importLeads);
 router.post("/lookup", c.lookupPhones);
 router.post("/admin/import", c.adminImport);
 router.patch("/:id", c.updateLead);
+router.delete("/:id", c.deleteLead);
 router.get("/sources/list", c.listSources);
 router.post("/sources", c.addSource);
 router.patch("/sources/:id", c.updateSource);
