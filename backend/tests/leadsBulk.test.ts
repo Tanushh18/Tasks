@@ -87,6 +87,24 @@ describe("lead sheet parsing", () => {
   });
 });
 
+const META_CSV = [
+  "Qualified,created_time,ad_id,ad_name,adset_id,adset_name,campaign_id,campaign_name,form_id,form_name,is_organic,platform,\"are_you_having_a_plot_in_gurgaon_,__farkukhnagar_or_badli\",full_name,phone_number,lead_status,id",
+  "l:1,2026-08-31T12:12:17-05:00,,,,,,,f:1,Construction-02,true,,<test lead: dummy data>,<test lead: dummy data for full_name>,p:<test lead: dummy data for phone_number>,Qualified,",
+  "l:2,2026-09-05T10:00:38-05:00,ag:1,Banner-01,as:1,Construction,c:1,ShineOne-Property,f:1,Construction-02,false,fb,yes,Jitender Yadav,p:+919968460543,CREATED,",
+  "l:2,2026-09-05T20:30:38+05:30,ag:1,Banner-01,as:1,Construction,c:1,ShineOne-Property,f:1,Construction-02,false,fb,yes,Jitender Yadav,p:+919968460543,CREATED,",
+].join("\n");
+
+describe("meta lead-ads export", () => {
+  it("takes the person's name and number, not the ad name or the p: prefix", () => {
+    const r = parseTabs([{ tab: "Sheet1", rows: parseCsv(META_CSV) }]);
+    const lead = r.leads.find((l) => l.phone === "+919968460543")!;
+    expect(lead.name).toBe("Jitender Yadav");
+    expect(lead.category).toBe("Construction");
+    expect(lead.plot).toBe("yes");
+    expect(r.leads).toHaveLength(1);
+  });
+});
+
 describe("no-auth bulk import", () => {
   const realFetch = global.fetch;
   afterEach(() => {
@@ -197,6 +215,25 @@ describe("admin-only lead tools", () => {
     expect(seen.url).toBeUndefined();
     expect(seen.lastError).toBeUndefined();
     expect((await authed(app, bob.token).get("/api/leads?page=1&status=all")).body.total).toBe(2);
+  });
+});
+
+describe("lead list by source", () => {
+  it("filters to one list, or combines all of them", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const a = authed(app, admin.token);
+    await a.post("/api/leads/admin/import").send({ csv: SIMPLE_CSV, label: "Calling data" });
+    await a.post("/api/leads/admin/import").send({ csv: META_CSV, label: "Meta leads" });
+    const sources = (await a.get("/api/leads/sources/list")).body.sources;
+    const id = (label: string) => sources.find((s: any) => s.label === label).id;
+    const total = async (q: string) => (await a.get(`/api/leads?page=1&status=all${q}`)).body;
+    expect((await total("")).total).toBe(3);
+    expect((await total("&sourceId=all")).total).toBe(3);
+    const meta = await total(`&sourceId=${id("Meta leads")}`);
+    expect(meta.total).toBe(1);
+    expect(meta.totalAll).toBe(1);
+    expect((await total(`&sourceId=${id("Calling data")}`)).total).toBe(2);
+    expect((await a.get("/api/leads?page=1&sourceId=nope")).status).toBe(400);
   });
 });
 

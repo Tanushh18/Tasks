@@ -104,6 +104,10 @@ export function LeadsScreen({ navigation }: any) {
 
   const [page, setPage] = useState(1);
   const [stage, setStage] = useState<string>(DEFAULT_STAGE);
+  // Which list the leads come from (e.g. Meta leads, Calling data); "all" combines every list.
+  const [sourceId, setSourceId] = useState<string>(ALL);
+  const [sources, setSources] = useState<api.LeadSource[]>([]);
+  const [pickingSource, setPickingSource] = useState(false);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [data, setData] = useState<api.LeadPage | null>(null);
@@ -139,7 +143,7 @@ export function LeadsScreen({ navigation }: any) {
   }, [search]);
 
   // A new filter or search starts again at page 1.
-  useEffect(() => setPage(1), [stage, query]);
+  useEffect(() => setPage(1), [stage, query, sourceId]);
 
   const load = useCallback(
     async (opts: { quiet?: boolean; fresh?: boolean } = {}) => {
@@ -147,7 +151,7 @@ export function LeadsScreen({ navigation }: any) {
       if (!opts.quiet) setLoading(true);
       if (opts.fresh) bypassCacheBriefly();
       try {
-        const res = await api.listLeadsPage({ page, status: stage, search: query });
+        const res = await api.listLeadsPage({ page, status: stage, search: query, sourceId });
         if (id !== request.current) return;
         // Deleting/filtering can leave us past the last page; step back.
         if (res.page > res.totalPages && res.totalPages >= 1) {
@@ -162,7 +166,7 @@ export function LeadsScreen({ navigation }: any) {
         if (id === request.current) setLoading(false);
       }
     },
-    [page, stage, query]
+    [page, stage, query, sourceId]
   );
 
   useEffect(() => {
@@ -203,6 +207,10 @@ export function LeadsScreen({ navigation }: any) {
   useEffect(() => {
     void isAutoSyncEnabled().then(setAutoAdd);
     api
+      .listSources()
+      .then((list) => setSources(list.filter((x) => x.enabled)))
+      .catch(() => undefined);
+    api
       .getLeadMeta()
       .then((m) => {
         if (m.statusSuggestions?.length) setStatusOptions(m.statusSuggestions);
@@ -220,6 +228,11 @@ export function LeadsScreen({ navigation }: any) {
     const others = (data?.stageCounts ?? []).map((c) => c.stage).filter((s) => s !== DEFAULT_STAGE);
     return [DEFAULT_STAGE, ...others, ALL];
   }, [data]);
+
+  const sourceName = useCallback(
+    (id: string) => (id === ALL ? "All leads" : sources.find((x) => x.id === id)?.label || "Sheet"),
+    [sources]
+  );
 
   const goToPage = (next: number) => {
     setPage(next);
@@ -521,6 +534,22 @@ export function LeadsScreen({ navigation }: any) {
         </View>
       ) : null}
 
+      <Pressable
+        onPress={() => setPickingSource(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`Lead list: ${sourceName(sourceId)}. Tap to change.`}
+        style={[
+          styles.dropdown,
+          { marginTop: spacing.md, minHeight: touchTarget.min, borderColor: colors.border, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, paddingHorizontal: spacing.md },
+        ]}
+      >
+        <Ionicons name="funnel-outline" size={18} color={colors.primary} />
+        <Text style={[typography.bodyStrong, { color: colors.text, flex: 1 }]} numberOfLines={1}>
+          {sourceName(sourceId)}
+        </Text>
+        <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
+      </Pressable>
+
       <View style={{ marginTop: spacing.md }}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Search name, phone, stage or notes" />
       </View>
@@ -741,6 +770,24 @@ export function LeadsScreen({ navigation }: any) {
         />
       )}
 
+      <BottomSheet visible={pickingSource} onClose={() => setPickingSource(false)} title="Show leads from" scrollable>
+        {[{ id: ALL, label: "All leads" }, ...sources.map((x) => ({ id: x.id, label: x.label || "Sheet" }))].map((opt) => (
+          <Pressable
+            key={opt.id}
+            onPress={() => {
+              setSourceId(opt.id);
+              setPickingSource(false);
+            }}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: sourceId === opt.id }}
+            style={[styles.dropdownRow, { minHeight: touchTarget.min, paddingVertical: spacing.sm }]}
+          >
+            <Text style={[sourceId === opt.id ? typography.bodyStrong : typography.body, { color: colors.text, flex: 1 }]}>{opt.label}</Text>
+            {sourceId === opt.id ? <Ionicons name="checkmark" size={20} color={colors.primary} /> : null}
+          </Pressable>
+        ))}
+      </BottomSheet>
+
       <BottomSheet visible={!!editing} onClose={() => setEditing(null)} title={editing?.name || "Lead"} subtitle={editing?.phone} avoidKeyboard>
         <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>Stage</Text>
         <FilterChipGroup>
@@ -860,6 +907,8 @@ const styles = StyleSheet.create({
   cardActions: { flexDirection: "row", alignItems: "center" },
   actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 8 },
   iconBtn: { alignItems: "center", justifyContent: "center" },
+  dropdown: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: StyleSheet.hairlineWidth },
+  dropdownRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   pager: { flexDirection: "row", alignItems: "center" },
   sheetButtons: { flexDirection: "row", marginTop: 8 },
 });

@@ -120,6 +120,9 @@ type Role =
 export function classifyHeader(raw: string): Role {
   const h = norm(raw);
   if (!h) return "remark"; // Unnamed trailing columns usually hold free-text remarks.
+  // Meta lead-ad export: ad/adset/campaign/form names describe the ad, not the person.
+  if (/^adset name$/.test(h)) return "category"; // "Construction" etc.
+  if (/^(ad|adset|campaign|form) (name|id)$|^(is organic|platform|created time|lead status|id|qualified)$/.test(h)) return "skip";
   if (/landline|land line|\bfax\b|\btel\b|telephone|\bstd\b/.test(h)) return "landline";
   if (/e-?mail/.test(h)) return "email";
   if (/(name|appl).*(2nd|iind|second|co-?appl|joint)|^(co-?applicant|joint)/.test(h)) return "name2";
@@ -129,7 +132,7 @@ export function classifyHeader(raw: string): Role {
   if (/address|^city$|pin ?code|pincode|^state$|locality/.test(h)) return "address";
   if (/remark|comment|note|feedback|response|follow/.test(h)) return "remark";
   if (/campaign|ad ?name|^type$|category/.test(h)) return "category";
-  if (/farukh|farrukh|^plot/.test(h)) return "plot";
+  if (/farukh|farrukh|farkukh|^plot|plot in/.test(h)) return "plot";
   if (/^(s|sr|serial)( no)?$|^s no$|^sr no$|serial no|status of buyer|^title$|salutation|country|^ph 1$/.test(h)) return "skip";
   if (/tower|apartment|flat|\bapt\b|unit|area|payment|facing|priority|as per|plan|size|block|floor/.test(h)) return "info";
   return "skip";

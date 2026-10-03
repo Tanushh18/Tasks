@@ -44,6 +44,7 @@ export async function listLeads(req: Request, res: Response) {
   const archived = req.query.archived === "true";
   const search = str(req.query.search as string, 120);
   const status = str(req.query.status as string, 200);
+  const sourceId = str(req.query.sourceId as string, 40);
   // Old app versions don't send `page` and expect every lead back in one go.
   const paged = req.query.page !== undefined;
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
@@ -51,6 +52,11 @@ export async function listLeads(req: Request, res: Response) {
 
   const base: Record<string, unknown>[] = [await leadAccessFilter(req.userId!)];
   if (!archived) base.push({ archived: false });
+  // One list only (e.g. Meta leads or Calling data); "all"/absent means every list combined.
+  if (sourceId && sourceId.toLowerCase() !== "all") {
+    if (!Types.ObjectId.isValid(sourceId)) return badRequest(res, "Unknown lead list");
+    base.push({ sourceIds: new Types.ObjectId(sourceId) });
+  }
 
   if (search) {
     const escapedSearch = escapeRegex(search);
