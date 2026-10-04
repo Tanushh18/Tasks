@@ -19,7 +19,7 @@ const clean=(v:unknown,max=4000)=>typeof v==="string"?v.trim().slice(0,max):"";
 const hash=(text:string)=>crypto.createHash("sha256").update(text).digest("hex");
 
 export async function accessibleSources(userId:string){return LeadSource.find({$or:[{ownerId:userId},{sharedWith:userId}]})}
-export async function leadAccessFilter(userId:string){const ids=(await accessibleSources(userId)).map(s=>s._id);return{$or:[{ownerId:new Types.ObjectId(userId)},{sourceIds:{$in:ids}}]}}
+export async function leadAccessFilter(userId:string){const ids=(await LeadSource.find({$or:[{ownerId:userId},{sharedWith:userId}]},{_id:1}).lean()).map(s=>s._id);return{$or:[{ownerId:new Types.ObjectId(userId)},{sourceIds:{$in:ids}}]}}
 
 /** Sheet link -> {sheetId,gid}. A link without a gid means "every tab" (gid "all"). */
 export const parseLeadSourceUrl=(url:string,allTabs=false)=>{const ref=parseSheetUrl(url);if(!ref)return null;return{sheetId:ref.sheetId,gid:allTabs||!ref.gid?"all":ref.gid}};

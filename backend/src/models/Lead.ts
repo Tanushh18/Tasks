@@ -12,4 +12,6 @@ const leadSchema = new Schema({
   notInterestedAt:{type:Date,default:null,index:true}
 },{timestamps:true});
 leadSchema.index({ownerId:1,phone:1},{unique:true}); leadSchema.index({ownerId:1,archived:1,sheetDate:-1}); leadSchema.index({archived:1,createdAt:-1}); leadSchema.index({sourceIds:1});
+// The list sorts newest first inside an owner or a source: these let Mongo read a page without sorting in memory.
+leadSchema.index({ownerId:1,archived:1,createdAt:-1,_id:-1}); leadSchema.index({sourceIds:1,archived:1,createdAt:-1,_id:-1});
 export type LeadDocument=HydratedDocument<InferSchemaType<typeof leadSchema>>; export const Lead=model("Lead",leadSchema);

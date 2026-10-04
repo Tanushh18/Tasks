@@ -25,7 +25,7 @@ import {
 } from "../../leads/callOverlay";
 import { syncTaggedContacts } from "../../leads/contactAutoSync";
 import { emitLeadEvent, onLeadEvent } from "../../leads/leadEvents";
-import { getLocalSources, queryLocalLeads, refreshLeadStoreIfStale } from "../../leads/leadStore";
+import { getLocalSources, isLocalFresh, queryLocalLeads, refreshLeadStoreIfStale } from "../../leads/leadStore";
 import { isUnreachableError } from "../../offline/httpQueue";
 import { bypassCacheBriefly } from "../../offline/httpCache";
 import { useTheme, type Theme } from "../../theme/useTheme";
@@ -135,9 +135,9 @@ export function LeadsScreen({ navigation }: any) {
   const listRef = useRef<FlatList<api.Lead>>(null);
   const request = useRef(0);
 
-  // Typing in search waits a moment before asking the server.
+  // Typing in search waits a moment so a fast typist triggers one lookup, not one per letter.
   useEffect(() => {
-    const t = setTimeout(() => setQuery(search.trim()), 350);
+    const t = setTimeout(() => setQuery(search.trim()), 150);
     return () => clearTimeout(t);
   }, [search]);
 
@@ -161,6 +161,9 @@ export function LeadsScreen({ navigation }: any) {
           setData(local);
           setError(null);
           setLoading(false);
+          // Searching, switching stage or list and paging are answered from the phone alone while the
+          // saved copy is recent. The 30 s refresh and pull-to-refresh still ask the server.
+          if (!opts.fresh && (await isLocalFresh(STORE_REFRESH_MS))) return;
         }
       }
       if (opts.fresh) bypassCacheBriefly();

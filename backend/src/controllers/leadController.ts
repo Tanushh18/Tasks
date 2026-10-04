@@ -85,20 +85,27 @@ export async function listLeads(req: Request, res: Response) {
     return res.json({ leads: leads.map(serializeLead) });
   }
 
-  const [total, leads, grouped, totalAll] = await Promise.all([
-    Lead.countDocuments(filter),
+  // Two queries per page: the page itself and one grouped count. Totals come from the group, so
+  // there is no separate countDocuments for the page total or for "all".
+  const [leads, grouped] = await Promise.all([
     Lead.find(filter).sort(sort).skip((page - 1) * limit).limit(limit).lean(),
     Lead.aggregate<{ _id: string; count: number }>([
       { $match: { $and: base } },
       { $group: { _id: "$status", count: { $sum: 1 } } },
     ]),
-    Lead.countDocuments({ $and: base }),
   ]);
 
   const counts = new Map<string, number>();
+  let totalAll = 0;
+  let total = 0;
+  const wantAll = !status || status.toLowerCase() === "all";
+  const wantNew = !wantAll && NEW_STATUS.test(status!);
   for (const g of grouped) {
-    const key = NEW_STATUS.test(g._id ?? "") ? "New" : String(g._id).trim();
+    const raw = g._id ?? "";
+    const key = NEW_STATUS.test(raw) ? "New" : String(raw).trim();
     counts.set(key, (counts.get(key) ?? 0) + g.count);
+    totalAll += g.count;
+    if (wantAll || (wantNew ? NEW_STATUS.test(raw) : raw === status)) total += g.count;
   }
 
   return res.json({

@@ -68,4 +68,37 @@ describe("on-device lead store", () => {
     expect(page.leads).toHaveLength(1);
     expect(page.leads[0]).toMatchObject({ id: "l1", status: "Follow-up", notes: "call Monday" });
   });
+
+  it("stays correct after edits (search and counts are not served from stale memory)", async () => {
+    mockGet.mockImplementation(async (url: string) =>
+      url === "/leads" ? { data: { leads: [mk(1), mk(2), mk(3)], totalPages: 1 } } : { data: { sources: [] } }
+    );
+    await refreshLeadStore();
+    expect((await queryLocalLeads({ page: 1, limit: 10, status: "all", search: "zebra" }))!.total).toBe(0);
+    const before = await queryLocalLeads({ page: 1, limit: 10, status: "all" });
+    expect(before!.stageCounts).toEqual([{ stage: "New", count: 3 }]);
+    await applyLocalEdit("l2", { notes: "Zebra plot", status: "Interested" });
+    expect((await queryLocalLeads({ page: 1, limit: 10, status: "all", search: "zebra" }))!.leads.map((l) => l.id)).toEqual(["l2"]);
+    const after = await queryLocalLeads({ page: 1, limit: 10, status: "all" });
+    expect(after!.stageCounts).toEqual(expect.arrayContaining([{ stage: "New", count: 2 }, { stage: "Interested", count: 1 }]));
+    // newest first, as the server returns it
+    const ids = after!.leads.map((l) => l.createdAt);
+    expect(ids).toEqual([...ids].sort().reverse());
+  });
+
+  it("answers search, filter and paging over 5,000 leads in a few milliseconds", async () => {
+    const big = Array.from({ length: 5000 }, (_, i) => mk(i + 1, { name: `Lead ${i}`, status: i % 7 ? "" : "Follow-up" }));
+    mockGet.mockImplementation(async (url: string, cfg: { params: { page: number } }) =>
+      url === "/leads"
+        ? { data: { leads: big.slice((cfg.params.page - 1) * 100, cfg.params.page * 100), totalPages: 50 } }
+        : { data: { sources: [] } }
+    );
+    await refreshLeadStore();
+    await queryLocalLeads({ page: 1, limit: 10, status: "all" }); // warm
+    const t = Date.now();
+    for (let i = 0; i < 20; i++) {
+      await queryLocalLeads({ page: 1 + (i % 5), limit: 10, status: i % 2 ? "New" : "Follow-up", search: i % 3 ? "lead 4" : "" });
+    }
+    expect((Date.now() - t) / 20).toBeLessThan(25);
+  });
 });

@@ -29,6 +29,26 @@ const metaKey = (scope: string) => `${BASE}:${scope}:meta`;
 const chunkKey = (scope: string, i: number) => `${BASE}:${scope}:${i}`;
 
 let cache: { scope: string; leads: Lead[]; meta: Meta } | null = null;
+/** Lower-cased text each lead is searched against, built once per lead instead of on every keystroke. */
+const haystack = new Map<string, string>();
+/** Stage counts per (list, search), reused while paging and switching stages; cleared on any change. */
+const countMemo = new Map<string, { stageCounts: { stage: string; count: number }[]; totalAll: number; base: Lead[] }>();
+
+const byNewest = (a: Lead, b: Lead) => (b.createdAt ?? "").localeCompare(a.createdAt ?? "") || b.id.localeCompare(a.id);
+
+function hayFor(l: Lead): string {
+  let h = haystack.get(l.id);
+  if (h === undefined) {
+    h = `${l.name ?? ""}\n${l.status ?? ""}\n${l.notes ?? ""}\n${l.info ?? ""}`.toLowerCase();
+    haystack.set(l.id, h);
+  }
+  return h;
+}
+
+function resetDerived(): void {
+  haystack.clear();
+  countMemo.clear();
+}
 let refreshing: Promise<number> | null = null;
 let chain: Promise<unknown> = Promise.resolve();
 
@@ -46,6 +66,8 @@ async function load(): Promise<{ scope: string; leads: Lead[]; meta: Meta } | nu
   if (!meta) return null;
   const leads: Lead[] = [];
   for (let i = 0; i < meta.chunks; i++) leads.push(...((await getJson<Lead[]>(chunkKey(scope, i))) ?? []));
+  leads.sort(byNewest);
+  resetDerived();
   cache = { scope, leads, meta };
   return cache;
 }
@@ -57,7 +79,9 @@ async function persist(scope: string, leads: Lead[], sources: LeadSource[]): Pro
   for (let i = chunks; i < (old?.chunks ?? 0); i++) await removeJson(chunkKey(scope, i));
   const meta: Meta = { updatedAt: Date.now(), chunks, count: leads.length, sources };
   await setJson(metaKey(scope), meta);
-  cache = { scope, leads, meta };
+  const sorted = [...leads].sort(byNewest);
+  resetDerived();
+  cache = { scope, leads: sorted, meta };
 }
 
 /** True once at least one full copy has been saved on this phone. */
@@ -99,6 +123,12 @@ export function refreshLeadStore(): Promise<number> {
   return refreshing;
 }
 
+/** True when the saved copy is newer than `maxAgeMs`, so the screen can skip the server entirely. */
+export async function isLocalFresh(maxAgeMs: number): Promise<boolean> {
+  const at = await localUpdatedAt();
+  return !!at && Date.now() - at < maxAgeMs && (await getHttpQueueCount()) === 0;
+}
+
 /** Refreshes only when the saved copy is older than `maxAgeMs` (or missing). Never throws. */
 export async function refreshLeadStoreIfStale(maxAgeMs: number): Promise<void> {
   try {
@@ -123,40 +153,47 @@ export async function queryLocalLeads(opts: {
   if (!store) return null;
   const { leads } = store;
 
-  let base = leads.filter((l) => !l.archived);
-  if (opts.sourceId && opts.sourceId !== "all") base = base.filter((l) => (l as Lead & { sourceIds?: string[] }).sourceIds?.includes(opts.sourceId!));
+  const sourceId = opts.sourceId && opts.sourceId !== "all" ? opts.sourceId : "";
   const q = (opts.search ?? "").trim().toLowerCase();
-  if (q) {
+  const memoKey = `${sourceId}|${q}`;
+  let memo = countMemo.get(memoKey);
+  if (!memo) {
+    // `leads` is already newest first, so filtering keeps the order and nothing needs sorting here.
     const digits = q.replace(/\D/g, "");
-    base = base.filter(
+    const base = leads.filter(
       (l) =>
-        [l.name, l.status, l.notes, l.info].some((f) => (f ?? "").toLowerCase().includes(q)) ||
-        (digits.length >= 3 && (l.phone ?? "").replace(/\D/g, "").includes(digits))
+        !l.archived &&
+        (!sourceId || (l as Lead & { sourceIds?: string[] }).sourceIds?.includes(sourceId)) &&
+        (!q || hayFor(l).includes(q) || (digits.length >= 3 && (l.phone ?? "").replace(/\D/g, "").includes(digits)))
     );
-  }
-
-  const counts = new Map<string, number>();
-  for (const l of base) {
-    const key = NEW_STATUS.test(l.status ?? "") ? "New" : String(l.status).trim();
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+    const counts = new Map<string, number>();
+    for (const l of base) {
+      const key = NEW_STATUS.test(l.status ?? "") ? "New" : String(l.status).trim();
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    memo = {
+      base,
+      totalAll: base.length,
+      stageCounts: [...counts.entries()].map(([stage, count]) => ({ stage, count })).sort((a, b) => b.count - a.count),
+    };
+    countMemo.set(memoKey, memo);
   }
 
   const status = opts.status;
   const filtered =
     !status || status.toLowerCase() === "all"
-      ? base
-      : base.filter((l) => (NEW_STATUS.test(status) ? NEW_STATUS.test(l.status ?? "") : l.status === status));
-  const sorted = [...filtered].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? "") || b.id.localeCompare(a.id));
-  const totalPages = Math.max(1, Math.ceil(sorted.length / opts.limit));
+      ? memo.base
+      : memo.base.filter((l) => (NEW_STATUS.test(status) ? NEW_STATUS.test(l.status ?? "") : l.status === status));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / opts.limit));
   const page = Math.min(Math.max(1, opts.page), totalPages);
   return {
-    leads: sorted.slice((page - 1) * opts.limit, page * opts.limit),
+    leads: filtered.slice((page - 1) * opts.limit, page * opts.limit),
     page,
     limit: opts.limit,
-    total: sorted.length,
+    total: filtered.length,
     totalPages,
-    totalAll: base.length,
-    stageCounts: [...counts.entries()].map(([stage, count]) => ({ stage, count })).sort((a, b) => b.count - a.count),
+    totalAll: memo.totalAll,
+    stageCounts: memo.stageCounts,
   };
 }
 
