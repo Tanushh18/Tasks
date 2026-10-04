@@ -256,6 +256,26 @@ describe("deleting a lead", () => {
   });
 });
 
+describe("names-only correction", () => {
+  it("fixes the name and leaves stage, notes and everything else alone", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const a = authed(app, admin.token);
+    await a.post("/api/leads/admin/import").send({ csv: META_CSV, label: "Meta leads" });
+    const lead = (await a.get("/api/leads?page=1&status=all")).body.leads[0];
+    await Lead.updateOne({ _id: lead.id }, { name: "Banner-01", status: "Follow-up", notes: "call Monday", category: "Interior" });
+
+    const dry = await request(app).post("/api/leads/bulk-import").send({ csv: META_CSV, namesOnly: true, dryRun: true });
+    expect(dry.body.changes).toEqual([{ phone: "+919968460543", from: "Banner-01", to: "Jitender Yadav" }]);
+    expect((await Lead.findById(lead.id).lean())?.name).toBe("Banner-01");
+
+    const res = await request(app).post("/api/leads/bulk-import").send({ csv: META_CSV, namesOnly: true });
+    expect(res.body.changed).toBe(1);
+    const after = await Lead.findById(lead.id).lean();
+    expect(after).toMatchObject({ name: "Jitender Yadav", status: "Follow-up", notes: "call Monday", category: "Interior" });
+    expect(await Lead.countDocuments()).toBe(1);
+  });
+});
+
 describe("lead list, edits and cleanup", () => {
   async function seed(count: number) {
     const admin = await registerUser(app, ADMIN, "4821", "Admin");

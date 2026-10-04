@@ -439,6 +439,20 @@ async function runImport(req: Request, res: Response, ownerId: string, owner: { 
   }
   const parsed = parseTabs(collected.tabs);
   const dryRun = truthy(b.dryRun);
+  if (truthy(b.namesOnly)) {
+    // Corrects names of leads that already exist (matched by mobile). Writes the name field and nothing else:
+    // no new leads, no lists, and stage / notes / category etc. are never touched.
+    const owner = new Types.ObjectId(ownerId);
+    const changes: { phone: string; from: string; to: string }[] = [];
+    for (const l of parsed.leads) {
+      if (!l.name || /test lead/i.test(l.name)) continue;
+      const cur = await Lead.findOne({ ownerId: owner, phone: l.phone }, { name: 1 }).lean();
+      if (!cur || cur.name === l.name) continue;
+      changes.push({ phone: l.phone, from: cur.name ?? "", to: l.name });
+      if (!dryRun) await Lead.updateOne({ _id: cur._id }, { $set: { name: l.name } });
+    }
+    return res.json({ dryRun, namesOnly: true, owner, checked: parsed.leads.length, changed: changes.length, changes });
+  }
   const result = await importParsedLeads(ownerId, parsed, {
     label: collected.label,
     dryRun,
