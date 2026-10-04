@@ -136,6 +136,25 @@ export async function listOrigins(_req: Request, res: Response) {
   res.json({ origins: rows.map((r) => ({ name: r._id, count: r.count })) });
 }
 
+/**
+ * Admin only. Renames a sheet name everywhere: every lead whose origin is `from` gets origin `to`. Only the origin field is
+ * written, so stages, notes and follow-ups are untouched. Renaming into a name that already exists merges the two groups.
+ * Lists that carry the old name are renamed too, so new leads from them use the new name.
+ */
+export async function renameOrigin(req: Request, res: Response) {
+  if (!req.isAdmin) return adminOnly(res);
+  const from = str(req.body?.from, 120);
+  const to = str(req.body?.to, 80);
+  if (!from) return badRequest(res, "Which sheet name should be renamed?");
+  if (!to) return badRequest(res, "Enter the new name");
+  if (to === from) return res.json({ renamed: 0, from, to });
+
+  const result = await Lead.updateMany({ origin: from }, { $set: { origin: to } });
+  const lists = await LeadSource.find({ label: from, sheetId: { $nin: Object.keys(KNOWN_SHEET_LABELS) } }, { _id: 1 }).lean();
+  if (lists.length) await LeadSource.updateMany({ _id: { $in: lists.map((l) => l._id) } }, { $set: { label: to } });
+  return res.json({ renamed: result.modifiedCount ?? 0, from, to });
+}
+
 export async function updateLead(req: Request, res: Response) {
   const access = await leadAccessFilter(req.userId!);
   const lead = await Lead.findOne({ _id: req.params.id, ...access });

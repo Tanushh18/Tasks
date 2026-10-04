@@ -210,6 +210,16 @@ export async function getLocalOrigins(): Promise<{ name: string; count: number }
   return [...counts.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** After a sheet name is renamed on the server, do the same to the copy on the phone. */
+export async function renameLocalOrigin(from: string, to: string): Promise<void> {
+  await serial(async () => {
+    const store = await load();
+    if (!store) return;
+    const leads = store.leads.map((l) => (l.origin === from ? { ...l, origin: to } : l));
+    await persist(store.scope, leads, store.meta.sources);
+  });
+}
+
 /** Applies an edit to the saved copy right away (used for online saves and for edits queued offline). */
 export async function applyLocalEdit(id: string, patch: Partial<Lead>): Promise<void> {
   await serial(async () => {

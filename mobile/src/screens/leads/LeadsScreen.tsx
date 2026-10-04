@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { Alert, AppState, FlatList, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as api from "../../api/leads";
+import { useAuth } from "../../auth/AuthContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BottomSheet } from "../../components/BottomSheet";
 import { Button } from "../../components/Button";
@@ -24,7 +25,7 @@ import {
 } from "../../leads/callOverlay";
 import { syncTaggedContacts } from "../../leads/contactAutoSync";
 import { emitLeadEvent, onLeadEvent } from "../../leads/leadEvents";
-import { getLocalOrigins, isLocalFresh, queryLocalLeads, refreshLeadStoreIfStale } from "../../leads/leadStore";
+import { getLocalOrigins, isLocalFresh, queryLocalLeads, refreshLeadStoreIfStale, renameLocalOrigin } from "../../leads/leadStore";
 import { isUnreachableError } from "../../offline/httpQueue";
 import { bypassCacheBriefly } from "../../offline/httpCache";
 import { useTheme, type Theme } from "../../theme/useTheme";
@@ -92,6 +93,12 @@ export function LeadsScreen({ navigation }: any) {
   const [sheet, setSheet] = useState<string>(ALL);
   const [sheets, setSheets] = useState<api.OriginCount[]>([]);
   const [pickingSource, setPickingSource] = useState(false);
+  // Renaming a sheet name (admin only) updates it on every lead that carries it.
+  const { user } = useAuth();
+  const isAdmin = api.isLeadAdmin(user);
+  const [renamingSheet, setRenamingSheet] = useState<string | null>(null);
+  const [sheetNewName, setSheetNewName] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
   const [offline, setOffline] = useState(false);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -260,6 +267,30 @@ export function LeadsScreen({ navigation }: any) {
     const others = (data?.stageCounts ?? []).map((c) => c.stage).filter((s) => s !== DEFAULT_STAGE);
     return [DEFAULT_STAGE, ...others, ALL];
   }, [data]);
+
+  const saveSheetRename = async () => {
+    const from = renamingSheet;
+    const to = sheetNewName.trim();
+    if (!from) return;
+    if (!to) {
+      Alert.alert("Name required");
+      return;
+    }
+    setRenameBusy(true);
+    try {
+      const { renamed } = await api.renameOrigin(from, to);
+      await renameLocalOrigin(from, to);
+      if (sheet === from) setSheet(to);
+      setRenamingSheet(null);
+      loadSheets();
+      void load({ quiet: true, fresh: true });
+      Alert.alert("Renamed", `${renamed.toLocaleString("en-IN")} lead${renamed === 1 ? "" : "s"} now show "${to}".`);
+    } catch (e) {
+      Alert.alert("Couldn't rename", getApiErrorMessage(e));
+    } finally {
+      setRenameBusy(false);
+    }
+  };
 
   const sheetName = (name: string) => (name === ALL ? "All leads" : name);
 
@@ -733,8 +764,37 @@ export function LeadsScreen({ navigation }: any) {
               <Text style={[typography.caption, { color: colors.textMuted }]}>{opt.count.toLocaleString("en-IN")}</Text>
             ) : null}
             {sheet === opt.name ? <Ionicons name="checkmark" size={20} color={colors.primary} /> : null}
+            {isAdmin && opt.name !== ALL ? (
+              <Pressable
+                onPress={() => {
+                  setPickingSource(false);
+                  setSheetNewName(opt.name);
+                  setRenamingSheet(opt.name);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Rename ${opt.name}`}
+                hitSlop={8}
+                style={[styles.renameBtn, { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, width: touchTarget.min - 8, height: touchTarget.min - 8 }]}
+              >
+                <Ionicons name="pencil" size={16} color={colors.text} />
+              </Pressable>
+            ) : null}
           </Pressable>
         ))}
+      </BottomSheet>
+
+      <BottomSheet
+        visible={renamingSheet !== null}
+        onClose={() => setRenamingSheet(null)}
+        title="Rename sheet"
+        subtitle="Every lead under this name is updated. Stages and notes are not touched."
+        avoidKeyboard
+      >
+        <TextField label="New name" value={sheetNewName} onChangeText={setSheetNewName} placeholder="e.g. Calling Data" autoCapitalize="words" />
+        <View style={[styles.sheetButtons, { gap: spacing.md }]}>
+          <Button label="Cancel" variant="secondary" onPress={() => setRenamingSheet(null)} style={{ flex: 1 }} />
+          <Button label="Rename" onPress={() => void saveSheetRename()} loading={renameBusy} style={{ flex: 1 }} />
+        </View>
       </BottomSheet>
 
       <BottomSheet visible={!!editing} onClose={() => setEditing(null)} title={editing?.name || "Lead"} subtitle={editing?.phone} avoidKeyboard>
@@ -843,6 +903,7 @@ const styles = StyleSheet.create({
   actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center" },
   iconBtn: { flex: 1, alignItems: "center", justifyContent: "center" },
   dropdown: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: StyleSheet.hairlineWidth },
+  renameBtn: { alignItems: "center", justifyContent: "center" },
   dropdownRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   pager: { flexDirection: "row", alignItems: "center" },
   sheetButtons: { flexDirection: "row", marginTop: 8 },

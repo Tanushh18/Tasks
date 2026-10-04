@@ -96,6 +96,12 @@ export async function listOrigins(): Promise<OriginCount[]> {
   return data.origins;
 }
 
+/** Admin only. Renames a sheet name on every lead that carries it (only the name changes). */
+export async function renameOrigin(from: string, to: string): Promise<{ renamed: number }> {
+  const { data } = await apiClient.post<{ renamed: number }>("/leads/origins/rename", { from, to });
+  return data;
+}
+
 export async function updateLead(id: string, body: Partial<Lead>): Promise<Lead> {
   const { data } = await apiClient.patch<{ lead: Lead }>(`/leads/${id}`, body);
   // Also true when the save was only queued offline: the list on the phone shows it straight away.

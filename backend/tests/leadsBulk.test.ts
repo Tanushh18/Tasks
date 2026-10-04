@@ -426,6 +426,34 @@ describe("imported leads that also belong to a named sheet", () => {
   });
 });
 
+describe("renaming a sheet name from the filter", () => {
+  it("updates every lead under that name, merges into an existing name, and touches nothing else", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const bob = await registerUser(app, "9876591007", "4821", "Bob");
+    const a = authed(app, admin.token);
+    await a.post("/api/leads/admin/import").send({ csv: SIMPLE_CSV, label: "Central Park II buyers" });
+    await a.post("/api/leads/admin/import").send({ csv: META_CSV, label: "Meta Sheet" });
+    await Lead.updateMany({ origin: "Central Park II buyers" }, { $set: { status: "Follow-up", notes: "keep me" } });
+
+    expect((await authed(app, bob.token).post("/api/leads/origins/rename").send({ from: "Central Park II buyers", to: "X" })).status).toBe(403);
+    expect((await a.post("/api/leads/origins/rename").send({ from: "Central Park II buyers", to: "  " })).status).toBe(400);
+
+    const res = await a.post("/api/leads/origins/rename").send({ from: "Central Park II buyers", to: "Calling Data" });
+    expect(res.body).toMatchObject({ renamed: 2, from: "Central Park II buyers", to: "Calling Data" });
+    expect((await a.get("/api/leads/origins")).body.origins).toEqual([
+      { name: "Calling Data", count: 2 },
+      { name: "Meta Sheet", count: 1 },
+    ]);
+    expect(await Lead.countDocuments({ origin: "Calling Data", status: "Follow-up", notes: "keep me" })).toBe(2);
+    // The import list itself carries the new name, so later leads from it use it too.
+    expect((await a.get("/api/leads/sources/list")).body.sources.map((s: any) => s.label)).toContain("Calling Data");
+
+    // Renaming into an existing name merges the groups.
+    await a.post("/api/leads/origins/rename").send({ from: "Calling Data", to: "Meta Sheet" });
+    expect((await a.get("/api/leads/origins")).body.origins).toEqual([{ name: "Meta Sheet", count: 3 }]);
+  });
+});
+
 describe("renaming a list", () => {
   it("lets the owner rename an imported list, and nobody else", async () => {
     const admin = await registerUser(app, ADMIN, "4821", "Admin");
