@@ -11,6 +11,7 @@ const c = Object.fromEntries(
 export const shinePublicRouter = Router();
 // Read-only and public: any website may read it, whatever CORS_ORIGIN says for the app.
 shinePublicRouter.get("/media", cors({ origin: true, methods: ["GET"] }), c.publicMedia);
+shinePublicRouter.get("/site", cors({ origin: true, methods: ["GET"] }), c.publicSite);
 
 const router = Router();
 router.use(requireAuth);
@@ -18,4 +19,6 @@ router.get("/projects", c.listProjects);
 router.post("/sign", c.signUpload);
 router.post("/uploaded", c.uploaded);
 router.post("/delete", c.removeMedia);
+router.get("/site", c.getSite);
+router.put("/site/:key", c.updateSiteProject);
 export default router;

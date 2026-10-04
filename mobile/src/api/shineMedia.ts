@@ -106,3 +106,29 @@ export async function uploadMany(
   if (uploaded > 0) await markUploaded().catch(() => undefined);
   return { uploaded, error };
 }
+
+/* ── Website project status (progress %, stage, ETA) ── */
+
+export const SITE_STAGES = ["Foundation", "Structure", "Finishing", "Interior Works", "Final Inspection", "Handover"] as const;
+
+export interface SiteProject {
+  key: string;
+  name: string;
+  status: "Completed" | "Ongoing";
+  area: string;
+  progress: number;
+  stage: string;
+  eta: string;
+}
+
+export type SiteProjectUpdate = Partial<Pick<SiteProject, "status" | "area" | "progress" | "stage" | "eta">>;
+
+export async function getSite(): Promise<{ projects: SiteProject[]; updatedAt: string | null }> {
+  const { data } = await apiClient.get("/shine-media/site", { _noCache: true } as object);
+  return data;
+}
+
+export async function updateSiteProject(key: string, update: SiteProjectUpdate): Promise<{ projects: SiteProject[] }> {
+  const { data } = await apiClient.put(`/shine-media/site/${encodeURIComponent(key)}`, update);
+  return data;
+}

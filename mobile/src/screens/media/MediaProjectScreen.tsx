@@ -10,6 +10,7 @@ import { ScreenContainer } from "../../components/ScreenContainer";
 import { SkeletonList } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import { useTheme } from "../../theme/useTheme";
+import { WebsiteProgressCard } from "./WebsiteProgressCard";
 
 const GAP = 6;
 const COLUMNS = 3;
@@ -130,6 +131,7 @@ export function MediaProjectScreen() {
           void load();
         }}
       >
+        <WebsiteProgressCard projectKey={projectKey} />
         <Button
           label={progress ? `Uploading ${progress.index + 1} of ${progress.total} · ${Math.round(progress.fraction * 100)}%` : "Add photos or videos"}
           onPress={add}
