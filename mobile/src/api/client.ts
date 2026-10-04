@@ -135,17 +135,24 @@ async function refreshAccessToken(): Promise<RefreshResult> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return { status: "rejected" };
 
-  try {
-    const response = await axios.post(`${getActiveBaseUrl()}/auth/refresh`, { refreshToken }, { timeout: 30000 });
-    const tokens = response.data as { accessToken: string; refreshToken: string };
-    await setSessionTokens(tokens);
-    return { status: "ok", accessToken: tokens.accessToken };
-  } catch (err) {
-    // Signing someone out because their signal dropped mid-refresh would break "log in once, stay
-    // logged in". Only an explicit refusal from the server counts.
-    const refused = axios.isAxiosError(err) && err.response && [400, 401, 403, 404].includes(err.response.status);
-    return refused ? { status: "rejected" } : { status: "unreachable" };
+  // Ask the active server first, then the others: a server that is down or suspended must not look
+  // like "couldn't refresh", or the request that triggered this fails with a bogus session error.
+  for (let i = 0; i < API_BASE_URLS.length; i++) {
+    const index = (activeServerIndex + i) % API_BASE_URLS.length;
+    try {
+      const response = await axios.post(`${API_BASE_URLS[index]}/auth/refresh`, { refreshToken }, { timeout: 30000 });
+      const tokens = response.data as { accessToken: string; refreshToken: string };
+      await setSessionTokens(tokens);
+      activeServerIndex = index;
+      return { status: "ok", accessToken: tokens.accessToken };
+    } catch (err) {
+      // Signing someone out because their signal dropped mid-refresh would break "log in once, stay
+      // logged in". Only an explicit refusal from a working server counts.
+      const refused = axios.isAxiosError(err) && err.response && [400, 401, 403, 404].includes(err.response.status);
+      if (refused) return { status: "rejected" };
+    }
   }
+  return { status: "unreachable" };
 }
 
 // Endpoints with no side effects worth worrying about duplicating: a timed-out login/register
@@ -192,7 +199,11 @@ apiClient.interceptors.response.use(
       const tried = original._serversTried ?? 1;
       if (tried < API_BASE_URLS.length) {
         original._serversTried = tried + 1;
-        activeServerIndex = (activeServerIndex + 1) % API_BASE_URLS.length;
+        // Several requests can fail on the same dead server at once; only the first one moves the
+        // active server on, or two failures would flip it straight back to the dead one.
+        if (!original.baseURL || original.baseURL === getActiveBaseUrl()) {
+          activeServerIndex = (activeServerIndex + 1) % API_BASE_URLS.length;
+        }
         return apiClient(original);
       }
     }

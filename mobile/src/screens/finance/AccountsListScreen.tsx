@@ -47,6 +47,8 @@ export function AccountsListScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [showingOfflineData, setShowingOfflineData] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // false: accounts scroll sideways as cards. true: every account is listed down the page.
+  const [showAll, setShowAll] = useState(false);
 
   const applySummary = useCallback((summary: FinancialSummary) => {
     setAccounts(summary.accounts);
@@ -90,6 +92,46 @@ export function AccountsListScreen({ navigation }: Props) {
     await load();
     setRefreshing(false);
   }, [load]);
+
+  const renderAccount = (item: AccountSummary, fullWidth: boolean) => (
+    <Pressable
+      onPress={() => navigation.navigate("AccountDetail", { accountId: item.accountId })}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.name}, balance ${formatCurrency(item.balance)}`}
+      style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+    >
+      <Card style={[styles.accountCard, shadow.card, { width: fullWidth ? "100%" : CARD_WIDTH, minHeight: touchTarget.large + 40 }]}>
+        <View
+          style={[
+            styles.accountIcon,
+            { backgroundColor: feature.finance.muted, borderRadius: radius.md, marginBottom: spacing.md },
+          ]}
+        >
+          <Ionicons name={ACCOUNT_ICONS[item.type] ?? "pricetag"} size={20} color={feature.finance.solid} />
+        </View>
+        <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text
+          style={[
+            typography.h2,
+            { color: item.balance >= 0 ? colors.success : colors.danger, marginTop: 2 },
+          ]}
+          numberOfLines={1}
+        >
+          {formatCurrency(item.balance)}
+        </Text>
+        <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]} numberOfLines={1}>
+          {formatCurrency(item.cashIn)} in · {formatCurrency(item.cashOut)} out
+        </Text>
+        {item.settledUpTo ? (
+          <Text style={[typography.caption, { color: colors.textFaint, marginTop: 2 }]} numberOfLines={1}>
+            Settled till {formatDateLabel(item.settledUpTo)}
+          </Text>
+        ) : null}
+      </Card>
+    </Pressable>
+  );
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["top", "left", "right"]}>
@@ -169,7 +211,12 @@ export function AccountsListScreen({ navigation }: Props) {
           </View>
 
           <View style={{ marginTop: spacing.xl }}>
-            <SectionHeader title="Your accounts" subtitle={accounts.length > 0 ? `${accounts.length} in total` : undefined} />
+            <SectionHeader
+              title="Your accounts"
+              subtitle={accounts.length > 0 ? `${accounts.length} in total` : undefined}
+              actionLabel={accounts.length > 1 ? (showAll ? "‹ Back" : "See all") : undefined}
+              onActionPress={() => setShowAll((v) => !v)}
+            />
           </View>
         </View>
 
@@ -200,52 +247,22 @@ export function AccountsListScreen({ navigation }: Props) {
             </Card>
           </View>
         ) : (
-          <FlatList
-            data={accounts}
-            keyExtractor={(item) => item.accountId}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md }}
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => navigation.navigate("AccountDetail", { accountId: item.accountId })}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.name}, balance ${formatCurrency(item.balance)}`}
-                style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-              >
-                <Card style={[styles.accountCard, shadow.card, { width: CARD_WIDTH, minHeight: touchTarget.large + 40 }]}>
-                  <View
-                    style={[
-                      styles.accountIcon,
-                      { backgroundColor: feature.finance.muted, borderRadius: radius.md, marginBottom: spacing.md },
-                    ]}
-                  >
-                    <Ionicons name={ACCOUNT_ICONS[item.type] ?? "pricetag"} size={20} color={feature.finance.solid} />
-                  </View>
-                  <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text
-                    style={[
-                      typography.h2,
-                      { color: item.balance >= 0 ? colors.success : colors.danger, marginTop: 2 },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {formatCurrency(item.balance)}
-                  </Text>
-                  <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]} numberOfLines={1}>
-                    {formatCurrency(item.cashIn)} in · {formatCurrency(item.cashOut)} out
-                  </Text>
-                  {item.settledUpTo ? (
-                    <Text style={[typography.caption, { color: colors.textFaint, marginTop: 2 }]} numberOfLines={1}>
-                      Settled till {formatDateLabel(item.settledUpTo)}
-                    </Text>
-                  ) : null}
-                </Card>
-              </Pressable>
-            )}
-          />
+          showAll ? (
+            <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
+              {accounts.map((item) => (
+                <React.Fragment key={item.accountId}>{renderAccount(item, true)}</React.Fragment>
+              ))}
+            </View>
+          ) : (
+            <FlatList
+              data={accounts}
+              keyExtractor={(item) => item.accountId}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.md }}
+              renderItem={({ item }) => renderAccount(item, false)}
+            />
+          )
         )}
       </ScrollView>
 

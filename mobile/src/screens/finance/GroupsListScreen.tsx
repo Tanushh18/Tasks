@@ -42,6 +42,16 @@ export function GroupsListScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={["top", "left", "right"]}>
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+        <Pressable
+          onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate("AccountsList"))}
+          accessibilityRole="button"
+          accessibilityLabel="Back to Money and all accounts"
+          hitSlop={8}
+          style={({ pressed }) => [styles.back, { minHeight: touchTarget.min, opacity: pressed ? 0.6 : 1 }]}
+        >
+          <Ionicons name="chevron-back" size={22} color={colors.primary} />
+          <Text style={[typography.bodyStrong, { color: colors.primary }]}>Money</Text>
+        </Pressable>
         <Text accessibilityRole="header" style={[typography.h1, { color: colors.text }]}>
           Group Expenses
         </Text>
@@ -125,6 +135,7 @@ export function GroupsListScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  back: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", marginLeft: -6 },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   fab: { position: "absolute", right: 20, bottom: 20, flexDirection: "row", alignItems: "center", justifyContent: "center" },
 });
