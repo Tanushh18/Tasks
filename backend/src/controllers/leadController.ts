@@ -17,6 +17,8 @@ import {
   normalizePhone,
   parseLeadSourceUrl,
   syncSource,
+  KNOWN_SHEET_LABELS,
+  sourceDisplayName,
 } from "../services/leadService";
 import { escapeRegex } from "../services/rules/text";
 
@@ -205,12 +207,6 @@ export async function deleteLead(req: Request, res: Response) {
   return res.status(204).send();
 }
 
-/** Friendly names for the two sheets this app is used with, shown whatever label they were added under. */
-const KNOWN_SHEET_LABELS: Record<string, string> = {
-  "1Nv1japYjs6HY3_R5lJTDEMW4vPrEOdXbEvJH4aRznZs": "Meta Sheet",
-  "1yJHK8tnURvrudVPt-PHYzVCtve5ScRa9uVCA6AqFM1U": "Calling Data",
-};
-
 async function serializeSource(source: any, userId: string) {
   const memberIds = (source.sharedWith ?? []) as unknown[];
   const members = memberIds.length
@@ -301,6 +297,8 @@ export async function updateSource(req: Request, res: Response) {
     source.label = req.body.label.trim().slice(0, 80);
 
   await source.save();
+  if (typeof req.body?.label === "string")
+    await Lead.updateMany({ ownerId: source.ownerId, originId: source._id }, { $set: { origin: sourceDisplayName(source) } });
 
   // Reconnecting a sheet picks up whatever was added while it was off; renaming does not re-read it.
   if (!wasEnabled && source.enabled && source.kind === "sheet")

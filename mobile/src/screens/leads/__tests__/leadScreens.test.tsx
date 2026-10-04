@@ -61,6 +61,7 @@ const lead = {
   createdAt: "2026-10-02T10:45:00.000Z",
   updatedAt: "2026-10-03T04:30:00.000Z",
   updatedByName: "Tanush",
+  origin: "Meta Sheet",
 };
 const bare = { ...lead, id: "l2", name: "Geeta", status: "", plotInFarukhNagar: "", category: "", requirement: "", budget: "", notes: "", updatedByName: "" };
 const mockListPage = jest.fn(async (opts: { page: number; status: string }) => ({
@@ -132,6 +133,7 @@ describe("lead screens render", () => {
     expect(text).toContain("Ramesh");
     expect(text).toMatch(/Added 2 Oct 2026/);
     expect(text).toContain("Updated by Tanush");
+    expect(text).toContain("Meta Sheet");
     expect(text).toContain("Page 1 of 2");
     expect(byLabel(r, "WhatsApp Ramesh")).toBeTruthy();
     // The add / import / share buttons live in Leads settings now, not above the list.

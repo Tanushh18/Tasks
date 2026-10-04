@@ -565,8 +565,15 @@ export function LeadsScreen({ navigation }: any) {
           </Text>
         ) : null}
 
-        {item.category || item.plotInFarukhNagar ? (
+        {item.origin || item.category || item.plotInFarukhNagar ? (
           <View style={[styles.metaRow, { marginTop: spacing.sm }]}>
+            {item.origin ? (
+              <View style={[styles.pill, { backgroundColor: feature.leads.muted }]}>
+                <Text style={[typography.caption, { color: feature.leads.solid }]} numberOfLines={1}>
+                  {item.origin}
+                </Text>
+              </View>
+            ) : null}
             {item.category ? (
               <View style={[styles.pill, { backgroundColor: colors.surfaceAlt }]}>
                 <Text style={[typography.caption, { color: colors.text }]}>{item.category}</Text>

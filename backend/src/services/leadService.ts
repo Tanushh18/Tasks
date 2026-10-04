@@ -15,6 +15,15 @@ export const NOT_INTERESTED_TTL_DAYS=30;
 /** A sheet linked with every tab ("all") is re-read at most this often; single tabs every scheduler tick. */
 const ALL_TABS_MIN_GAP_MS=5*60*1000;
 
+/** Friendly names for the two sheets this app is used with, shown whatever label they were added under. */
+export const KNOWN_SHEET_LABELS:Record<string,string>={
+  "1Nv1japYjs6HY3_R5lJTDEMW4vPrEOdXbEvJH4aRznZs":"Meta Sheet",
+  "1yJHK8tnURvrudVPt-PHYzVCtve5ScRa9uVCA6AqFM1U":"Calling Data",
+};
+/** The name a list is shown under (and stored as a lead's origin). */
+export const sourceDisplayName=(s:{label?:string|null;sheetId?:string;kind?:string})=>
+  KNOWN_SHEET_LABELS[s.sheetId??""]??(s.label||(s.kind==="manual"?"My contacts":s.kind==="import"?"Imported leads":"Google Sheet"));
+
 const clean=(v:unknown,max=4000)=>typeof v==="string"?v.trim().slice(0,max):"";
 const hash=(text:string)=>crypto.createHash("sha256").update(text).digest("hex");
 
@@ -25,7 +34,7 @@ export async function leadAccessFilter(userId:string){const ids=(await LeadSourc
 export const parseLeadSourceUrl=(url:string,allTabs=false)=>{const ref=parseSheetUrl(url);if(!ref)return null;return{sheetId:ref.sheetId,gid:allTabs||!ref.gid?"all":ref.gid}};
 
 /** Writes parsed leads for one owner. Existing leads only get blanks filled in; nothing typed by a person is overwritten. */
-async function upsertParsed(ownerId:string,sourceId:Types.ObjectId|string,items:ParsedLead[],opts:{overwriteName?:boolean;skipDeleted?:boolean;linkOnly?:boolean;restoreArchived?:boolean}={}){
+async function upsertParsed(ownerId:string,sourceId:Types.ObjectId|string,items:ParsedLead[],opts:{overwriteName?:boolean;skipDeleted?:boolean;linkOnly?:boolean;restoreArchived?:boolean;origin?:string}={}){
   const owner=new Types.ObjectId(ownerId);
   const phones=items.map(l=>l.phone);
   const existing=new Map<string,any>();
@@ -40,7 +49,7 @@ async function upsertParsed(ownerId:string,sourceId:Types.ObjectId|string,items:
     const cur=existing.get(l.phone);
     if(!cur){
       if(deleted.has(l.phone)){skippedDeleted++;continue}
-      ops.push({insertOne:{document:{ownerId:owner,phone:l.phone,name:l.name,email:l.email,address:l.address,notes:l.notes,info:l.info,category:l.category,plotInFarukhNagar:l.plot,alternatePhones:l.alternatePhones,sourceIds:[sourceId],sheetDate:now}}});
+      ops.push({insertOne:{document:{ownerId:owner,phone:l.phone,name:l.name,email:l.email,address:l.address,notes:l.notes,info:l.info,category:l.category,plotInFarukhNagar:l.plot,alternatePhones:l.alternatePhones,sourceIds:[sourceId],origin:opts.origin??"",originId:opts.origin?sourceId:null,sheetDate:now}}});
       added++;continue;
     }
     if(opts.linkOnly){
@@ -85,7 +94,7 @@ export async function syncSource(source:any,ownerId:string,force=false){
   const leads=parsed.leads.filter(l=>!/test lead/i.test(`${l.name} ${l.notes}`));
   // A connected sheet only ever adds: new numbers become leads, existing leads are left alone, and rows
   // deleted from the sheet do not remove anything. Re-attaching a sheet (first sync) brings its hidden leads back.
-  const {added,updated}=await upsertParsed(ownerId,source._id,leads,{linkOnly:true,skipDeleted:true,restoreArchived:!source.lastSyncedAt});
+  const {added,updated}=await upsertParsed(ownerId,source._id,leads,{linkOnly:true,skipDeleted:true,restoreArchived:!source.lastSyncedAt,origin:sourceDisplayName(source)});
   await LeadSource.updateOne({_id:source._id},{lastHash:nextHash,lastSyncedAt:new Date(),lastCheckedAt:new Date(),lastError:""});
   return{changed:true,added,updated,removed:0};
 }
@@ -160,7 +169,7 @@ export async function addManualLeads(userId:string,items:NewLead[]){
       existing++;continue;
     }
     const status=clean(item.status,200);
-    await Lead.create({ownerId:userId,phone,name:clean(item.name,120),status,category:clean(item.category,80),notes:clean(item.notes,4000),sourceIds:[source._id],sheetDate:new Date(),...(isNotInterested(status)?{notInterestedAt:new Date()}:{})});
+    await Lead.create({ownerId:userId,phone,name:clean(item.name,120),status,category:clean(item.category,80),notes:clean(item.notes,4000),sourceIds:[source._id],origin:sourceDisplayName(source),originId:source._id,sheetDate:new Date(),...(isNotInterested(status)?{notInterestedAt:new Date()}:{})});
     // Someone deliberately re-adding a number lifts the "deleted by cleanup" mark.
     await LeadTombstone.deleteOne({ownerId:userId,phone});
     addedPhones.push(phone);
@@ -200,7 +209,7 @@ export async function importParsedLeads(ownerId:string,parsed:ParseResult,opts:B
     return{summary,source:null};
   }
   const source=await importSourceFor(ownerId,opts.label);
-  const res=await upsertParsed(ownerId,source._id,mine,{skipDeleted:!opts.includeDeleted});
+  const res=await upsertParsed(ownerId,source._id,mine,{skipDeleted:!opts.includeDeleted,origin:sourceDisplayName(source)});
   Object.assign(summary,res);
   await LeadSource.updateOne({_id:source._id},{lastSyncedAt:new Date(),lastCheckedAt:new Date(),lastError:""});
   return{summary,source:{id:String(source._id),label:source.label}};
@@ -212,4 +221,19 @@ export async function existingPhones(userId:string,raw:string[]){
   if(!phones.length)return[];
   const found=await Lead.find({phone:{$in:phones},...(await leadAccessFilter(userId))},{phone:1}).lean();
   return[...new Set(found.map(f=>f.phone))];
+}
+
+
+/**
+ * Gives every lead that has no origin yet the name of the oldest list it belongs to. Only the two new fields are
+ * written (origin, originId); nothing else on a lead is touched. Safe to run on every start.
+ */
+export async function backfillLeadOrigins(){
+  const sources=await LeadSource.find({}).sort({createdAt:1}).lean();
+  let filled=0;
+  for(const source of sources){
+    const res=await Lead.updateMany({sourceIds:source._id,$or:[{origin:{$exists:false}},{origin:""}]},{$set:{origin:sourceDisplayName(source),originId:source._id}});
+    filled+=res.modifiedCount??0;
+  }
+  return filled;
 }

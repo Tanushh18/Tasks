@@ -3,7 +3,7 @@ import { createApp } from "../src/app";
 import { Lead } from "../src/models/Lead";
 import { LeadSource } from "../src/models/LeadSource";
 import { extractPhones, normalizePhone, parseCsv, parseTabs } from "../src/services/leadImport";
-import { cleanupNotInterested, syncSource } from "../src/services/leadService";
+import { backfillLeadOrigins, cleanupNotInterested, syncSource } from "../src/services/leadService";
 import { authed, registerUser } from "./helpers";
 
 const app = createApp();
@@ -325,6 +325,43 @@ describe("removing a sheet", () => {
     expect(list.total).toBe(2);
     expect(await Lead.countDocuments({ archived: true })).toBe(0);
     expect(await Lead.findOne({ phone: "+919417516921" }).lean()).toMatchObject({ status: "Follow-up", notes: "call Monday", archived: false });
+  });
+});
+
+describe("each lead remembers its sheet", () => {
+  it("stores where a lead came from, keeps it after the sheet is removed, and follows a rename", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const a = authed(app, admin.token);
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, text: async () => SIMPLE_CSV })) as any;
+    const added = await a.post("/api/leads/sources").send({ url: "https://docs.google.com/spreadsheets/d/sheetO/edit#gid=0", label: "Old name" });
+    const id = added.body.source.id;
+    let leads = (await a.get("/api/leads?page=1&status=all")).body.leads;
+    expect(leads.map((l: any) => l.origin)).toEqual(["Old name", "Old name"]);
+
+    await a.patch(`/api/leads/sources/${id}`).send({ label: "Meta Sheet" });
+    leads = (await a.get("/api/leads?page=1&status=all")).body.leads;
+    expect(leads.every((l: any) => l.origin === "Meta Sheet")).toBe(true);
+
+    await a.delete(`/api/leads/sources/${id}`);
+    leads = (await a.get("/api/leads?page=1&status=all")).body.leads;
+    expect(leads).toHaveLength(2);
+    expect(leads.every((l: any) => l.origin === "Meta Sheet")).toBe(true);
+
+    // Leads added by hand are labelled too.
+    await a.post("/api/leads/import").send({ contacts: [{ name: "Walk in", phone: "9123456780" }] });
+    const mine = (await a.get("/api/leads?page=1&status=all")).body.leads.find((l: any) => l.name === "Walk in");
+    expect(mine.origin).toBe("My contacts");
+  });
+
+  it("labels older leads once and touches nothing else on them", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const a = authed(app, admin.token);
+    await a.post("/api/leads/admin/import").send({ csv: SIMPLE_CSV, label: "Calling Data" });
+    await Lead.updateMany({}, { $unset: { origin: 1, originId: 1 }, $set: { status: "Follow-up", notes: "keep me" } });
+    expect(await backfillLeadOrigins()).toBe(2);
+    expect(await backfillLeadOrigins()).toBe(0);
+    const lead = await Lead.findOne({ phone: "+919417516921" }).lean();
+    expect(lead).toMatchObject({ origin: "Calling Data", status: "Follow-up", notes: "keep me" });
   });
 });
 

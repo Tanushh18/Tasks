@@ -22,6 +22,8 @@ export interface Lead {
   notInterestedAt?: string | null;
   alternatePhones?: string[];
   email?: string;
+  /** The sheet / list this lead first came from, e.g. "Meta Sheet". Stays even if that sheet is removed. */
+  origin?: string;
   /** Read-only context from an imported sheet (tower, flat, dealer…). */
   info?: string;
 }

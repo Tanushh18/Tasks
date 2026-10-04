@@ -3,7 +3,9 @@ const leadSchema = new Schema({
   ownerId:{type:Schema.Types.ObjectId,ref:"User",required:true,index:true}, phone:{type:String,required:true},
   name:{type:String,default:""}, plotInFarukhNagar:{type:String,default:""}, plotManual:{type:Boolean,default:false},
   category:{type:String,default:""}, status:{type:String,default:""}, requirement:{type:String,default:""}, address:{type:String,default:""},
-  budget:{type:String,default:""}, notes:{type:String,default:""}, sourceIds:{type:[Schema.Types.ObjectId],default:[]}, sheetDate:Date, archived:{type:Boolean,default:false},
+  budget:{type:String,default:""}, notes:{type:String,default:""}, sourceIds:{type:[Schema.Types.ObjectId],default:[]},
+  // Where the lead first came from (sheet / import / contacts). Stays on the lead even if that sheet is later removed or renamed in place.
+  origin:{type:String,default:""}, originId:{type:Schema.Types.ObjectId,default:null}, sheetDate:Date, archived:{type:Boolean,default:false},
   // Extra numbers / email / read-only context (tower, flat, dealer…) picked up from imported sheets.
   alternatePhones:{type:[String],default:[]}, email:{type:String,default:""}, info:{type:String,default:""},
   // Who last changed the lead and when the stage last changed; drives "Updated by X at …" on the card.
