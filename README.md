@@ -1023,3 +1023,12 @@ npm run build && docker build -t we-three-api . # Build Docker image
 ---
 
 For issues, questions, or suggestions, please refer to the original project documentation or create an issue in the repository.
+
+## Website photos (Media tab)
+
+The **Media** tab manages the photos and videos shown on the ShineOne Estate website, one folder per project (Sector 4, 9, 42, 46, Reliance Met City). They live in a separate Cloudinary account under `ShineOne/<project>/`.
+
+- Any signed-in user can add (photos and videos, several at once) or delete (press and hold, then confirm). Nothing is ever deleted automatically.
+- Uploads go from the phone straight to Cloudinary with a signature from the server (`POST /api/shine-media/sign`), so large videos don't pass through the server.
+- The website reads `GET /api/public/shine/media` (no sign-in, read-only, cached 60 s) and falls back to its built-in list if the server can't be reached. The older photos that sit outside the project folders are listed by name in `shineMediaService.ts`.
+- Server variables (Render): `CLOUDINARY_CLOUD_NAME_shine`, `CLOUDINARY_API_KEY_shine`, `CLOUDINARY_API_SECRET_shine`.

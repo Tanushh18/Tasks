@@ -33,6 +33,7 @@ import vaultDocumentRoutes from "./routes/vaultDocumentRoutes";
 import vehicleRoutes from "./routes/vehicleRoutes";
 import weeklySummaryRoutes from "./routes/weeklySummaryRoutes";
 import leadRoutes from "./routes/leadRoutes";
+import shineMediaRoutes, { shinePublicRouter } from "./routes/shineMediaRoutes";
 
 export function createApp(): Express {
   const app = express();
@@ -86,6 +87,8 @@ export function createApp(): Express {
   app.use("/api/weekly-summary", weeklySummaryRoutes);
   app.use("/api/activity-feed", activityFeedRoutes);
   app.use("/api/leads", leadRoutes);
+  app.use("/api/public/shine", shinePublicRouter);
+  app.use("/api/shine-media", shineMediaRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

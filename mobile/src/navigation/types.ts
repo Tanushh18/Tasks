@@ -136,5 +136,6 @@ export type MainTabParamList = {
   TasksTab: NavigatorScreenParams<TasksStackParamList>;
   FinanceTab: NavigatorScreenParams<FinanceStackParamList>;
   LeadsTab: undefined;
+  MediaTab: undefined;
   MoreTab: NavigatorScreenParams<MoreStackParamList>;
 };

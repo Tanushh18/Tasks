@@ -29,6 +29,10 @@ export const env = {
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME ?? "",
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY ?? "",
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET ?? "",
+  // Separate Cloudinary account for the ShineOne Estate website photos (Media tab).
+  shineCloudName: process.env.CLOUDINARY_CLOUD_NAME_shine ?? "",
+  shineApiKey: process.env.CLOUDINARY_API_KEY_shine ?? "",
+  shineApiSecret: process.env.CLOUDINARY_API_SECRET_shine ?? "",
   cloudinaryFolder: process.env.CLOUDINARY_UPLOAD_FOLDER ?? "tasks-app",
   // Google Apps Script web app that sends the email (see docs/apps-script-mailer.gs).
   mailWebhookUrl: process.env.MAIL_WEBHOOK_URL ?? "",

@@ -8,6 +8,7 @@ import { useTheme } from "../theme/useTheme";
 import { FinanceNavigator } from "./FinanceNavigator";
 import { HomeNavigator } from "./HomeNavigator";
 import { LeadsNavigator } from "./LeadsNavigator";
+import { MediaNavigator } from "./MediaNavigator";
 import { MoreNavigator } from "./MoreNavigator";
 import { TasksNavigator } from "./TasksNavigator";
 import type { MainTabParamList } from "./types";
@@ -22,6 +23,7 @@ const ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof Ionicons
   TasksTab: "checkbox",
   FinanceTab: "wallet",
   LeadsTab: "trending-up",
+  MediaTab: "images",
   MoreTab: "ellipsis-horizontal-circle",
 };
 
@@ -30,6 +32,7 @@ const OUTLINE_ICONS: Record<keyof MainTabParamList, React.ComponentProps<typeof 
   TasksTab: "checkbox-outline",
   FinanceTab: "wallet-outline",
   LeadsTab: "trending-up-outline",
+  MediaTab: "images-outline",
   MoreTab: "ellipsis-horizontal-circle-outline",
 };
 
@@ -83,6 +86,7 @@ export function MainTabs() {
       {showLeadsTab ? (
         <Tab.Screen name="LeadsTab" component={LeadsNavigator} options={{ title: "Leads" }} />
       ) : null}
+      <Tab.Screen name="MediaTab" component={MediaNavigator} options={{ title: "Media" }} />
       <Tab.Screen name="MoreTab" component={MoreNavigator} options={{ title: "More" }} />
     </Tab.Navigator>
   );
