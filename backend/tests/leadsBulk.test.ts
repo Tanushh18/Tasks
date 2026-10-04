@@ -313,6 +313,21 @@ describe("connected sheets add to the database and never change it", () => {
   });
 });
 
+describe("removing a sheet", () => {
+  it("keeps every lead visible and unchanged", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const a = authed(app, admin.token);
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, text: async () => SIMPLE_CSV })) as any;
+    const added = await a.post("/api/leads/sources").send({ url: "https://docs.google.com/spreadsheets/d/sheetR/edit#gid=0" });
+    await Lead.updateOne({ phone: "+919417516921" }, { status: "Follow-up", notes: "call Monday" });
+    expect((await a.delete(`/api/leads/sources/${added.body.source.id}`)).status).toBe(204);
+    const list = (await a.get("/api/leads?page=1&status=all")).body;
+    expect(list.total).toBe(2);
+    expect(await Lead.countDocuments({ archived: true })).toBe(0);
+    expect(await Lead.findOne({ phone: "+919417516921" }).lean()).toMatchObject({ status: "Follow-up", notes: "call Monday", archived: false });
+  });
+});
+
 describe("renaming a list", () => {
   it("lets the owner rename an imported list, and nobody else", async () => {
     const admin = await registerUser(app, ADMIN, "4821", "Admin");

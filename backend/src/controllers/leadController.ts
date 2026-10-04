@@ -347,16 +347,9 @@ export async function deleteSource(req: Request, res: Response) {
 
   if (!source) return notFound(res);
 
-  // Leads belong to the sheet owner's workspace; detach them from the deleted source.
-  await Lead.updateMany(
-    { ownerId: req.userId, sourceIds: source._id },
-    { $pull: { sourceIds: source._id } }
-  );
-
-  await Lead.updateMany(
-    { ownerId: req.userId, sourceIds: { $size: 0 } },
-    { $set: { archived: true } }
-  );
+  // The sheet was only a way to import. The leads are the owner's own data now, so they all stay visible and
+  // unchanged; they just stop belonging to the removed list.
+  await Lead.updateMany({ ownerId: req.userId, sourceIds: source._id }, { $pull: { sourceIds: source._id } });
 
   return res.status(204).send();
 }

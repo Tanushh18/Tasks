@@ -132,7 +132,7 @@ export function LeadSourcesScreen() {
   };
 
   const removeSheet = (s: api.LeadSource) =>
-    confirm("Remove this sheet?", "Its leads stay in your list unless no other sheet has them.", async () => {
+    confirm("Remove this sheet?", "Only the sheet link is removed. All its leads stay in the app, unchanged. People it was shared with will no longer see them.", async () => {
       try {
         await api.deleteSource(s.id);
         await load();
