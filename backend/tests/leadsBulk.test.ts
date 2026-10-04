@@ -427,7 +427,7 @@ describe("imported leads that also belong to a named sheet", () => {
 });
 
 describe("renaming a sheet name from the filter", () => {
-  it("updates every lead under that name, merges into an existing name, and touches nothing else", async () => {
+  it("anyone signed in can rename it: updates every lead under that name, merges into an existing name, touches nothing else", async () => {
     const admin = await registerUser(app, ADMIN, "4821", "Admin");
     const bob = await registerUser(app, "9876591007", "4821", "Bob");
     const a = authed(app, admin.token);
@@ -435,10 +435,11 @@ describe("renaming a sheet name from the filter", () => {
     await a.post("/api/leads/admin/import").send({ csv: META_CSV, label: "Meta Sheet" });
     await Lead.updateMany({ origin: "Central Park II buyers" }, { $set: { status: "Follow-up", notes: "keep me" } });
 
-    expect((await authed(app, bob.token).post("/api/leads/origins/rename").send({ from: "Central Park II buyers", to: "X" })).status).toBe(403);
-    expect((await a.post("/api/leads/origins/rename").send({ from: "Central Park II buyers", to: "  " })).status).toBe(400);
+    expect((await authed(app, bob.token).post("/api/leads/origins/rename").send({ from: "Central Park II buyers", to: "  " })).status).toBe(400);
 
-    const res = await a.post("/api/leads/origins/rename").send({ from: "Central Park II buyers", to: "Calling Data" });
+    // A normal user (not admin) can rename too.
+    const res = await authed(app, bob.token).post("/api/leads/origins/rename").send({ from: "Central Park II buyers", to: "Calling Data" });
+    expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ renamed: 2, from: "Central Park II buyers", to: "Calling Data" });
     expect((await a.get("/api/leads/origins")).body.origins).toEqual([
       { name: "Calling Data", count: 2 },

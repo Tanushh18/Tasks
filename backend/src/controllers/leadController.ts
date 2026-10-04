@@ -137,12 +137,11 @@ export async function listOrigins(_req: Request, res: Response) {
 }
 
 /**
- * Admin only. Renames a sheet name everywhere: every lead whose origin is `from` gets origin `to`. Only the origin field is
+ * Anyone signed in. Renames a sheet name everywhere: every lead whose origin is `from` gets origin `to`. Only the origin field is
  * written, so stages, notes and follow-ups are untouched. Renaming into a name that already exists merges the two groups.
  * Lists that carry the old name are renamed too, so new leads from them use the new name.
  */
 export async function renameOrigin(req: Request, res: Response) {
-  if (!req.isAdmin) return adminOnly(res);
   const from = str(req.body?.from, 120);
   const to = str(req.body?.to, 80);
   if (!from) return badRequest(res, "Which sheet name should be renamed?");

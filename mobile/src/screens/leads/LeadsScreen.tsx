@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { Alert, AppState, FlatList, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as api from "../../api/leads";
-import { useAuth } from "../../auth/AuthContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BottomSheet } from "../../components/BottomSheet";
 import { Button } from "../../components/Button";
@@ -93,9 +92,7 @@ export function LeadsScreen({ navigation }: any) {
   const [sheet, setSheet] = useState<string>(ALL);
   const [sheets, setSheets] = useState<api.OriginCount[]>([]);
   const [pickingSource, setPickingSource] = useState(false);
-  // Renaming a sheet name (admin only) updates it on every lead that carries it.
-  const { user } = useAuth();
-  const isAdmin = api.isLeadAdmin(user);
+  // Renaming a sheet name (anyone signed in) updates it on every lead that carries it.
   const [renamingSheet, setRenamingSheet] = useState<string | null>(null);
   const [sheetNewName, setSheetNewName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
@@ -764,7 +761,7 @@ export function LeadsScreen({ navigation }: any) {
               <Text style={[typography.caption, { color: colors.textMuted }]}>{opt.count.toLocaleString("en-IN")}</Text>
             ) : null}
             {sheet === opt.name ? <Ionicons name="checkmark" size={20} color={colors.primary} /> : null}
-            {isAdmin && opt.name !== ALL ? (
+            {opt.name !== ALL ? (
               <Pressable
                 onPress={() => {
                   setPickingSource(false);

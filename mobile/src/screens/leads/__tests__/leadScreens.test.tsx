@@ -235,17 +235,11 @@ describe("lead screens render", () => {
     await act(async () => r.unmount());
   });
 
-  it("lets the admin rename a sheet name from the dropdown, and hides the button from everyone else", async () => {
-    const open = async (r: TestRenderer.ReactTestRenderer) => act(async () => byLabel(r, "Sheet: All leads. Tap to change.").props.onPress());
-    mockUser = { id: "me", mobileNumber: "9876500001" };
-    const normal = await renderLeads();
-    await open(normal);
-    expect(normal.root.findAll((n) => n.props.accessibilityLabel === "Rename Meta Sheet")).toHaveLength(0);
-    await act(async () => normal.unmount());
-
-    mockUser = { id: "me", isAdmin: true };
+  it("lets any signed-in user rename a sheet name from the dropdown", async () => {
+    mockUser = { id: "me", mobileNumber: "9876500001" }; // not an admin
     const r = await renderLeads();
-    await open(r);
+    await act(async () => byLabel(r, "Sheet: All leads. Tap to change.").props.onPress());
+    expect(r.root.findAll((n) => n.props.accessibilityLabel === "Rename All leads")).toHaveLength(0);
     await act(async () => byLabel(r, "Rename Meta Sheet").props.onPress());
     const field = r.root.findAll((n) => n.props.label === "New name")[0];
     await act(async () => field.props.onChangeText("Calling Data"));
