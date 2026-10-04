@@ -198,6 +198,12 @@ export async function deleteLead(req: Request, res: Response) {
   return res.status(204).send();
 }
 
+/** Friendly names for the two sheets this app is used with, shown whatever label they were added under. */
+const KNOWN_SHEET_LABELS: Record<string, string> = {
+  "1Nv1japYjs6HY3_R5lJTDEMW4vPrEOdXbEvJH4aRznZs": "Meta Sheet",
+  "1yJHK8tnURvrudVPt-PHYzVCtve5ScRa9uVCA6AqFM1U": "Calling Data",
+};
+
 async function serializeSource(source: any, userId: string) {
   const memberIds = (source.sharedWith ?? []) as unknown[];
   const members = memberIds.length
@@ -207,6 +213,7 @@ async function serializeSource(source: any, userId: string) {
   const isOwner = String(ownerId) === userId;
   const out: Record<string, unknown> = {
     ...rest,
+    label: KNOWN_SHEET_LABELS[rest.sheetId as string] ?? rest.label,
     id: String(_id),
     kind: rest.kind ?? "sheet",
     allTabs: rest.gid === "all",

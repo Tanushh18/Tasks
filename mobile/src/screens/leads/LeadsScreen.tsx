@@ -1,8 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as Contacts from "expo-contacts/legacy";
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, AppState, FlatList, Linking, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Alert, AppState, FlatList, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as api from "../../api/leads";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -12,29 +11,22 @@ import { Button } from "../../components/Button";
 import { FilterChip, FilterChipGroup } from "../../components/FilterChip";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SearchBar } from "../../components/SearchBar";
-import { SkeletonLines } from "../../components/Skeleton";
+import { Skeleton } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
-import { runAdminCsvImport } from "../../leads/adminCsvImport";
 import { QUICK_STATUSES, registerCall } from "../../leads/callFollowUp";
 import {
   getOverlaySetup,
   overlaySupported,
   requestOverlaySetup,
-  showTestOverlay,
   startCallWatch,
   wasOverlaySetupOffered,
   type OverlaySetup,
 } from "../../leads/callOverlay";
-import {
-  LEAD_TAG,
-  getAutoSyncStatus,
-  isAutoSyncEnabled,
-  setAutoSyncEnabled,
-  syncTaggedContacts,
-  type AutoSyncStatus,
-} from "../../leads/contactAutoSync";
+import { syncTaggedContacts } from "../../leads/contactAutoSync";
 import { emitLeadEvent, onLeadEvent } from "../../leads/leadEvents";
+import { getLocalSources, queryLocalLeads, refreshLeadStoreIfStale } from "../../leads/leadStore";
+import { isUnreachableError } from "../../offline/httpQueue";
 import { bypassCacheBriefly } from "../../offline/httpCache";
 import { useTheme, type Theme } from "../../theme/useTheme";
 
@@ -44,6 +36,8 @@ type IconName = React.ComponentProps<typeof Ionicons>["name"];
 export const DEFAULT_STAGE = "New";
 const ALL = "all";
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** How old the full copy on the phone may get before a successful list load refreshes it. */
+const STORE_REFRESH_MS = 5 * 60 * 1000;
 
 /** Fields the update sheet keeps out of the way until someone asks for them (or they already have a value). */
 const OPTIONAL_FIELDS = [
@@ -89,14 +83,6 @@ export function daysUntilDeleted(notInterestedAt: string | null | undefined, ttl
   return Math.max(0, left);
 }
 
-function syncStatusLine(s: AutoSyncStatus | null): { text: string; error: boolean } | null {
-  if (!s) return null;
-  if (s.lastError) return { text: `Last try failed: ${s.lastError}`, error: true };
-  if (s.pending) return { text: `${s.pending} waiting to upload`, error: false };
-  if (s.lastSuccessAt) return { text: `Checked ${formatStamp(new Date(s.lastSuccessAt).toISOString())}`, error: false };
-  return null;
-}
-
 export function LeadsScreen({ navigation }: any) {
   const { colors, spacing, typography, radius, touchTarget, feature } = useTheme();
   const { user } = useAuth();
@@ -108,13 +94,13 @@ export function LeadsScreen({ navigation }: any) {
   const [sourceId, setSourceId] = useState<string>(ALL);
   const [sources, setSources] = useState<api.LeadSource[]>([]);
   const [pickingSource, setPickingSource] = useState(false);
+  const [offline, setOffline] = useState(false);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [data, setData] = useState<api.LeadPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [statusOptions, setStatusOptions] = useState<string[]>(api.DEFAULT_STATUS_OPTIONS);
   const [ttlDays, setTtlDays] = useState(30);
 
@@ -126,12 +112,25 @@ export function LeadsScreen({ navigation }: any) {
   const [renaming, setRenaming] = useState<api.Lead | null>(null);
   const [identity, setIdentity] = useState({ name: "", phone: "" });
 
-  const [adding, setAdding] = useState(false);
-  const [newLead, setNewLead] = useState({ name: "", phone: "" });
 
-  const [autoAdd, setAutoAdd] = useState(false);
-  const [autoStatus, setAutoStatus] = useState<AutoSyncStatus | null>(null);
   const [overlay, setOverlay] = useState<OverlaySetup | null>(null);
+
+  // Top-right button that opens the Leads settings (add, import, share, call pop-up, offline copy).
+  useLayoutEffect(() => {
+    navigation.setOptions?.({
+      headerRight: () => (
+        <Pressable
+          onPress={() => navigation.navigate("LeadSettings")}
+          accessibilityRole="button"
+          accessibilityLabel="Leads settings"
+          hitSlop={8}
+          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}
+        >
+          <Ionicons name="settings-outline" size={24} color={colors.text} />
+        </Pressable>
+      ),
+    });
+  }, [navigation, colors.text]);
 
   const listRef = useRef<FlatList<api.Lead>>(null);
   const request = useRef(0);
@@ -145,10 +144,25 @@ export function LeadsScreen({ navigation }: any) {
   // A new filter or search starts again at page 1.
   useEffect(() => setPage(1), [stage, query, sourceId]);
 
+  const localPage = useCallback(
+    () => queryLocalLeads({ page, limit: api.PAGE_SIZE, status: stage, search: query, sourceId }),
+    [page, stage, query, sourceId]
+  );
+
   const load = useCallback(
     async (opts: { quiet?: boolean; fresh?: boolean } = {}) => {
       const id = ++request.current;
-      if (!opts.quiet) setLoading(true);
+      if (!opts.quiet) {
+        setLoading(true);
+        // The copy saved on the phone shows straight away; the server's answer replaces it.
+        const local = await localPage().catch(() => null);
+        if (id !== request.current) return;
+        if (local) {
+          setData(local);
+          setError(null);
+          setLoading(false);
+        }
+      }
       if (opts.fresh) bypassCacheBriefly();
       try {
         const res = await api.listLeadsPage({ page, status: stage, search: query, sourceId });
@@ -160,22 +174,30 @@ export function LeadsScreen({ navigation }: any) {
         }
         setData(res);
         setError(null);
+        setOffline(false);
+        void refreshLeadStoreIfStale(STORE_REFRESH_MS);
       } catch (e) {
-        if (id === request.current && !opts.quiet) setError(getApiErrorMessage(e, "We couldn't load your leads."));
+        if (id !== request.current) return;
+        // Server off or unreachable: carry on from the copy on the phone.
+        const local = isUnreachableError(e) ? await localPage().catch(() => null) : null;
+        if (id !== request.current) return;
+        if (local) {
+          setData(local);
+          setError(null);
+          setOffline(true);
+        } else if (!opts.quiet) {
+          setError(getApiErrorMessage(e, "We couldn't load your leads."));
+        }
       } finally {
         if (id === request.current) setLoading(false);
       }
     },
-    [page, stage, query, sourceId]
+    [page, stage, query, sourceId, localPage]
   );
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  const refreshAutoStatus = useCallback(() => {
-    void getAutoSyncStatus().then(setAutoStatus);
-  }, []);
 
   // Re-check the "pop-up over other apps" setup whenever they come back (e.g. from Settings).
   useEffect(() => {
@@ -188,24 +210,22 @@ export function LeadsScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       void load({ quiet: true, fresh: true });
-      refreshAutoStatus();
       // Leads are shared: quietly pick up edits made by other people on the same list.
       const timer = setInterval(() => void load({ quiet: true, fresh: true }), 30000);
       return () => clearInterval(timer);
-    }, [load, refreshAutoStatus])
+    }, [load])
   );
 
   useEffect(
     () =>
       onLeadEvent("leadsChanged", () => {
         void load({ quiet: true, fresh: true });
-        refreshAutoStatus();
-      }),
-    [load, refreshAutoStatus]
+        }),
+    [load]
   );
 
   useEffect(() => {
-    void isAutoSyncEnabled().then(setAutoAdd);
+        void getLocalSources().then((list) => list.length && setSources((cur) => (cur.length ? cur : list.filter((x) => x.enabled))));
     api
       .listSources()
       .then((list) => setSources(list.filter((x) => x.enabled)))
@@ -287,35 +307,7 @@ export function LeadsScreen({ navigation }: any) {
     } catch (e) {
       Alert.alert("Sync failed", getApiErrorMessage(e));
     } finally {
-      refreshAutoStatus();
       setSyncing(false);
-    }
-  };
-
-  const toggleAutoAdd = async (on: boolean) => {
-    if (!on) {
-      await setAutoSyncEnabled(false);
-      setAutoAdd(false);
-      return;
-    }
-    const perm = await Contacts.requestPermissionsAsync();
-    if (perm.status !== "granted") {
-      Alert.alert("Contacts permission needed", "Allow contacts access in your phone's Settings for We Three.", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Open Settings", onPress: () => void Linking.openSettings() },
-      ]);
-      return;
-    }
-    await setAutoSyncEnabled(true);
-    setAutoAdd(true);
-    const result = await syncTaggedContacts({ force: true });
-    refreshAutoStatus();
-    if (result && result.added > 0) {
-      Alert.alert("Leads added", `${result.added} contact${result.added === 1 ? "" : "s"} with "${LEAD_TAG}" in the name added as leads.`);
-      await load({ fresh: true });
-    } else if (!result) {
-      // The automatic upload didn't go through: offer the matches by hand.
-      emitLeadEvent("showContactSuggestions", { manual: true });
     }
   };
 
@@ -408,53 +400,6 @@ export function LeadsScreen({ navigation }: any) {
     }
   };
 
-  const addLead = async () => {
-    if (!newLead.phone.trim()) {
-      Alert.alert("Phone number required");
-      return;
-    }
-    setSaving(true);
-    try {
-      const r = await api.importLeads([{ name: newLead.name.trim(), phone: newLead.phone.trim() }]);
-      if (r.invalid) {
-        Alert.alert("Invalid number", "Enter a valid 10-digit Indian mobile number.");
-        return;
-      }
-      if (r.existing) Alert.alert("Already a lead", "This number is already in your leads.");
-      setNewLead({ name: "", phone: "" });
-      setAdding(false);
-      await load({ fresh: true });
-    } catch (e) {
-      Alert.alert("Couldn't add lead", getApiErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const ActionTile = ({ icon, label, onPress, busy }: { icon: IconName; label: string; onPress: () => void; busy?: boolean }) => (
-    <Pressable
-      onPress={onPress}
-      disabled={busy}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={({ pressed }) => [
-        styles.tile,
-        {
-          backgroundColor: feature.leads.muted,
-          borderRadius: radius.md,
-          minHeight: touchTarget.large,
-          opacity: pressed || busy ? 0.6 : 1,
-        },
-      ]}
-    >
-      <Ionicons name={icon} size={20} color={feature.leads.solid} />
-      <Text style={[typography.captionStrong, { color: feature.leads.solid, marginTop: 4, textAlign: "center" }]} numberOfLines={2}>
-        {busy ? "Working…" : label}
-      </Text>
-    </Pressable>
-  );
-
-  const statusLine = syncStatusLine(autoStatus);
   const totalAll = data?.totalAll ?? 0;
 
   const header = (
@@ -486,73 +431,15 @@ export function LeadsScreen({ navigation }: any) {
         </Pressable>
       </View>
 
-      <View style={[styles.tiles, { gap: spacing.sm, marginTop: spacing.lg }]}>
-        <ActionTile icon="person-add-outline" label="Add lead" onPress={() => setAdding(true)} />
-        <ActionTile icon="people-outline" label="From contacts" onPress={() => navigation.navigate("LeadImport")} />
-        <ActionTile
-          icon="scan-outline"
-          label={`Find "${LEAD_TAG}" contacts`}
-          onPress={() => emitLeadEvent("showContactSuggestions", { manual: true })}
-        />
-        <ActionTile icon="share-social-outline" label={isAdmin ? "Sheets & share" : "Share"} onPress={() => navigation.navigate("LeadSources")} />
-        {isAdmin ? (
-          <ActionTile icon="document-attach-outline" label="Import CSV" busy={importing} onPress={() => void runAdminCsvImport(setImporting)} />
-        ) : null}
-      </View>
-
-      <View
-        style={[
-          styles.autoRow,
-          { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
-        ]}
-      >
-        <Ionicons name="flash-outline" size={20} color={feature.leads.solid} />
-        <View style={{ flex: 1 }}>
-          <Text style={[typography.captionStrong, { color: colors.text }]}>Auto-add tagged contacts</Text>
-          <Text style={[typography.caption, { color: colors.textMuted }]}>
-            {`Any contact with "${LEAD_TAG}" in the name becomes a lead`}
-          </Text>
-          {autoAdd && statusLine ? (
-            <Text style={[typography.caption, { color: statusLine.error ? colors.danger : colors.textMuted }]} numberOfLines={2}>
-              {statusLine.text}
-            </Text>
-          ) : null}
-        </View>
-        <Switch
-          value={autoAdd}
-          onValueChange={(v) => void toggleAutoAdd(v)}
-          trackColor={{ true: feature.leads.solid, false: colors.border }}
-          accessibilityLabel="Auto-add contacts tagged lead"
-        />
-      </View>
-
-      {overlay?.supported ? (
+      {offline ? (
         <View
-          style={[
-            styles.autoRow,
-            { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.sm },
-          ]}
+          accessibilityRole="alert"
+          style={[styles.autoRow, { backgroundColor: colors.warningMuted, borderColor: colors.warning, borderRadius: radius.md, padding: spacing.sm, marginTop: spacing.md }]}
         >
-          <Ionicons name="albums-outline" size={20} color={feature.leads.solid} />
-          <View style={{ flex: 1 }}>
-            <Text style={[typography.captionStrong, { color: colors.text }]}>Call pop-up over other apps</Text>
-            <Text style={[typography.caption, { color: overlay.overlay && overlay.phoneState ? colors.success : colors.textMuted }]}>
-              {overlay.overlay && overlay.phoneState
-                ? "On: after a call, pick the stage from any app"
-                : !overlay.phoneState
-                  ? "Needs phone-call status permission"
-                  : 'Needs "Display over other apps"'}
-            </Text>
-          </View>
-          {overlay.overlay && overlay.phoneState ? (
-            <Pressable onPress={showTestOverlay} accessibilityRole="button" accessibilityLabel="Show a test pop-up" hitSlop={8}>
-              <Text style={[typography.captionStrong, { color: colors.primary }]}>Test</Text>
-            </Pressable>
-          ) : (
-            <Pressable onPress={() => void requestOverlaySetup().then(setOverlay)} accessibilityRole="button" accessibilityLabel="Set up call pop-up" hitSlop={8}>
-              <Text style={[typography.captionStrong, { color: colors.primary }]}>Set up</Text>
-            </Pressable>
-          )}
+          <Ionicons name="cloud-offline-outline" size={18} color={colors.warning} />
+          <Text style={[typography.caption, { color: colors.text, flex: 1 }]}>
+            Server not reachable. Showing leads saved on this phone; your edits sync when it's back.
+          </Text>
         </View>
       ) : null}
 
@@ -785,7 +672,19 @@ export function LeadsScreen({ navigation }: any) {
           onRefresh={() => void load({ fresh: true })}
           ListEmptyComponent={
             loading ? (
-              <SkeletonLines count={5} />
+              <View accessibilityLabel="Loading leads" accessibilityRole="progressbar">
+                {[0, 1, 2, 3].map((i) => (
+                  <View
+                    key={i}
+                    style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md }]}
+                  >
+                    <Skeleton width="55%" height={18} />
+                    <Skeleton width="35%" height={12} style={{ marginTop: spacing.sm }} />
+                    <Skeleton width="80%" height={12} style={{ marginTop: spacing.md }} />
+                    <Skeleton height={36} style={{ marginTop: spacing.md, borderRadius: radius.pill }} />
+                  </View>
+                ))}
+              </View>
             ) : (
               <EmptyState
                 title={query ? "No matching leads" : stage === ALL ? "No leads yet" : `No leads in "${stage}"`}
@@ -908,20 +807,6 @@ export function LeadsScreen({ navigation }: any) {
         </View>
       </BottomSheet>
 
-      <BottomSheet visible={adding} onClose={() => setAdding(false)} title="Add a lead" avoidKeyboard>
-        <TextField label="Name" value={newLead.name} onChangeText={(t) => setNewLead((n) => ({ ...n, name: t }))} autoCapitalize="words" />
-        <TextField
-          label="Mobile number"
-          value={newLead.phone}
-          onChangeText={(t) => setNewLead((n) => ({ ...n, phone: t }))}
-          keyboardType="phone-pad"
-          placeholder="10-digit mobile number"
-        />
-        <View style={[styles.sheetButtons, { gap: spacing.md }]}>
-          <Button label="Cancel" variant="secondary" onPress={() => setAdding(false)} style={{ flex: 1 }} />
-          <Button label="Add lead" onPress={addLead} loading={saving} style={{ flex: 1 }} />
-        </View>
-      </BottomSheet>
     </ScreenContainer>
   );
 }

@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import { LeadsScreen } from "../screens/leads/LeadsScreen";
 import { LeadImportScreen } from "../screens/leads/LeadImportScreen";
+import { LeadSettingsScreen } from "../screens/leads/LeadSettingsScreen";
 import { LeadSourcesScreen } from "../screens/leads/LeadSourcesScreen";
 
 const Stack = createNativeStackNavigator();
@@ -13,6 +14,11 @@ export function LeadsNavigator() {
         name="LeadsMain"
         component={LeadsScreen}
         options={{ title: "Lead Tracker" }}
+      />
+      <Stack.Screen
+        name="LeadSettings"
+        component={LeadSettingsScreen}
+        options={{ title: "Leads settings" }}
       />
       <Stack.Screen
         name="LeadSources"

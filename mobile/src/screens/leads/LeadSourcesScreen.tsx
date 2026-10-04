@@ -8,7 +8,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { BottomSheet } from "../../components/BottomSheet";
 import { Button } from "../../components/Button";
 import { ScreenContainer } from "../../components/ScreenContainer";
-import { EmptyState, ErrorState } from "../../components/StateViews";
+import { EmptyState, ErrorState, LoadingState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
 import { runAdminCsvImport } from "../../leads/adminCsvImport";
 import { useTheme } from "../../theme/useTheme";
@@ -18,6 +18,7 @@ export function LeadSourcesScreen() {
   const { user } = useAuth();
   const [sources, setSources] = useState<api.LeadSource[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [adding, setAdding] = useState(false);
   const [url, setUrl] = useState("");
   const [label, setLabel] = useState("");
@@ -35,6 +36,8 @@ export function LeadSourcesScreen() {
       setError(null);
     } catch (e) {
       setError(getApiErrorMessage(e));
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
@@ -214,6 +217,8 @@ export function LeadSourcesScreen() {
 
       {error ? (
         <ErrorState message={error} onRetry={load} />
+      ) : !loaded ? (
+        <LoadingState label="Loading your sheets…" />
       ) : sources.length === 0 ? (
         <EmptyState
           title="No lists yet"

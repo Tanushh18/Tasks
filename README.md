@@ -97,6 +97,8 @@ The application consists of three components:
 #### Additional Features
 - **Polls**: Create family polls and voting
 - **Lead Management**: Track and manage leads (CRM-like functionality)
+  - A gear button at the top right opens **Leads settings**: add a lead, from contacts, find "lead" contacts, auto-add tagged contacts, sheets & share, import CSV, the call pop-up setup and the offline copy. The list itself only shows the source dropdown, search and stage chips.
+  - A full copy of your leads is kept on the phone (`mobile/src/leads/leadStore.ts`), so the list opens instantly and search, filters, stage and note edits keep working when the server is off. Edits queue and sync later.
   - A "Show leads from" dropdown picks one list (e.g. Meta leads or Calling data) or All leads combined. Meta lead-ad exports are read by `full_name` / `phone_number` (the `p:` prefix is dropped, the ad name is not used as the lead's name).
   - 10 leads per page, opening on "New". Every card shows when the lead was added and who last updated it.
   - Edit a lead's name and mobile behind the pencil button. The update sheet shows stage and notes, and other fields only when asked for.

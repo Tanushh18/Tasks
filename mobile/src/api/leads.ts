@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import { applyLocalEdit, removeLocalLead } from "../leads/leadStore";
 
 export interface Lead {
   id: string;
@@ -68,6 +69,8 @@ export const PAGE_SIZE = 10;
 /** One page of leads. `status` "all" shows every stage; "New" includes leads with no stage yet. */
 export async function listLeadsPage(opts: { page: number; status: string; search?: string; limit?: number; sourceId?: string }): Promise<LeadPage> {
   const { data } = await apiClient.get<LeadPage>("/leads", {
+    // The saved copy in leads/leadStore.ts is the offline fallback, so skip the generic response cache.
+    _noCache: true,
     params: {
       page: opts.page,
       limit: opts.limit ?? PAGE_SIZE,
@@ -75,17 +78,20 @@ export async function listLeadsPage(opts: { page: number; status: string; search
       search: opts.search || undefined,
       sourceId: opts.sourceId && opts.sourceId !== "all" ? opts.sourceId : undefined,
     },
-  });
+  } as object);
   return data;
 }
 
 export async function updateLead(id: string, body: Partial<Lead>): Promise<Lead> {
   const { data } = await apiClient.patch<{ lead: Lead }>(`/leads/${id}`, body);
+  // Also true when the save was only queued offline: the list on the phone shows it straight away.
+  void applyLocalEdit(id, body).catch(() => undefined);
   return data.lead;
 }
 
 export async function deleteLead(id: string): Promise<void> {
   await apiClient.delete(`/leads/${id}`);
+  void removeLocalLead(id).catch(() => undefined);
 }
 
 export async function listSources(): Promise<LeadSource[]> {

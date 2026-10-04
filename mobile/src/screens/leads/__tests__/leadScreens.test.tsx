@@ -37,6 +37,13 @@ jest.mock("../../../leads/callOverlay", () => ({
 }));
 jest.mock("../../../leads/adminCsvImport", () => ({ runAdminCsvImport: jest.fn() }));
 jest.mock("../../../offline/httpCache", () => ({ bypassCacheBriefly: jest.fn() }));
+jest.mock("../../../leads/leadStore", () => ({
+  getLocalSources: jest.fn(async () => []),
+  queryLocalLeads: jest.fn(async () => null),
+  refreshLeadStoreIfStale: jest.fn(async () => undefined),
+  refreshLeadStore: jest.fn(async () => 0),
+  localUpdatedAt: jest.fn(async () => null),
+}));
 
 const lead = {
   id: "l1",
@@ -89,6 +96,7 @@ jest.mock("../../../api/leads", () => ({
   unshareSource: jest.fn(),
 }));
 
+import { LeadSettingsScreen } from "../LeadSettingsScreen";
 import { LeadSourcesScreen } from "../LeadSourcesScreen";
 import { LeadsScreen } from "../LeadsScreen";
 
@@ -122,9 +130,11 @@ describe("lead screens render", () => {
     expect(text).toMatch(/Added 2 Oct 2026/);
     expect(text).toContain("Updated by Tanush");
     expect(text).toContain("Page 1 of 2");
-    expect(text).toContain("WhatsApp");
-    // Admin-only tools stay hidden from normal users.
+    expect(byLabel(r, "WhatsApp Ramesh")).toBeTruthy();
+    // The add / import / share buttons live in Leads settings now, not above the list.
     expect(text).not.toContain("Import CSV");
+    expect(text).not.toContain("Add lead");
+    expect(text).not.toContain("Auto-add tagged contacts");
 
     const next = r.root.findAll((n) => n.props.label === "Next ›")[0];
     await act(async () => next.props.onPress());
@@ -171,12 +181,34 @@ describe("lead screens render", () => {
     await act(async () => r.unmount());
   });
 
-  it("shows the admin the CSV import", async () => {
+  it("puts the add, import, share and auto-add tools in Leads settings (admin sees the CSV import)", async () => {
+    const renderSettings = async () => {
+      let r!: TestRenderer.ReactTestRenderer;
+      await act(async () => {
+        r = TestRenderer.create(<LeadSettingsScreen navigation={{ navigate: jest.fn() }} />);
+      });
+      return r;
+    };
     mockUser = { id: "me", isAdmin: true };
-    const r = await renderLeads();
-    expect(textOf(r)).toContain("Import CSV");
-    expect(textOf(r)).toContain("Sheets & share");
-    await act(async () => r.unmount());
+    const admin = await renderSettings();
+    for (const label of ["Add a lead", "From contacts", "Auto-add tagged contacts", "Sheets & share", "Import CSV", "Leads saved on this phone"]) {
+      expect(textOf(admin)).toContain(label);
+    }
+    await act(async () => admin.unmount());
+
+    mockUser = { id: "me", mobileNumber: "9876500001" };
+    const normal = await renderSettings();
+    expect(textOf(normal)).not.toContain("Import CSV");
+    expect(textOf(normal)).toContain("Share");
+    await act(async () => normal.unmount());
+  });
+
+  it("has a settings button at the top right of the Leads screen", async () => {
+    const setOptions = jest.fn();
+    await act(async () => {
+      TestRenderer.create(<LeadsScreen navigation={{ navigate: jest.fn(), setOptions }} />);
+    });
+    expect(setOptions).toHaveBeenCalledWith(expect.objectContaining({ headerRight: expect.any(Function) }));
   });
 
   it("LeadSourcesScreen shows sheets, members and owner/shared actions", async () => {

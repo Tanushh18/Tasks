@@ -237,6 +237,16 @@ describe("lead list by source", () => {
   });
 });
 
+describe("sheet names", () => {
+  it("shows the Meta sheet as 'Meta Sheet' whatever it was added as", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const a = authed(app, admin.token);
+    await LeadSource.create({ ownerId: admin.userId, sheetId: "1Nv1japYjs6HY3_R5lJTDEMW4vPrEOdXbEvJH4aRznZs", gid: "all", label: "Property Leads", url: "x" });
+    const list = (await a.get("/api/leads/sources/list")).body.sources;
+    expect(list.map((s: any) => s.label)).toContain("Meta Sheet");
+  });
+});
+
 describe("deleting a lead", () => {
   it("is admin only and keeps a sheet from re-adding the lead", async () => {
     const admin = await registerUser(app, ADMIN, "4821", "Admin");

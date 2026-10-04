@@ -18,6 +18,8 @@ type ClientConfig = InternalAxiosRequestConfig & {
   _fromCache?: boolean;
   /** Set when replaying a queued write, so a second failure isn't queued again. */
   _skipQueue?: boolean;
+  /** Don't read or write the on-device response cache (used by the lead store, which keeps its own copy). */
+  _noCache?: boolean;
 };
 
 /** When an older copy exists locally, don't make the person wait out a cold-starting server. */
@@ -28,7 +30,7 @@ function methodOf(config: { method?: string }): string {
 }
 
 function isCacheableGet(config: ClientConfig): boolean {
-  return methodOf(config) === "get" && isCacheableUrl(config.url);
+  return methodOf(config) === "get" && isCacheableUrl(config.url) && !config._noCache;
 }
 
 function cachedReply(config: ClientConfig, data: unknown, note: string): AxiosResponse {
