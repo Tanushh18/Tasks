@@ -561,6 +561,16 @@ export function LeadsScreen({ navigation }: any) {
               {item.name || "Unnamed lead"}
             </Text>
             <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>{item.phone}</Text>
+            <View style={[styles.stampRow, { marginTop: 2 }]}>
+              <Ionicons name="documents-outline" size={12} color={item.origin ? feature.leads.solid : colors.textFaint} />
+              <Text
+                style={[typography.captionStrong, { color: item.origin ? feature.leads.solid : colors.textFaint }]}
+                numberOfLines={1}
+                accessibilityLabel={item.origin ? `From ${item.origin}` : "Source not recorded"}
+              >
+                {item.origin ? `From ${item.origin}` : "Source not recorded"}
+              </Text>
+            </View>
           </View>
           <View style={[styles.pill, { backgroundColor: tone.bg }]}>
             <Text style={[typography.captionStrong, { color: tone.fg }]} numberOfLines={1}>
@@ -589,15 +599,8 @@ export function LeadsScreen({ navigation }: any) {
           </Text>
         ) : null}
 
-        {item.origin || item.category || item.plotInFarukhNagar ? (
+        {item.category || item.plotInFarukhNagar ? (
           <View style={[styles.metaRow, { marginTop: spacing.sm }]}>
-            {item.origin ? (
-              <View style={[styles.pill, { backgroundColor: feature.leads.muted }]}>
-                <Text style={[typography.caption, { color: feature.leads.solid }]} numberOfLines={1}>
-                  {item.origin}
-                </Text>
-              </View>
-            ) : null}
             {item.category ? (
               <View style={[styles.pill, { backgroundColor: colors.surfaceAlt }]}>
                 <Text style={[typography.caption, { color: colors.text }]}>{item.category}</Text>

@@ -131,6 +131,27 @@ describe("lead screens render", () => {
   }
   const byLabel = (r: TestRenderer.ReactTestRenderer, label: string) => r.root.findAll((n) => n.props.accessibilityLabel === label)[0];
 
+  it("shows which sheet each lead came from on its card, even when none is recorded", async () => {
+    mockListPage.mockResolvedValueOnce({
+      leads: [
+        { ...lead, origin: "Calling Data" },
+        { ...bare, origin: "My contacts" },
+        { ...bare, id: "l9", name: "Old Lead", origin: undefined },
+      ],
+      page: 1,
+      limit: 10,
+      total: 3,
+      totalPages: 1,
+      totalAll: 3,
+      stageCounts: [{ stage: "New", count: 3 }],
+    } as never);
+    const r = await renderLeads();
+    const text = textOf(r);
+    expect(text).toContain("From Calling Data");
+    expect(text).toContain("From My contacts");
+    expect(text).toContain("Source not recorded");
+  });
+
   it("opens on New leads, 10 per page, with dates, who updated, and paging", async () => {
     const r = await renderLeads();
     expect(mockListPage).toHaveBeenCalledWith(expect.objectContaining({ page: 1, status: "New" }));
@@ -142,7 +163,8 @@ describe("lead screens render", () => {
     expect(text).toContain("Ramesh");
     expect(text).toMatch(/Added 2 Oct 2026/);
     expect(text).toContain("Updated by Tanush");
-    expect(text).toContain("Meta Sheet");
+    expect(text).toContain("From Meta Sheet");
+    expect(byLabel(r, "From Meta Sheet")).toBeTruthy();
     expect(text).toContain("Page 1 of 2");
     expect(byLabel(r, "WhatsApp Ramesh")).toBeTruthy();
     // The add / import / share buttons live in Leads settings now, not above the list.
