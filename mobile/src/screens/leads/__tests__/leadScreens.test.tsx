@@ -92,6 +92,7 @@ jest.mock("../../../api/leads", () => ({
   ]),
   sourceLabel: (s: { label?: string; kind: string }) => s.label || (s.kind === "manual" ? "My contacts" : s.kind === "import" ? "Imported leads" : "Google Sheet"),
   renameSource: jest.fn(),
+  setSourceSync: jest.fn(),
   addSource: jest.fn(),
   deleteSource: jest.fn(),
   shareSource: jest.fn(),
@@ -226,6 +227,13 @@ describe("lead screens render", () => {
     expect(text).toContain("Shared with you");
     expect(text).toContain("Leave");
     expect(text).toContain("Add Google Sheet");
+    // A connected sheet shows the sync switch and what it does; sharing stays as before.
+    expect(text).toContain("Sync from sheet");
+    expect(text).toContain("Connected: new rows are added");
+    expect(text).toContain("Share");
+    const sw = r.root.findAll((n) => n.props.accessibilityLabel === "Sync FB ads from its sheet")[0];
+    await act(async () => sw.props.onValueChange(false));
+    expect((jest.requireMock("../../../api/leads") as { setSourceSync: jest.Mock }).setSourceSync).toHaveBeenCalledWith("s1", false);
     await act(async () => r.unmount());
   });
 

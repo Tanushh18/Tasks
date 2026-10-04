@@ -29,6 +29,7 @@ export function LeadSourcesScreen() {
   const isAdmin = api.isLeadAdmin(user);
   const [shareFor, setShareFor] = useState<api.LeadSource | null>(null);
   const [shareNumber, setShareNumber] = useState("");
+  const [syncBusy, setSyncBusy] = useState<string | null>(null);
   const [renameFor, setRenameFor] = useState<api.LeadSource | null>(null);
   const [newName, setNewName] = useState("");
 
@@ -99,6 +100,18 @@ export function LeadSourcesScreen() {
       { text: "Yes", style: "destructive", onPress: () => void action() },
     ]);
 
+  const toggleSync = async (s: api.LeadSource, on: boolean) => {
+    setSyncBusy(s.id);
+    try {
+      await api.setSourceSync(s.id, on);
+      await load();
+    } catch (e) {
+      Alert.alert("Couldn't change sync", getApiErrorMessage(e));
+    } finally {
+      setSyncBusy(null);
+    }
+  };
+
   const rename = async () => {
     if (!renameFor) return;
     const name = newName.trim();
@@ -167,10 +180,26 @@ export function LeadSourcesScreen() {
 
         {s.isOwner && s.lastError ? (
           <Text style={[typography.caption, { color: colors.danger, marginTop: spacing.sm }]}>{s.lastError}</Text>
-        ) : s.isOwner && s.kind === "sheet" ? (
-          <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]}>
-            {s.allTabs ? "Syncs automatically every 5 minutes" : "Syncs automatically every 15 seconds"}
-          </Text>
+        ) : null}
+
+        {s.isOwner && s.kind === "sheet" ? (
+          <View style={[styles.syncRow, { marginTop: spacing.sm, gap: spacing.md }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[typography.captionStrong, { color: colors.text }]}>Sync from sheet</Text>
+              <Text style={[typography.caption, { color: colors.textMuted }]}>
+                {s.enabled
+                  ? `Connected: new rows are added ${s.allTabs ? "about every 5 minutes" : "within seconds"}. Leads already here are never changed by the sheet.`
+                  : "Not connected: nothing is read from the sheet. Its leads stay in the app."}
+              </Text>
+            </View>
+            <Switch
+              value={s.enabled}
+              disabled={syncBusy === s.id}
+              onValueChange={(v) => void toggleSync(s, v)}
+              trackColor={{ true: feature.leads.solid, false: colors.border }}
+              accessibilityLabel={`Sync ${api.sourceLabel(s)} from its sheet`}
+            />
+          </View>
         ) : null}
 
         {s.sharedWith.length > 0 ? (
@@ -312,6 +341,7 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: "row", alignItems: "center", gap: 12 },
   icon: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  syncRow: { flexDirection: "row", alignItems: "center" },
   memberRow: { flexDirection: "row", alignItems: "center", gap: 8, borderTopWidth: StyleSheet.hairlineWidth },
   buttons: { flexDirection: "row" },
   switchRow: { flexDirection: "row", alignItems: "center", gap: 12 },

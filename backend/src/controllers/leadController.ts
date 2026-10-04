@@ -295,13 +295,15 @@ export async function updateSource(req: Request, res: Response) {
 
   if (!source) return notFound(res);
 
+  const wasEnabled = source.enabled;
   if (typeof req.body?.enabled === "boolean") source.enabled = req.body.enabled;
   if (typeof req.body?.label === "string")
     source.label = req.body.label.trim().slice(0, 80);
 
   await source.save();
 
-  if (source.enabled && source.kind === "sheet")
+  // Reconnecting a sheet picks up whatever was added while it was off; renaming does not re-read it.
+  if (!wasEnabled && source.enabled && source.kind === "sheet")
     await syncSource(source.toObject(), req.userId!, true).catch(() => {});
 
   return res.json({ source: await serializeSource(source.toObject(), req.userId!) });

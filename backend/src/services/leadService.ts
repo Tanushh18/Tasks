@@ -25,7 +25,7 @@ export async function leadAccessFilter(userId:string){const ids=(await LeadSourc
 export const parseLeadSourceUrl=(url:string,allTabs=false)=>{const ref=parseSheetUrl(url);if(!ref)return null;return{sheetId:ref.sheetId,gid:allTabs||!ref.gid?"all":ref.gid}};
 
 /** Writes parsed leads for one owner. Existing leads only get blanks filled in; nothing typed by a person is overwritten. */
-async function upsertParsed(ownerId:string,sourceId:Types.ObjectId|string,items:ParsedLead[],opts:{overwriteName?:boolean;skipDeleted?:boolean}={}){
+async function upsertParsed(ownerId:string,sourceId:Types.ObjectId|string,items:ParsedLead[],opts:{overwriteName?:boolean;skipDeleted?:boolean;linkOnly?:boolean;restoreArchived?:boolean}={}){
   const owner=new Types.ObjectId(ownerId);
   const phones=items.map(l=>l.phone);
   const existing=new Map<string,any>();
@@ -42,6 +42,11 @@ async function upsertParsed(ownerId:string,sourceId:Types.ObjectId|string,items:
       if(deleted.has(l.phone)){skippedDeleted++;continue}
       ops.push({insertOne:{document:{ownerId:owner,phone:l.phone,name:l.name,email:l.email,address:l.address,notes:l.notes,info:l.info,category:l.category,plotInFarukhNagar:l.plot,alternatePhones:l.alternatePhones,sourceIds:[sourceId],sheetDate:now}}});
       added++;continue;
+    }
+    if(opts.linkOnly){
+      // The database is the source of truth: a lead that already exists is never edited by a sheet, only linked to its list.
+      ops.push({updateOne:{filter:{_id:cur._id},update:{$addToSet:{sourceIds:sourceId},...(opts.restoreArchived&&cur.archived?{$set:{archived:false}}:{})}}});
+      updated++;continue;
     }
     const set:Record<string,unknown>={archived:false};
     if(l.name&&(opts.overwriteName?l.name!==cur.name:!cur.name))set.name=l.name;
@@ -69,6 +74,8 @@ async function readSource(source:any):Promise<{text:string;parsed:ParseResult}>{
 }
 
 export async function syncSource(source:any,ownerId:string,force=false){
+  // Not connected: no sync at all. The leads and the list stay as they are.
+  if(source.enabled===false)return{changed:false,added:0,updated:0,removed:0};
   const {text,parsed}=await readSource(source);
   const nextHash=hash(text);
   if(!force&&nextHash===source.lastHash){await LeadSource.updateOne({_id:source._id},{lastCheckedAt:new Date(),lastError:""});return{changed:false,added:0,updated:0,removed:0}}
@@ -76,12 +83,11 @@ export async function syncSource(source:any,ownerId:string,force=false){
   if(parsed.reports.every(r=>r.rows===0))return{changed:false,added:0,updated:0,removed:0};
   if(!parsed.leads.length&&parsed.reports.every(r=>r.headerRow===null))throw new Error("No phone/mobile column found in this sheet");
   const leads=parsed.leads.filter(l=>!/test lead/i.test(`${l.name} ${l.notes}`));
-  const {added,updated}=await upsertParsed(ownerId,source._id,leads,{overwriteName:true,skipDeleted:true});
-  const ids=leads.map(l=>l.phone);
-  const pulled=await Lead.updateMany({ownerId,sourceIds:source._id,phone:{$nin:ids}},{$pull:{sourceIds:source._id}});
-  await Lead.updateMany({ownerId,sourceIds:{$size:0}},{$set:{archived:true}});
+  // A connected sheet only ever adds: new numbers become leads, existing leads are left alone, and rows
+  // deleted from the sheet do not remove anything. Re-attaching a sheet (first sync) brings its hidden leads back.
+  const {added,updated}=await upsertParsed(ownerId,source._id,leads,{linkOnly:true,skipDeleted:true,restoreArchived:!source.lastSyncedAt});
   await LeadSource.updateOne({_id:source._id},{lastHash:nextHash,lastSyncedAt:new Date(),lastCheckedAt:new Date(),lastError:""});
-  return{changed:true,added,updated,removed:pulled.modifiedCount??0};
+  return{changed:true,added,updated,removed:0};
 }
 
 let timer:NodeJS.Timeout|undefined;

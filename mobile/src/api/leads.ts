@@ -107,6 +107,12 @@ export async function addSource(url: string, label = "", allTabs = false): Promi
   return data;
 }
 
+/** Owner only. Turns the sheet connection on or off. Off: no sync, but the list and its leads stay. */
+export async function setSourceSync(id: string, enabled: boolean): Promise<LeadSource> {
+  const { data } = await apiClient.patch<{ source: LeadSource }>(`/leads/sources/${id}`, { enabled });
+  return data.source;
+}
+
 /** Owner only. Renames a list; the dropdown and the sheets screen show the new name. */
 export async function renameSource(id: string, label: string): Promise<LeadSource> {
   const { data } = await apiClient.patch<{ source: LeadSource }>(`/leads/sources/${id}`, { label });

@@ -230,7 +230,7 @@ export function LeadsScreen({ navigation }: any) {
   const loadSources = useCallback(() => {
     api
       .listSources()
-      .then((list) => setSources(list.filter((x) => x.enabled)))
+      .then((list) => setSources(list))
       .catch(() => undefined);
   }, []);
 
@@ -242,7 +242,7 @@ export function LeadsScreen({ navigation }: any) {
   );
 
   useEffect(() => {
-    void getLocalSources().then((list) => list.length && setSources((cur) => (cur.length ? cur : list.filter((x) => x.enabled))));
+    void getLocalSources().then((list) => list.length && setSources((cur) => (cur.length ? cur : list)));
     api
       .getLeadMeta()
       .then((m) => {

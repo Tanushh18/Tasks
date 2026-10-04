@@ -247,6 +247,72 @@ describe("sheet names", () => {
   });
 });
 
+describe("connected sheets add to the database and never change it", () => {
+  const csv = (rows: string[]) => ["OWNER NAME,MOBILE", ...rows].join("\n");
+  const withCsv = (body: () => string) => {
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200, text: async () => body() })) as any;
+  };
+  const realFetch = global.fetch;
+  afterEach(() => {
+    global.fetch = realFetch;
+  });
+
+  it("adds new numbers, leaves existing leads alone, and keeps leads whose row was deleted", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const a = authed(app, admin.token);
+    let sheet = csv(["Balwinder,9417516921", "Nisha,9818497174"]);
+    withCsv(() => sheet);
+    const added = await a.post("/api/leads/sources").send({ url: "https://docs.google.com/spreadsheets/d/sheetY/edit#gid=0", label: "Meta Sheet" });
+    expect(added.status).toBe(201);
+    expect((await Lead.countDocuments())).toBe(2);
+
+    // Someone works the lead in the app.
+    await Lead.updateOne({ phone: "+919417516921" }, { name: "Balwinder Singh", status: "Follow-up", notes: "call Monday" });
+
+    // The sheet now renames Balwinder, drops Nisha and adds Karan.
+    sheet = csv(["Balwinder Kumar,9417516921", "Karan,9876543210"]);
+    const source = await LeadSource.findById(added.body.source.id).lean();
+    const res = await syncSource(source, String(source!.ownerId), true);
+    expect(res.added).toBe(1);
+
+    const bal = await Lead.findOne({ phone: "+919417516921" }).lean();
+    expect(bal).toMatchObject({ name: "Balwinder Singh", status: "Follow-up", notes: "call Monday", archived: false });
+    expect(await Lead.exists({ phone: "+919876543210" })).not.toBeNull();
+    const nisha = await Lead.findOne({ phone: "+919818497174" }).lean();
+    expect(nisha).toMatchObject({ archived: false });
+    expect(nisha!.sourceIds.map(String)).toContain(String(source!._id));
+    // Everything stays under the sheet's list, so the per-list filter still works.
+    expect((await a.get(`/api/leads?page=1&status=all&sourceId=${source!._id}`)).body.total).toBe(3);
+  });
+
+  it("does not sync a sheet that is switched off, picks up what was added when it is switched back on, and does not re-read on rename", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const a = authed(app, admin.token);
+    let sheet = csv(["Balwinder,9417516921"]);
+    withCsv(() => sheet);
+    const added = await a.post("/api/leads/sources").send({ url: "https://docs.google.com/spreadsheets/d/sheetZ/edit#gid=0" });
+    const id = added.body.source.id;
+    expect(await Lead.countDocuments()).toBe(1);
+
+    expect((await a.patch(`/api/leads/sources/${id}`).send({ enabled: false })).status).toBe(200);
+    sheet = csv(["Balwinder,9417516921", "Nisha,9818497174"]);
+    await a.post("/api/leads/sync");
+    const source = await LeadSource.findById(id).lean();
+    await syncSource(source, String(source!.ownerId), true);
+    expect(await Lead.countDocuments()).toBe(1);
+    // The list and its lead stay.
+    expect((await a.get("/api/leads/sources/list")).body.sources[0].enabled).toBe(false);
+    expect((await a.get(`/api/leads?page=1&status=all&sourceId=${id}`)).body.total).toBe(1);
+
+    (global.fetch as jest.Mock).mockClear();
+    await a.patch(`/api/leads/sources/${id}`).send({ label: "Renamed" });
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    await a.patch(`/api/leads/sources/${id}`).send({ enabled: true });
+    expect(await Lead.countDocuments()).toBe(2);
+  });
+});
+
 describe("renaming a list", () => {
   it("lets the owner rename an imported list, and nobody else", async () => {
     const admin = await registerUser(app, ADMIN, "4821", "Admin");
