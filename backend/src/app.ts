@@ -55,7 +55,8 @@ export function createApp(): Express {
   app.use("/api", idempotency);
 
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
+    // Render sets RENDER_GIT_COMMIT, so a URL check shows which version is live.
+    res.json({ status: "ok", commit: process.env.RENDER_GIT_COMMIT ?? null, timestamp: new Date().toISOString() });
   });
 
   app.use("/api/auth", authRoutes);
