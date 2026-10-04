@@ -32,7 +32,12 @@ const clip = { publicId: "ShineOne/sec 4/v", kind: "video", url: "https://x/v.mp
 const mockList = jest.fn();
 const mockUploadMany = jest.fn();
 const mockDelete = jest.fn(async () => undefined);
+const mockGetSite = jest.fn();
+const mockUpdateSite = jest.fn();
 jest.mock("../../../api/shineMedia", () => ({
+  SITE_STAGES: ["Foundation", "Structure", "Finishing", "Interior Works", "Final Inspection", "Handover"],
+  getSite: () => mockGetSite(),
+  updateSiteProject: (...a: unknown[]) => mockUpdateSite(...a),
   listProjects: () => mockList(),
   uploadMany: (...a: unknown[]) => mockUploadMany(...a),
   deleteMedia: (...a: unknown[]) => mockDelete(...(a as [])),
@@ -45,8 +50,13 @@ const textOf = (r: TestRenderer.ReactTestRenderer) =>
   r.root.findAll((n) => typeof n.children?.[0] === "string").map((n) => n.children.join("")).join(" | ");
 const byLabel = (r: TestRenderer.ReactTestRenderer, label: string) => r.root.findAll((n) => n.props.accessibilityLabel === label);
 
+const site42 = { key: "sec 42", name: "Sector 42", status: "Ongoing", area: "3200 Sq. Feet", progress: 78, stage: "", eta: "June 2026" };
+const site4 = { key: "sec 4", name: "Sector 4", status: "Completed", area: "5700 Sq. Feet", progress: 100, stage: "", eta: "" };
+
 beforeEach(() => {
   jest.clearAllMocks();
+  mockGetSite.mockResolvedValue({ projects: [site4, site42], updatedAt: null });
+  mockUpdateSite.mockImplementation(async (_key: string, upd: object) => ({ projects: [site4, { ...site42, ...upd }] }));
   mockList.mockResolvedValue({
     configured: true,
     projects: [
@@ -164,5 +174,39 @@ describe("Project photos", () => {
       await buttons.find((b) => b.text === "Delete")!.onPress!();
     });
     expect(mockDelete).toHaveBeenCalledWith(expect.objectContaining({ publicId: "ShineOne/sec 4/a", kind: "image" }));
+  });
+});
+
+describe("Website progress", () => {
+  const button = (r: TestRenderer.ReactTestRenderer, label: string) =>
+    r.root.findAll((n) => n.props.accessibilityRole === "button" && n.props.accessibilityLabel === label)[0];
+
+  it("shows the project's progress and saves a change to the website", async () => {
+    mockParams = { projectKey: "sec 42", label: "Sector 42" };
+    const r = await render(<MediaProjectScreen />);
+    expect(textOf(r)).toContain("Website progress");
+    expect(textOf(r)).toContain("78%");
+    await act(async () => {
+      byLabel(r, "Increase progress by 5")[0].props.onPress();
+    });
+    expect(textOf(r)).toContain("83%");
+    await act(async () => {
+      await button(r, "Save to website").props.onPress();
+    });
+    expect(mockUpdateSite).toHaveBeenCalledWith("sec 42", expect.objectContaining({ progress: 83, status: "Ongoing", eta: "June 2026" }));
+    expect(textOf(r)).toContain("Saved");
+    mockParams = { projectKey: "sec 4", label: "Sector 4" };
+  });
+
+  it("hides the progress controls for a completed project", async () => {
+    const r = await render(<MediaProjectScreen />);
+    expect(textOf(r)).toContain("Website progress");
+    expect(byLabel(r, "Increase progress by 5")).toHaveLength(0);
+  });
+
+  it("offers a retry when the progress can't load", async () => {
+    mockGetSite.mockRejectedValue(new Error("offline"));
+    const r = await render(<MediaProjectScreen />);
+    expect(textOf(r)).toContain("Couldn't load the website progress.");
   });
 });

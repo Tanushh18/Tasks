@@ -11,6 +11,7 @@ import {
   clearShineCache,
   type MediaKind,
 } from "../services/shineMediaService";
+import { getShineSite, projectUpdateSchema, updateShineProject } from "../services/shineSiteService";
 
 const kindOf = (v: unknown): MediaKind => {
   if (v === "image" || v === "video") return v;
@@ -58,4 +59,23 @@ export async function publicMedia(_req: Request, res: Response) {
   for (const p of SHINE_PROJECTS) folders[p.key] = (all.get(p.key) ?? []).map((i) => i.url);
   res.set("Cache-Control", "public, max-age=60");
   res.json({ folders });
+}
+
+/** No sign-in: project status the website shows (progress %, stage, ETA). */
+export async function publicSite(_req: Request, res: Response) {
+  const site = await getShineSite();
+  res.set("Cache-Control", "public, max-age=60");
+  res.json(site);
+}
+
+/** Signed-in: same data, uncached, for the app. */
+export async function getSite(_req: Request, res: Response) {
+  res.json(await getShineSite());
+}
+
+/** Signed-in: change one project's status / progress / stage / ETA. */
+export async function updateSiteProject(req: Request, res: Response) {
+  const parsed = projectUpdateSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw ApiError.badRequest(parsed.error.issues[0]?.message ?? "Invalid project update");
+  res.json(await updateShineProject(String(req.params.key ?? ""), parsed.data));
 }
