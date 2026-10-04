@@ -233,3 +233,27 @@ export async function backfillLeadOrigins(){
   }
   return filled;
 }
+
+
+/**
+ * Leads first loaded from a CSV / file import keep that import's name as their origin. When the same leads also belong to
+ * a connected sheet with a friendly name (Meta Sheet, Calling Data), show that name instead. Writes only origin / originId,
+ * only on leads linked to exactly one of those sheets, and only when their origin is an import list. Safe to run on every start.
+ */
+export async function relabelImportedLeadsToSheets(){
+  const known=await LeadSource.find({sheetId:{$in:Object.keys(KNOWN_SHEET_LABELS)}}).lean();
+  if(!known.length)return 0;
+  const imports=await LeadSource.find({kind:"import"},{_id:1}).lean();
+  if(!imports.length)return 0;
+  const importIds=imports.map(i=>i._id);
+  let changed=0;
+  for(const source of known){
+    const others=known.filter(k=>String(k._id)!==String(source._id)).map(k=>k._id);
+    const res=await Lead.updateMany(
+      {sourceIds:{$all:[source._id],$nin:others},originId:{$in:importIds}},
+      {$set:{origin:sourceDisplayName(source),originId:source._id}}
+    );
+    changed+=res.modifiedCount??0;
+  }
+  return changed;
+}

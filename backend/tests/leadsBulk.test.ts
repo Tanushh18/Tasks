@@ -3,7 +3,7 @@ import { createApp } from "../src/app";
 import { Lead } from "../src/models/Lead";
 import { LeadSource } from "../src/models/LeadSource";
 import { extractPhones, normalizePhone, parseCsv, parseTabs } from "../src/services/leadImport";
-import { backfillLeadOrigins, cleanupNotInterested, syncSource } from "../src/services/leadService";
+import { backfillLeadOrigins, cleanupNotInterested, relabelImportedLeadsToSheets, syncSource } from "../src/services/leadService";
 import { authed, registerUser } from "./helpers";
 
 const app = createApp();
@@ -398,6 +398,31 @@ describe("one shared pool with a sheet filter", () => {
     await authed(app, admin.token).post("/api/leads/admin/import").send({ csv: SIMPLE_CSV, label: "Calling Data" });
     expect(await Lead.countDocuments({ phone: "+919417516921" })).toBe(1);
     expect(await Lead.countDocuments()).toBe(2);
+  });
+});
+
+describe("imported leads that also belong to a named sheet", () => {
+  it("shows the sheet's name, touches only the origin, and leaves everything else alone", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const a = authed(app, admin.token);
+    await a.post("/api/leads/admin/import").send({ csv: SIMPLE_CSV, label: "Central Park II buyers" });
+    const imported = await LeadSource.findOne({ kind: "import" }).lean();
+    // The Calling Data sheet is connected and has linked the same leads.
+    const calling = await LeadSource.create({ ownerId: admin.userId, sheetId: "1yJHK8tnURvrudVPt-PHYzVCtve5ScRa9uVCA6AqFM1U", gid: "all", url: "x", label: "" });
+    // One lead is also in the Meta sheet, so it is ambiguous and must be left alone.
+    const meta = await LeadSource.create({ ownerId: admin.userId, sheetId: "1Nv1japYjs6HY3_R5lJTDEMW4vPrEOdXbEvJH4aRznZs", gid: "all", url: "x", label: "" });
+    await Lead.updateMany({}, { $addToSet: { sourceIds: calling._id }, $set: { status: "Follow-up", notes: "keep me" } });
+    await Lead.updateOne({ phone: "+919818497174" }, { $addToSet: { sourceIds: meta._id } });
+
+    expect(await relabelImportedLeadsToSheets()).toBe(1);
+    expect(await relabelImportedLeadsToSheets()).toBe(0);
+
+    const moved = await Lead.findOne({ phone: "+919417516921" }).lean();
+    expect(moved).toMatchObject({ origin: "Calling Data", status: "Follow-up", notes: "keep me", archived: false });
+    expect(String(moved!.originId)).toBe(String(calling._id));
+    const ambiguous = await Lead.findOne({ phone: "+919818497174" }).lean();
+    expect(ambiguous).toMatchObject({ origin: "Central Park II buyers" });
+    expect(String(ambiguous!.originId)).toBe(String(imported!._id));
   });
 });
 
