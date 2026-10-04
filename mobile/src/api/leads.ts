@@ -107,6 +107,17 @@ export async function addSource(url: string, label = "", allTabs = false): Promi
   return data;
 }
 
+/** Owner only. Renames a list; the dropdown and the sheets screen show the new name. */
+export async function renameSource(id: string, label: string): Promise<LeadSource> {
+  const { data } = await apiClient.patch<{ source: LeadSource }>(`/leads/sources/${id}`, { label });
+  return data.source;
+}
+
+/** The name shown for a list everywhere (dropdown, sheets screen). */
+export function sourceLabel(s: Pick<LeadSource, "label" | "kind">): string {
+  return s.label || (s.kind === "manual" ? "My contacts" : s.kind === "import" ? "Imported leads" : "Google Sheet");
+}
+
 export async function deleteSource(id: string): Promise<void> {
   await apiClient.delete(`/leads/sources/${id}`);
 }

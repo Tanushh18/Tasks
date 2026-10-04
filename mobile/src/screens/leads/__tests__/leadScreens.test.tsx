@@ -90,6 +90,8 @@ jest.mock("../../../api/leads", () => ({
     { id: "s1", kind: "sheet", url: "https://docs.google.com/x", label: "FB ads", sheetId: "x", gid: "0", enabled: true, isOwner: true, sharedWith: [{ id: "u2", name: "Bob", mobileNumber: "9876500002" }] },
     { id: "s2", kind: "manual", url: "", label: "My contacts", sheetId: "manual", gid: "0", enabled: true, isOwner: false, sharedWith: [] },
   ]),
+  sourceLabel: (s: { label?: string; kind: string }) => s.label || (s.kind === "manual" ? "My contacts" : s.kind === "import" ? "Imported leads" : "Google Sheet"),
+  renameSource: jest.fn(),
   addSource: jest.fn(),
   deleteSource: jest.fn(),
   shareSource: jest.fn(),

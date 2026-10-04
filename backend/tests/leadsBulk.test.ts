@@ -247,6 +247,19 @@ describe("sheet names", () => {
   });
 });
 
+describe("renaming a list", () => {
+  it("lets the owner rename an imported list, and nobody else", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const bob = await registerUser(app, "9876591004", "4821", "Bob");
+    const a = authed(app, admin.token);
+    await a.post("/api/leads/admin/import").send({ csv: SIMPLE_CSV, label: "Central Park 2" });
+    const src = (await a.get("/api/leads/sources/list")).body.sources.find((s: any) => s.label === "Central Park 2");
+    expect((await authed(app, bob.token).patch(`/api/leads/sources/${src.id}`).send({ label: "X" })).status).toBe(404);
+    expect((await a.patch(`/api/leads/sources/${src.id}`).send({ label: "Calling Data" })).status).toBe(200);
+    expect((await a.get("/api/leads/sources/list")).body.sources.map((s: any) => s.label)).toContain("Calling Data");
+  });
+});
+
 describe("deleting a lead", () => {
   it("is admin only and keeps a sheet from re-adding the lead", async () => {
     const admin = await registerUser(app, ADMIN, "4821", "Admin");

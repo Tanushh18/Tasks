@@ -223,16 +223,26 @@ export function LeadsScreen({ navigation }: any) {
     () =>
       onLeadEvent("leadsChanged", () => {
         void load({ quiet: true, fresh: true });
-        }),
+      }),
     [load]
   );
 
-  useEffect(() => {
-        void getLocalSources().then((list) => list.length && setSources((cur) => (cur.length ? cur : list.filter((x) => x.enabled))));
+  const loadSources = useCallback(() => {
     api
       .listSources()
       .then((list) => setSources(list.filter((x) => x.enabled)))
       .catch(() => undefined);
+  }, []);
+
+  // Names can change on the sheets screen, so reload them whenever this screen comes back into view.
+  useFocusEffect(
+    useCallback(() => {
+      loadSources();
+    }, [loadSources])
+  );
+
+  useEffect(() => {
+    void getLocalSources().then((list) => list.length && setSources((cur) => (cur.length ? cur : list.filter((x) => x.enabled))));
     api
       .getLeadMeta()
       .then((m) => {
@@ -253,7 +263,7 @@ export function LeadsScreen({ navigation }: any) {
   }, [data]);
 
   const sourceName = useCallback(
-    (id: string) => (id === ALL ? "All leads" : sources.find((x) => x.id === id)?.label || "Sheet"),
+    (id: string) => (id === ALL ? "All leads" : (() => { const x = sources.find((y) => y.id === id); return x ? api.sourceLabel(x) : "Sheet"; })()),
     [sources]
   );
 
@@ -706,7 +716,7 @@ export function LeadsScreen({ navigation }: any) {
       )}
 
       <BottomSheet visible={pickingSource} onClose={() => setPickingSource(false)} title="Show leads from" scrollable>
-        {[{ id: ALL, label: "All leads" }, ...sources.map((x) => ({ id: x.id, label: x.label || "Sheet" }))].map((opt) => (
+        {[{ id: ALL, label: "All leads" }, ...sources.map((x) => ({ id: x.id, label: api.sourceLabel(x) }))].map((opt) => (
           <Pressable
             key={opt.id}
             onPress={() => {

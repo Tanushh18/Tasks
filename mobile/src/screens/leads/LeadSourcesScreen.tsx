@@ -29,6 +29,8 @@ export function LeadSourcesScreen() {
   const isAdmin = api.isLeadAdmin(user);
   const [shareFor, setShareFor] = useState<api.LeadSource | null>(null);
   const [shareNumber, setShareNumber] = useState("");
+  const [renameFor, setRenameFor] = useState<api.LeadSource | null>(null);
+  const [newName, setNewName] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -97,6 +99,25 @@ export function LeadSourcesScreen() {
       { text: "Yes", style: "destructive", onPress: () => void action() },
     ]);
 
+  const rename = async () => {
+    if (!renameFor) return;
+    const name = newName.trim();
+    if (!name) {
+      Alert.alert("Name required");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.renameSource(renameFor.id, name);
+      setRenameFor(null);
+      await load();
+    } catch (e) {
+      Alert.alert("Couldn't rename", getApiErrorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const removeSheet = (s: api.LeadSource) =>
     confirm("Remove this sheet?", "Its leads stay in your list unless no other sheet has them.", async () => {
       try {
@@ -131,7 +152,7 @@ export function LeadSourcesScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[typography.bodyStrong, { color: colors.text }]} numberOfLines={1}>
-              {s.label || (manual ? "My contacts" : imported ? "Imported leads" : "Google Sheet")}
+              {api.sourceLabel(s)}
             </Text>
             <Text style={[typography.caption, { color: colors.textMuted }]} numberOfLines={1}>
               {subtitle}
@@ -179,6 +200,7 @@ export function LeadSourcesScreen() {
         <View style={[styles.buttons, { gap: spacing.sm, marginTop: spacing.md }]}>
           {s.isOwner ? (
             <>
+              <Button label="Rename" variant="secondary" onPress={() => { setRenameFor(s); setNewName(s.label || ""); }} style={{ flex: 1 }} />
               <Button label="Share" variant="secondary" onPress={() => setShareFor(s)} style={{ flex: 1 }} />
               {!manual ? <Button label="Remove" variant="ghost" onPress={() => removeSheet(s)} style={{ flex: 1 }} /> : null}
             </>
@@ -228,6 +250,14 @@ export function LeadSourcesScreen() {
       ) : (
         sources.map(renderSource)
       )}
+
+      <BottomSheet visible={!!renameFor} onClose={() => setRenameFor(null)} title="Rename list" subtitle={renameFor ? api.sourceLabel(renameFor) : undefined} avoidKeyboard>
+        <TextField label="Name" value={newName} onChangeText={setNewName} placeholder="e.g. Meta Sheet" autoCapitalize="words" />
+        <View style={{ flexDirection: "row", gap: spacing.md, marginTop: 8 }}>
+          <Button label="Cancel" variant="secondary" onPress={() => setRenameFor(null)} style={{ flex: 1 }} />
+          <Button label="Save" onPress={() => void rename()} loading={busy} style={{ flex: 1 }} />
+        </View>
+      </BottomSheet>
 
       <BottomSheet visible={adding} onClose={() => setAdding(false)} title="Add Google Sheet" avoidKeyboard>
         <TextField label="Label (optional)" value={label} onChangeText={setLabel} placeholder="e.g. Facebook ads" />
