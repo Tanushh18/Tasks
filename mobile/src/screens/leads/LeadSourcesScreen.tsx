@@ -27,8 +27,6 @@ export function LeadSourcesScreen() {
   const [importing, setImporting] = useState(false);
   // Linking sheets and importing files are admin tools; the server enforces this too.
   const isAdmin = api.isLeadAdmin(user);
-  const [shareFor, setShareFor] = useState<api.LeadSource | null>(null);
-  const [shareNumber, setShareNumber] = useState("");
   const [syncBusy, setSyncBusy] = useState<string | null>(null);
   const [renameFor, setRenameFor] = useState<api.LeadSource | null>(null);
   const [newName, setNewName] = useState("");
@@ -70,30 +68,6 @@ export function LeadSourcesScreen() {
     }
   };
 
-  const share = async () => {
-    if (!shareFor || !shareNumber.trim()) return;
-    setBusy(true);
-    try {
-      await api.shareSource(shareFor.id, shareNumber.trim());
-      setShareNumber("");
-      setShareFor(null);
-      await load();
-    } catch (e) {
-      Alert.alert("Couldn't share", getApiErrorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const unshare = async (sourceId: string, userId: string) => {
-    try {
-      await api.unshareSource(sourceId, userId);
-      await load();
-    } catch (e) {
-      Alert.alert("Couldn't update sharing", getApiErrorMessage(e));
-    }
-  };
-
   const confirm = (title: string, message: string, action: () => Promise<void>) =>
     Alert.alert(title, message, [
       { text: "Cancel", style: "cancel" },
@@ -132,7 +106,7 @@ export function LeadSourcesScreen() {
   };
 
   const removeSheet = (s: api.LeadSource) =>
-    confirm("Remove this sheet?", "Only the sheet link is removed. All its leads stay in the app, unchanged. People it was shared with will no longer see them.", async () => {
+    confirm("Remove this sheet?", "Only the sheet link is removed. All its leads stay in the app, unchanged, and keep the sheet name for the filter.", async () => {
       try {
         await api.deleteSource(s.id);
         await load();
@@ -171,11 +145,6 @@ export function LeadSourcesScreen() {
               {subtitle}
             </Text>
           </View>
-          {!s.isOwner ? (
-            <View style={[styles.badge, { backgroundColor: colors.surfaceAlt }]}>
-              <Text style={[typography.caption, { color: colors.textMuted }]}>Shared with you</Text>
-            </View>
-          ) : null}
         </View>
 
         {s.isOwner && s.lastError ? (
@@ -202,47 +171,13 @@ export function LeadSourcesScreen() {
           </View>
         ) : null}
 
-        {s.sharedWith.length > 0 ? (
-          <View style={{ marginTop: spacing.md }}>
-            <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.xs }]}>Shared with</Text>
-            {s.sharedWith.map((m) => (
-              <View key={m.id} style={[styles.memberRow, { borderTopColor: colors.border, minHeight: touchTarget.min }]}>
-                <Ionicons name="person-circle-outline" size={22} color={colors.textMuted} />
-                <Text style={[typography.body, { color: colors.text, flex: 1 }]} numberOfLines={1}>
-                  {m.name} · {m.mobileNumber}
-                </Text>
-                {s.isOwner ? (
-                  <Pressable
-                    onPress={() => confirm("Stop sharing?", `${m.name} will no longer see these leads.`, () => unshare(s.id, m.id))}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Stop sharing with ${m.name}`}
-                    hitSlop={8}
-                  >
-                    <Ionicons name="close-circle" size={22} color={colors.danger} />
-                  </Pressable>
-                ) : null}
-              </View>
-            ))}
-          </View>
-        ) : null}
-
         <View style={[styles.buttons, { gap: spacing.sm, marginTop: spacing.md }]}>
           {s.isOwner ? (
             <>
               <Button label="Rename" variant="secondary" onPress={() => { setRenameFor(s); setNewName(s.label || ""); }} style={{ flex: 1 }} />
-              <Button label="Share" variant="secondary" onPress={() => setShareFor(s)} style={{ flex: 1 }} />
               {!manual ? <Button label="Remove" variant="ghost" onPress={() => removeSheet(s)} style={{ flex: 1 }} /> : null}
             </>
-          ) : (
-            <Button
-              label="Leave"
-              variant="ghost"
-              onPress={() => {
-                if (user) confirm("Leave this list?", "You'll stop seeing these leads.", () => unshare(s.id, user.id));
-              }}
-              style={{ flex: 1 }}
-            />
-          )}
+          ) : null}
         </View>
       </View>
     );
@@ -251,7 +186,7 @@ export function LeadSourcesScreen() {
   return (
     <ScreenContainer edges={["left", "right"]}>
       <Text style={[typography.body, { color: colors.textMuted, marginBottom: spacing.md }]}>
-        Everyone a list is shared with sees and edits the same leads.
+        Every signed-in user sees and edits all leads. A connected sheet only adds new ones, and each lead keeps its sheet name for the filter.
       </Text>
       {isAdmin ? (
         <View style={[styles.buttons, { gap: spacing.sm, marginBottom: spacing.lg }]}>
@@ -313,25 +248,6 @@ export function LeadSourcesScreen() {
         </View>
       </BottomSheet>
 
-      <BottomSheet
-        visible={!!shareFor}
-        onClose={() => setShareFor(null)}
-        title="Share with"
-        subtitle={shareFor ? shareFor.label || (shareFor.kind === "manual" ? "My contacts" : "Google Sheet") : undefined}
-        avoidKeyboard
-      >
-        <TextField
-          label="Mobile number"
-          value={shareNumber}
-          onChangeText={setShareNumber}
-          placeholder="Number they use to log in to We Three"
-          keyboardType="phone-pad"
-        />
-        <View style={[styles.buttons, { gap: spacing.md }]}>
-          <Button label="Cancel" variant="secondary" onPress={() => setShareFor(null)} style={{ flex: 1 }} />
-          <Button label="Share" onPress={share} loading={busy} style={{ flex: 1 }} />
-        </View>
-      </BottomSheet>
     </ScreenContainer>
   );
 }

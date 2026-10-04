@@ -365,6 +365,42 @@ describe("each lead remembers its sheet", () => {
   });
 });
 
+describe("one shared pool with a sheet filter", () => {
+  it("every signed-in user sees, edits and filters all leads; no sharing needed", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const priya = await registerUser(app, "9876591005", "4821", "Priya");
+    const a = authed(app, admin.token);
+    const p = authed(app, priya.token);
+    await a.post("/api/leads/admin/import").send({ csv: META_CSV, label: "Meta Sheet" });
+    await a.post("/api/leads/admin/import").send({ csv: SIMPLE_CSV, label: "Calling Data" });
+
+    // Priya was never shared anything and still sees everything.
+    expect((await p.get("/api/leads?page=1&status=all")).body.total).toBe(3);
+    const origins = (await p.get("/api/leads/origins")).body.origins;
+    expect(origins).toEqual([
+      { name: "Calling Data", count: 2 },
+      { name: "Meta Sheet", count: 1 },
+    ]);
+    const meta = (await p.get("/api/leads?page=1&status=all&origin=Meta%20Sheet")).body;
+    expect(meta.total).toBe(1);
+    expect(meta.leads[0]).toMatchObject({ name: "Jitender Yadav", origin: "Meta Sheet" });
+
+    // She can edit a lead the admin imported.
+    const res = await p.patch(`/api/leads/${meta.leads[0].id}`).send({ status: "Follow-up" });
+    expect(res.status).toBe(200);
+    expect((await a.get("/api/leads?page=1&status=Follow-up")).body.total).toBe(1);
+  });
+
+  it("a number already in the pool is not added a second time by another user or another sheet", async () => {
+    const admin = await registerUser(app, ADMIN, "4821", "Admin");
+    const priya = await registerUser(app, "9876591006", "4821", "Priya");
+    await authed(app, priya.token).post("/api/leads/import").send({ contacts: [{ name: "Balwinder", phone: "9417516921" }] });
+    await authed(app, admin.token).post("/api/leads/admin/import").send({ csv: SIMPLE_CSV, label: "Calling Data" });
+    expect(await Lead.countDocuments({ phone: "+919417516921" })).toBe(1);
+    expect(await Lead.countDocuments()).toBe(2);
+  });
+});
+
 describe("renaming a list", () => {
   it("lets the owner rename an imported list, and nobody else", async () => {
     const admin = await registerUser(app, ADMIN, "4821", "Admin");
@@ -379,15 +415,14 @@ describe("renaming a list", () => {
 });
 
 describe("deleting a lead", () => {
-  it("is admin only and keeps a sheet from re-adding the lead", async () => {
+  it("anyone signed in can delete, and a sheet does not re-add the lead", async () => {
     const admin = await registerUser(app, ADMIN, "4821", "Admin");
     const bob = await registerUser(app, "9876591003", "4821", "Bob");
     const a = authed(app, admin.token);
     await a.post("/api/leads/admin/import").send({ csv: SIMPLE_CSV, label: "Owners" });
     const leads = (await a.get("/api/leads?page=1&status=all")).body.leads;
     const target = leads[0];
-    expect((await authed(app, bob.token).delete(`/api/leads/${target.id}`)).status).toBe(403);
-    expect((await a.delete(`/api/leads/${target.id}`)).status).toBe(204);
+    expect((await authed(app, bob.token).delete(`/api/leads/${target.id}`)).status).toBe(204);
     expect((await a.delete(`/api/leads/${target.id}`)).status).toBe(404);
     expect((await a.delete("/api/leads/nope")).status).toBe(404);
     expect((await a.get("/api/leads?page=1&status=all")).body.total).toBe(1);

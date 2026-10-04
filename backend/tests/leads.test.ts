@@ -17,26 +17,18 @@ describe("shared leads", () => {
     global.fetch = realFetch;
   });
 
-  it("stores sheet leads in the database and shares them with another user", async () => {
+  it("stores sheet leads in the database and every signed-in user sees and edits them, no sharing", async () => {
     const alice = await registerUser(app, ADMIN, "4821", "Alice");
     const bob = await registerUser(app, "9876590002", "4821", "Bob");
-    const stranger = await registerUser(app, "9876590003", "4821", "Stranger");
     const a = authed(app, alice.token);
     const b = authed(app, bob.token);
-    const s = authed(app, stranger.token);
 
     const added = await a.post("/api/leads/sources").send({ url: SHEET });
     expect(added.status).toBe(201);
     expect(added.body.source.isOwner).toBe(true);
     const sourceId = added.body.source.id;
 
-    // Before sharing, Bob sees nothing.
-    expect((await b.get("/api/leads")).body.leads).toHaveLength(0);
-
-    const shared = await a.post(`/api/leads/sources/${sourceId}/share`).send({ mobileNumber: "9876590002" });
-    expect(shared.status).toBe(200);
-    expect(shared.body.source.sharedWith[0].name).toBe("Bob");
-
+    // Bob sees everything without anything being shared with him.
     const bobLeads = (await b.get("/api/leads")).body.leads;
     expect(bobLeads).toHaveLength(2);
     expect((await b.get("/api/leads/sources/list")).body.sources[0].isOwner).toBe(false);
@@ -49,18 +41,9 @@ describe("shared leads", () => {
     expect(aliceView.status).toBe("Interested");
     expect(aliceView.notes).toBe("Call tomorrow");
 
-    // A stranger can neither see nor edit them.
-    expect((await s.get("/api/leads")).body.leads).toHaveLength(0);
-    expect((await s.patch(`/api/leads/${lead.id}`).send({ status: "x" })).status).toBe(404);
-
-    // Only the owner can delete the sheet or manage sharing.
+    // Managing the sheet itself (remove, rename, sync switch) stays with the admin.
     expect((await b.delete(`/api/leads/sources/${sourceId}`)).status).toBe(404);
-    expect((await b.post(`/api/leads/sources/${sourceId}/share`).send({ mobileNumber: "9876590003" })).status).toBe(404);
-
-    // Bob can leave; then he loses access.
-    const left = await b.delete(`/api/leads/sources/${sourceId}/share/${bob.userId}`);
-    expect(left.status).toBe(200);
-    expect((await b.get("/api/leads")).body.leads).toHaveLength(0);
+    expect((await b.patch(`/api/leads/sources/${sourceId}`).send({ label: "x" })).status).toBe(404);
   });
 
   it("rejects sharing with an unknown number", async () => {

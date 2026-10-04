@@ -39,6 +39,7 @@ jest.mock("../../../leads/adminCsvImport", () => ({ runAdminCsvImport: jest.fn()
 jest.mock("../../../offline/httpCache", () => ({ bypassCacheBriefly: jest.fn() }));
 jest.mock("../../../leads/leadStore", () => ({
   getLocalSources: jest.fn(async () => []),
+  getLocalOrigins: jest.fn(async () => []),
   queryLocalLeads: jest.fn(async () => null),
   refreshLeadStoreIfStale: jest.fn(async () => undefined),
   refreshLeadStore: jest.fn(async () => 0),
@@ -94,6 +95,10 @@ jest.mock("../../../api/leads", () => ({
   sourceLabel: (s: { label?: string; kind: string }) => s.label || (s.kind === "manual" ? "My contacts" : s.kind === "import" ? "Imported leads" : "Google Sheet"),
   renameSource: jest.fn(),
   setSourceSync: jest.fn(),
+  listOrigins: jest.fn(async () => [
+    { name: "Calling Data", count: 2 },
+    { name: "Meta Sheet", count: 12 },
+  ]),
   addSource: jest.fn(),
   deleteSource: jest.fn(),
   shareSource: jest.fn(),
@@ -104,6 +109,8 @@ import { LeadSettingsScreen } from "../LeadSettingsScreen";
 import { LeadSourcesScreen } from "../LeadSourcesScreen";
 import { LeadsScreen } from "../LeadsScreen";
 
+const textOfNode = (n: TestRenderer.ReactTestInstance) =>
+  n.findAll((c) => typeof c.children?.[0] === "string").map((c) => c.children.join("")).join(" | ");
 const textOf = (r: TestRenderer.ReactTestRenderer) =>
   r.root.findAll((n) => typeof n.children?.[0] === "string").map((n) => n.children.join("")).join(" | ");
 
@@ -196,7 +203,7 @@ describe("lead screens render", () => {
     };
     mockUser = { id: "me", isAdmin: true };
     const admin = await renderSettings();
-    for (const label of ["Add a lead", "From contacts", "Auto-add tagged contacts", "Sheets & share", "Import CSV", "Leads saved on this phone"]) {
+    for (const label of ["Add a lead", "From contacts", "Auto-add tagged contacts", "Sheets", "Import CSV", "Leads saved on this phone"]) {
       expect(textOf(admin)).toContain(label);
     }
     await act(async () => admin.unmount());
@@ -204,8 +211,26 @@ describe("lead screens render", () => {
     mockUser = { id: "me", mobileNumber: "9876500001" };
     const normal = await renderSettings();
     expect(textOf(normal)).not.toContain("Import CSV");
-    expect(textOf(normal)).toContain("Share");
+    // No sharing any more, and connecting sheets is the admin's job.
+    expect(textOf(normal)).not.toContain("Share");
+    expect(textOf(normal)).not.toContain("SHEETS AND FILES");
     await act(async () => normal.unmount());
+  });
+
+  it("filters by sheet name, shows each sheet's count, and lets anyone delete", async () => {
+    const r = await renderLeads();
+    await act(async () => byLabel(r, "Sheet: All leads. Tap to change.").props.onPress());
+    const text = textOf(r);
+    expect(text).toContain("Meta Sheet");
+    expect(text).toContain("12");
+    const meta = r.root.findAll((n) => n.props.accessibilityRole === "radio" && typeof n.props.onPress === "function").find((n) =>
+      JSON.stringify(n.props.accessibilityState) && textOfNode(n).includes("Meta Sheet")
+    )!;
+    await act(async () => meta.props.onPress());
+    expect(mockListPage).toHaveBeenLastCalledWith(expect.objectContaining({ origin: "Meta Sheet", page: 1 }));
+    // A normal user (not admin) gets the delete button too.
+    expect(byLabel(r, "Delete Ramesh")).toBeTruthy();
+    await act(async () => r.unmount());
   });
 
   it("has a settings button at the top right of the Leads screen", async () => {
@@ -216,7 +241,7 @@ describe("lead screens render", () => {
     expect(setOptions).toHaveBeenCalledWith(expect.objectContaining({ headerRight: expect.any(Function) }));
   });
 
-  it("LeadSourcesScreen shows sheets, members and owner/shared actions", async () => {
+  it("LeadSourcesScreen shows sheets and owner actions, with no sharing", async () => {
     mockUser = { id: "me", isAdmin: true };
     let r!: TestRenderer.ReactTestRenderer;
     await act(async () => {
@@ -224,15 +249,14 @@ describe("lead screens render", () => {
     });
     const text = textOf(r);
     expect(text).toContain("FB ads");
-    expect(text).toContain("Bob · 9876500002");
     expect(text).toContain("My contacts");
-    expect(text).toContain("Shared with you");
-    expect(text).toContain("Leave");
+    expect(text).not.toContain("Shared with");
+    expect(text).not.toContain("Leave");
     expect(text).toContain("Add Google Sheet");
     // A connected sheet shows the sync switch and what it does; sharing stays as before.
     expect(text).toContain("Sync from sheet");
     expect(text).toContain("Connected: new rows are added");
-    expect(text).toContain("Share");
+    expect(text).not.toContain("Share");
     const sw = r.root.findAll((n) => n.props.accessibilityLabel === "Sync FB ads from its sheet")[0];
     await act(async () => sw.props.onValueChange(false));
     expect((jest.requireMock("../../../api/leads") as { setSourceSync: jest.Mock }).setSourceSync).toHaveBeenCalledWith("s1", false);

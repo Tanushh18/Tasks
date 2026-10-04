@@ -69,7 +69,7 @@ export async function listLeads(search?: string, archived = false): Promise<Lead
 export const PAGE_SIZE = 10;
 
 /** One page of leads. `status` "all" shows every stage; "New" includes leads with no stage yet. */
-export async function listLeadsPage(opts: { page: number; status: string; search?: string; limit?: number; sourceId?: string }): Promise<LeadPage> {
+export async function listLeadsPage(opts: { page: number; status: string; search?: string; limit?: number; sourceId?: string; origin?: string }): Promise<LeadPage> {
   const { data } = await apiClient.get<LeadPage>("/leads", {
     // The saved copy in leads/leadStore.ts is the offline fallback, so skip the generic response cache.
     _noCache: true,
@@ -79,9 +79,21 @@ export async function listLeadsPage(opts: { page: number; status: string; search
       status: opts.status,
       search: opts.search || undefined,
       sourceId: opts.sourceId && opts.sourceId !== "all" ? opts.sourceId : undefined,
+      origin: opts.origin && opts.origin !== "all" ? opts.origin : undefined,
     },
   } as object);
   return data;
+}
+
+export interface OriginCount {
+  name: string;
+  count: number;
+}
+
+/** Every sheet name leads came from, with counts: the options of the sheet filter. */
+export async function listOrigins(): Promise<OriginCount[]> {
+  const { data } = await apiClient.get<{ origins: OriginCount[] }>("/leads/origins", { _noCache: true } as object);
+  return data.origins;
 }
 
 export async function updateLead(id: string, body: Partial<Lead>): Promise<Lead> {

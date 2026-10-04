@@ -15,6 +15,7 @@ router.post("/bulk-import", express.text({ type: ["text/csv", "text/plain"], lim
 router.use(requireAuth);
 router.get("/meta", c.meta);
 router.get("/", c.listLeads);
+router.get("/origins", c.listOrigins);
 router.post("/import", c.importLeads);
 router.post("/lookup", c.lookupPhones);
 router.post("/admin/import", c.adminImport);

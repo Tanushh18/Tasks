@@ -148,14 +148,17 @@ export async function queryLocalLeads(opts: {
   status: string;
   search?: string;
   sourceId?: string;
+  /** Sheet name stored on each lead ("Meta Sheet"); "all" or empty for every sheet. */
+  origin?: string;
 }): Promise<LeadPage | null> {
   const store = await load();
   if (!store) return null;
   const { leads } = store;
 
   const sourceId = opts.sourceId && opts.sourceId !== "all" ? opts.sourceId : "";
+  const origin = opts.origin && opts.origin !== "all" ? opts.origin : "";
   const q = (opts.search ?? "").trim().toLowerCase();
-  const memoKey = `${sourceId}|${q}`;
+  const memoKey = `${sourceId}|${origin}|${q}`;
   let memo = countMemo.get(memoKey);
   if (!memo) {
     // `leads` is already newest first, so filtering keeps the order and nothing needs sorting here.
@@ -164,6 +167,7 @@ export async function queryLocalLeads(opts: {
       (l) =>
         !l.archived &&
         (!sourceId || (l as Lead & { sourceIds?: string[] }).sourceIds?.includes(sourceId)) &&
+        (!origin || l.origin === origin) &&
         (!q || hayFor(l).includes(q) || (digits.length >= 3 && (l.phone ?? "").replace(/\D/g, "").includes(digits)))
     );
     const counts = new Map<string, number>();
@@ -195,6 +199,15 @@ export async function queryLocalLeads(opts: {
     totalAll: memo.totalAll,
     stageCounts: memo.stageCounts,
   };
+}
+
+/** The sheet filter's options from the copy on the phone (used when the server can't be reached). */
+export async function getLocalOrigins(): Promise<{ name: string; count: number }[]> {
+  const store = await load();
+  if (!store) return [];
+  const counts = new Map<string, number>();
+  for (const l of store.leads) if (!l.archived && l.origin) counts.set(l.origin, (counts.get(l.origin) ?? 0) + 1);
+  return [...counts.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Applies an edit to the saved copy right away (used for online saves and for edits queued offline). */

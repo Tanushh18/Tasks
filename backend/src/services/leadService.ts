@@ -27,8 +27,9 @@ export const sourceDisplayName=(s:{label?:string|null;sheetId?:string;kind?:stri
 const clean=(v:unknown,max=4000)=>typeof v==="string"?v.trim().slice(0,max):"";
 const hash=(text:string)=>crypto.createHash("sha256").update(text).digest("hex");
 
-export async function accessibleSources(userId:string){return LeadSource.find({$or:[{ownerId:userId},{sharedWith:userId}]})}
-export async function leadAccessFilter(userId:string){const ids=(await LeadSource.find({$or:[{ownerId:userId},{sharedWith:userId}]},{_id:1}).lean()).map(s=>s._id);return{$or:[{ownerId:new Types.ObjectId(userId)},{sourceIds:{$in:ids}}]}}
+/** One shared pool: every signed-in user sees and edits every list and every lead. There is no sharing. */
+export async function accessibleSources(_userId:string){return LeadSource.find({})}
+export async function leadAccessFilter(_userId:string):Promise<Record<string,unknown>>{return{}}
 
 /** Sheet link -> {sheetId,gid}. A link without a gid means "every tab" (gid "all"). */
 export const parseLeadSourceUrl=(url:string,allTabs=false)=>{const ref=parseSheetUrl(url);if(!ref)return null;return{sheetId:ref.sheetId,gid:allTabs||!ref.gid?"all":ref.gid}};
@@ -41,8 +42,8 @@ async function upsertParsed(ownerId:string,sourceId:Types.ObjectId|string,items:
   const deleted=new Set<string>();
   for(let i=0;i<phones.length;i+=1000){
     const chunk=phones.slice(i,i+1000);
-    for(const l of await Lead.find({ownerId:owner,phone:{$in:chunk}}).lean())existing.set(l.phone,l);
-    if(opts.skipDeleted)for(const t of await LeadTombstone.find({ownerId:owner,phone:{$in:chunk}}).lean())deleted.add(t.phone);
+    for(const l of await Lead.find({phone:{$in:chunk}}).lean())if(!existing.has(l.phone))existing.set(l.phone,l);
+    if(opts.skipDeleted)for(const t of await LeadTombstone.find({phone:{$in:chunk}}).lean())deleted.add(t.phone);
   }
   const ops:any[]=[];let added=0,updated=0,skippedDeleted=0;const now=new Date();
   for(const l of items){
@@ -184,26 +185,21 @@ export interface BulkImportOptions{label:string;dryRun?:boolean;includeDeleted?:
  * Numbers already tracked anywhere this owner can see are not duplicated.
  */
 export async function importParsedLeads(ownerId:string,parsed:ParseResult,opts:BulkImportOptions){
-  const access=await leadAccessFilter(ownerId);
   const phones=parsed.leads.map(l=>l.phone);
-  const others=new Set<string>();
-  for(let i=0;i<phones.length;i+=1000){
-    const found=await Lead.find({phone:{$in:phones.slice(i,i+1000)},...access,ownerId:{$ne:new Types.ObjectId(ownerId)}},{phone:1}).lean();
-    for(const f of found)others.add(f.phone);
-  }
-  const mine=parsed.leads.filter(l=>!others.has(l.phone));
+  // Shared pool: a number someone else already added is the same lead, so it is linked, not skipped.
+  const mine=parsed.leads;
   const summary={
     rows:parsed.reports.reduce((s,r)=>s+r.rows,0),
     validUnique:parsed.leads.length,
     noValidMobile:parsed.reports.reduce((s,r)=>s+r.noPhone,0),
     placeholders:parsed.reports.reduce((s,r)=>s+r.placeholder,0),
     duplicateRows:parsed.reports.reduce((s,r)=>s+r.duplicates,0),
-    sharedWithYouAlready:others.size,
+    sharedWithYouAlready:0,
     added:0,updated:0,skippedDeleted:0,
   };
   if(opts.dryRun){
     const owned=new Set<string>();
-    for(let i=0;i<phones.length;i+=1000)for(const l of await Lead.find({ownerId:new Types.ObjectId(ownerId),phone:{$in:phones.slice(i,i+1000)}},{phone:1}).lean())owned.add(l.phone);
+    for(let i=0;i<phones.length;i+=1000)for(const l of await Lead.find({phone:{$in:phones.slice(i,i+1000)}},{phone:1}).lean())owned.add(l.phone);
     summary.updated=mine.filter(l=>owned.has(l.phone)).length;
     summary.added=mine.length-summary.updated;
     return{summary,source:null};

@@ -48,6 +48,7 @@ export async function listLeads(req: Request, res: Response) {
   const search = str(req.query.search as string, 120);
   const status = str(req.query.status as string, 200);
   const sourceId = str(req.query.sourceId as string, 40);
+  const origin = str(req.query.origin as string, 120);
   // Old app versions don't send `page` and expect every lead back in one go.
   const paged = req.query.page !== undefined;
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 10));
@@ -56,6 +57,8 @@ export async function listLeads(req: Request, res: Response) {
   const base: Record<string, unknown>[] = [await leadAccessFilter(req.userId!)];
   if (!archived) base.push({ archived: false });
   // One list only (e.g. Meta leads or Calling data); "all"/absent means every list combined.
+  // Sheet filter: the sheet name stored on each lead, so it keeps working after a sheet is disconnected.
+  if (origin && origin.toLowerCase() !== "all") base.push({ origin });
   if (sourceId && sourceId.toLowerCase() !== "all") {
     if (!Types.ObjectId.isValid(sourceId)) return badRequest(res, "Unknown lead list");
     base.push({ sourceIds: new Types.ObjectId(sourceId) });
@@ -121,6 +124,16 @@ export async function listLeads(req: Request, res: Response) {
       .map(([stage, count]) => ({ stage, count }))
       .sort((a, b) => b.count - a.count),
   });
+}
+
+/** Every sheet name leads came from, with how many active leads each has: the options of the sheet filter. */
+export async function listOrigins(_req: Request, res: Response) {
+  const rows = await Lead.aggregate<{ _id: string; count: number }>([
+    { $match: { archived: false, origin: { $nin: ["", null] } } },
+    { $group: { _id: "$origin", count: { $sum: 1 } } },
+    { $sort: { _id: 1 } },
+  ]);
+  res.json({ origins: rows.map((r) => ({ name: r._id, count: r.count })) });
 }
 
 export async function updateLead(req: Request, res: Response) {
@@ -192,9 +205,8 @@ export async function updateLead(req: Request, res: Response) {
   return res.json({ lead: serializeLead(lead.toObject()) });
 }
 
-/** Admin only. Removes the lead and remembers its number so a sheet sync doesn't bring it back. */
+/** Anyone signed in. Removes the lead and remembers its number so a sheet sync doesn't bring it back. */
 export async function deleteLead(req: Request, res: Response) {
-  if (!req.isAdmin) return adminOnly(res);
   if (!Types.ObjectId.isValid(req.params.id)) return notFound(res, "Lead not found");
   const access = await leadAccessFilter(req.userId!);
   const lead = await Lead.findOneAndDelete({ _id: req.params.id, ...access });
@@ -207,13 +219,13 @@ export async function deleteLead(req: Request, res: Response) {
   return res.status(204).send();
 }
 
-async function serializeSource(source: any, userId: string) {
+async function serializeSource(source: any, userId: string, isAdmin = false) {
   const memberIds = (source.sharedWith ?? []) as unknown[];
   const members = memberIds.length
     ? await User.find({ _id: { $in: memberIds } }, { name: 1, mobileNumber: 1 }).lean()
     : [];
   const { _id, ownerId, lastHash, sharedWith, __v, ...rest } = source;
-  const isOwner = String(ownerId) === userId;
+  const isOwner = String(ownerId) === userId || isAdmin;
   const out: Record<string, unknown> = {
     ...rest,
     label: KNOWN_SHEET_LABELS[rest.sheetId as string] ?? rest.label,
@@ -243,7 +255,7 @@ export async function listSources(req: Request, res: Response) {
   const sources = (await accessibleSources(req.userId!)).sort(
     (a: any, b: any) => +new Date(a.createdAt) - +new Date(b.createdAt)
   );
-  const out = await Promise.all(sources.map((s) => serializeSource(s.toObject(), req.userId!)));
+  const out = await Promise.all(sources.map((s) => serializeSource(s.toObject(), req.userId!, !!req.isAdmin)));
   res.json({ sources: out });
 }
 
@@ -280,14 +292,12 @@ export async function addSource(req: Request, res: Response) {
     result = { changed: false, error: message };
   }
   const fresh = await LeadSource.findById(source._id).lean();
-  return res.status(201).json({ source: await serializeSource(fresh, req.userId!), result });
+  return res.status(201).json({ source: await serializeSource(fresh, req.userId!, !!req.isAdmin), result });
 }
 
 export async function updateSource(req: Request, res: Response) {
-  const source = await LeadSource.findOne({
-    _id: req.params.id,
-    ownerId: req.userId,
-  });
+  // Lists are managed by the admin (or whoever added them).
+  const source = await LeadSource.findOne({ _id: req.params.id, ...(req.isAdmin ? {} : { ownerId: req.userId }) });
 
   if (!source) return notFound(res);
 
@@ -298,13 +308,13 @@ export async function updateSource(req: Request, res: Response) {
 
   await source.save();
   if (typeof req.body?.label === "string")
-    await Lead.updateMany({ ownerId: source.ownerId, originId: source._id }, { $set: { origin: sourceDisplayName(source) } });
+    await Lead.updateMany({ originId: source._id }, { $set: { origin: sourceDisplayName(source) } });
 
   // Reconnecting a sheet picks up whatever was added while it was off; renaming does not re-read it.
   if (!wasEnabled && source.enabled && source.kind === "sheet")
     await syncSource(source.toObject(), req.userId!, true).catch(() => {});
 
-  return res.json({ source: await serializeSource(source.toObject(), req.userId!) });
+  return res.json({ source: await serializeSource(source.toObject(), req.userId!, !!req.isAdmin) });
 }
 
 export async function shareSource(req: Request, res: Response) {
@@ -318,7 +328,7 @@ export async function shareSource(req: Request, res: Response) {
 
   await LeadSource.updateOne({ _id: source._id }, { $addToSet: { sharedWith: user._id } });
   const fresh = await LeadSource.findById(source._id).lean();
-  return res.json({ source: await serializeSource(fresh, req.userId!) });
+  return res.json({ source: await serializeSource(fresh, req.userId!, !!req.isAdmin) });
 }
 
 export async function unshareSource(req: Request, res: Response) {
@@ -333,21 +343,21 @@ export async function unshareSource(req: Request, res: Response) {
     { new: true }
   ).lean();
   if (!source) return notFound(res);
-  return res.json({ source: await serializeSource(source, req.userId!) });
+  return res.json({ source: await serializeSource(source, req.userId!, !!req.isAdmin) });
 }
 
 export async function deleteSource(req: Request, res: Response) {
   const source = await LeadSource.findOneAndDelete({
     _id: req.params.id,
-    ownerId: req.userId,
+    ...(req.isAdmin ? {} : { ownerId: req.userId }),
     kind: { $ne: "manual" },
   });
 
   if (!source) return notFound(res);
 
-  // The sheet was only a way to import. The leads are the owner's own data now, so they all stay visible and
-  // unchanged; they just stop belonging to the removed list.
-  await Lead.updateMany({ ownerId: req.userId, sourceIds: source._id }, { $pull: { sourceIds: source._id } });
+  // The sheet was only a way to import. Its leads stay visible and unchanged, still carrying the sheet name
+  // (origin) for the filter; they just stop belonging to the removed list.
+  await Lead.updateMany({ sourceIds: source._id }, { $pull: { sourceIds: source._id } });
 
   return res.status(204).send();
 }

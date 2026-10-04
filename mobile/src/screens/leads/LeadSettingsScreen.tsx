@@ -230,21 +230,23 @@ export function LeadSettingsScreen({ navigation }: any) {
         <Text style={[typography.caption, { color: statusLine.error ? colors.danger : colors.textMuted, marginBottom: spacing.sm }]}>{statusLine.text}</Text>
       ) : null}
 
-      <Section title="SHEETS AND FILES" />
-      <Row
-        icon="share-social-outline"
-        title={isAdmin ? "Sheets & share" : "Share"}
-        subtitle={isAdmin ? "Link Google Sheets and share lists" : "Lists shared with you"}
-        onPress={() => navigation.navigate("LeadSources")}
-      />
       {isAdmin ? (
-        <Row
+        <>
+          <Section title="SHEETS AND FILES" />
+          <Row
+            icon="grid-outline"
+            title="Sheets"
+            subtitle="Connect Google Sheets; their leads are saved for everyone"
+            onPress={() => navigation.navigate("LeadSources")}
+          />
+          <Row
           icon="document-attach-outline"
           title="Import CSV"
           subtitle="Preview, then add leads from a file"
           busy={importing}
-          onPress={() => void runAdminCsvImport(setImporting)}
-        />
+            onPress={() => void runAdminCsvImport(setImporting)}
+          />
+        </>
       ) : null}
 
       {overlay?.supported ? (

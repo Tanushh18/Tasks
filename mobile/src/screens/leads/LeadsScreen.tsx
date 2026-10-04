@@ -5,7 +5,6 @@ import { Alert, AppState, FlatList, Linking, Pressable, StyleSheet, Text, View }
 import { getApiErrorMessage } from "../../api/client";
 import * as api from "../../api/leads";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useAuth } from "../../auth/AuthContext";
 import { BottomSheet } from "../../components/BottomSheet";
 import { Button } from "../../components/Button";
 import { FilterChip, FilterChipGroup } from "../../components/FilterChip";
@@ -25,7 +24,7 @@ import {
 } from "../../leads/callOverlay";
 import { syncTaggedContacts } from "../../leads/contactAutoSync";
 import { emitLeadEvent, onLeadEvent } from "../../leads/leadEvents";
-import { getLocalSources, isLocalFresh, queryLocalLeads, refreshLeadStoreIfStale } from "../../leads/leadStore";
+import { getLocalOrigins, isLocalFresh, queryLocalLeads, refreshLeadStoreIfStale } from "../../leads/leadStore";
 import { isUnreachableError } from "../../offline/httpQueue";
 import { bypassCacheBriefly } from "../../offline/httpCache";
 import { useTheme, type Theme } from "../../theme/useTheme";
@@ -85,14 +84,13 @@ export function daysUntilDeleted(notInterestedAt: string | null | undefined, ttl
 
 export function LeadsScreen({ navigation }: any) {
   const { colors, spacing, typography, radius, touchTarget, feature } = useTheme();
-  const { user } = useAuth();
-  const isAdmin = api.isLeadAdmin(user);
 
   const [page, setPage] = useState(1);
   const [stage, setStage] = useState<string>(DEFAULT_STAGE);
   // Which list the leads come from (e.g. Meta leads, Calling data); "all" combines every list.
-  const [sourceId, setSourceId] = useState<string>(ALL);
-  const [sources, setSources] = useState<api.LeadSource[]>([]);
+  // Sheet filter: the sheet name saved on every lead ("Meta Sheet", "Calling Data"…); "all" shows every sheet.
+  const [sheet, setSheet] = useState<string>(ALL);
+  const [sheets, setSheets] = useState<api.OriginCount[]>([]);
   const [pickingSource, setPickingSource] = useState(false);
   const [offline, setOffline] = useState(false);
   const [search, setSearch] = useState("");
@@ -142,11 +140,11 @@ export function LeadsScreen({ navigation }: any) {
   }, [search]);
 
   // A new filter or search starts again at page 1.
-  useEffect(() => setPage(1), [stage, query, sourceId]);
+  useEffect(() => setPage(1), [stage, query, sheet]);
 
   const localPage = useCallback(
-    () => queryLocalLeads({ page, limit: api.PAGE_SIZE, status: stage, search: query, sourceId }),
-    [page, stage, query, sourceId]
+    () => queryLocalLeads({ page, limit: api.PAGE_SIZE, status: stage, search: query, origin: sheet }),
+    [page, stage, query, sheet]
   );
 
   const load = useCallback(
@@ -168,7 +166,7 @@ export function LeadsScreen({ navigation }: any) {
       }
       if (opts.fresh) bypassCacheBriefly();
       try {
-        const res = await api.listLeadsPage({ page, status: stage, search: query, sourceId });
+        const res = await api.listLeadsPage({ page, status: stage, search: query, origin: sheet });
         if (id !== request.current) return;
         // Deleting/filtering can leave us past the last page; step back.
         if (res.page > res.totalPages && res.totalPages >= 1) {
@@ -195,7 +193,7 @@ export function LeadsScreen({ navigation }: any) {
         if (id === request.current) setLoading(false);
       }
     },
-    [page, stage, query, sourceId, localPage]
+    [page, stage, query, sheet, localPage]
   );
 
   useEffect(() => {
@@ -227,22 +225,23 @@ export function LeadsScreen({ navigation }: any) {
     [load]
   );
 
-  const loadSources = useCallback(() => {
+  const loadSheets = useCallback(() => {
     api
-      .listSources()
-      .then((list) => setSources(list))
-      .catch(() => undefined);
+      .listOrigins()
+      .then(setSheets)
+      // Offline: build the options from the copy on the phone.
+      .catch(() => void getLocalOrigins().then((list) => list.length && setSheets(list)));
   }, []);
 
-  // Names can change on the sheets screen, so reload them whenever this screen comes back into view.
+  // New sheets and renames show up whenever this screen comes back into view.
   useFocusEffect(
     useCallback(() => {
-      loadSources();
-    }, [loadSources])
+      loadSheets();
+    }, [loadSheets])
   );
 
   useEffect(() => {
-    void getLocalSources().then((list) => list.length && setSources((cur) => (cur.length ? cur : list)));
+    void getLocalOrigins().then((list) => list.length && setSheets((cur) => (cur.length ? cur : list)));
     api
       .getLeadMeta()
       .then((m) => {
@@ -262,10 +261,7 @@ export function LeadsScreen({ navigation }: any) {
     return [DEFAULT_STAGE, ...others, ALL];
   }, [data]);
 
-  const sourceName = useCallback(
-    (id: string) => (id === ALL ? "All leads" : (() => { const x = sources.find((y) => y.id === id); return x ? api.sourceLabel(x) : "Sheet"; })()),
-    [sources]
-  );
+  const sheetName = (name: string) => (name === ALL ? "All leads" : name);
 
   const goToPage = (next: number) => {
     setPage(next);
@@ -370,7 +366,7 @@ export function LeadsScreen({ navigation }: any) {
   const confirmDelete = (lead: api.Lead) => {
     Alert.alert(
       "Delete this lead?",
-      `${lead.name || "Unnamed lead"} (${lead.phone}) will be removed for everyone and won't come back from the sheet.`,
+      `${lead.name || "Unnamed lead"} (${lead.phone}) will be removed for everyone signed in, and won't come back from the sheet.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -422,7 +418,7 @@ export function LeadsScreen({ navigation }: any) {
           <Text style={[typography.h3, { color: colors.text }]}>
             {totalAll.toLocaleString("en-IN")} active lead{totalAll === 1 ? "" : "s"}
           </Text>
-          <Text style={[typography.caption, { color: colors.textMuted }]}>Shared with everyone on your lists</Text>
+          <Text style={[typography.caption, { color: colors.textMuted }]}>Everyone signed in sees and edits the same leads</Text>
         </View>
         <Pressable
           onPress={sync}
@@ -459,7 +455,7 @@ export function LeadsScreen({ navigation }: any) {
       <Pressable
         onPress={() => setPickingSource(true)}
         accessibilityRole="button"
-        accessibilityLabel={`Lead list: ${sourceName(sourceId)}. Tap to change.`}
+        accessibilityLabel={`Sheet: ${sheetName(sheet)}. Tap to change.`}
         style={[
           styles.dropdown,
           { marginTop: spacing.md, minHeight: touchTarget.min, borderColor: colors.border, backgroundColor: colors.surfaceAlt, borderRadius: radius.md, paddingHorizontal: spacing.md },
@@ -467,7 +463,7 @@ export function LeadsScreen({ navigation }: any) {
       >
         <Ionicons name="funnel-outline" size={18} color={colors.primary} />
         <Text style={[typography.bodyStrong, { color: colors.text, flex: 1 }]} numberOfLines={1}>
-          {sourceName(sourceId)}
+          {sheetName(sheet)}
         </Text>
         <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
       </Pressable>
@@ -649,20 +645,18 @@ export function LeadsScreen({ navigation }: any) {
           >
             <Ionicons name="pencil" size={20} color={colors.text} />
           </Pressable>
-          {isAdmin ? (
-            <Pressable
-              onPress={() => confirmDelete(item)}
-              accessibilityRole="button"
-              accessibilityLabel={`Delete ${item.name || "lead"}`}
-              hitSlop={4}
-              style={({ pressed }) => [
-                styles.iconBtn,
-                { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, minHeight: touchTarget.min, opacity: pressed ? 0.8 : 1 },
-              ]}
-            >
-              <Ionicons name="trash-outline" size={20} color={colors.danger} />
-            </Pressable>
-          ) : null}
+          <Pressable
+            onPress={() => confirmDelete(item)}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${item.name || "lead"}`}
+            hitSlop={4}
+            style={({ pressed }) => [
+              styles.iconBtn,
+              { backgroundColor: colors.surfaceAlt, borderRadius: radius.pill, minHeight: touchTarget.min, opacity: pressed ? 0.8 : 1 },
+            ]}
+          >
+            <Ionicons name="trash-outline" size={20} color={colors.danger} />
+          </Pressable>
         </View>
       </Pressable>
     );
@@ -723,19 +717,22 @@ export function LeadsScreen({ navigation }: any) {
       )}
 
       <BottomSheet visible={pickingSource} onClose={() => setPickingSource(false)} title="Show leads from" scrollable>
-        {[{ id: ALL, label: "All leads" }, ...sources.map((x) => ({ id: x.id, label: api.sourceLabel(x) }))].map((opt) => (
+        {[{ name: ALL, label: "All leads", count: undefined as number | undefined }, ...sheets.map((x) => ({ name: x.name, label: x.name, count: x.count }))].map((opt) => (
           <Pressable
-            key={opt.id}
+            key={opt.name}
             onPress={() => {
-              setSourceId(opt.id);
+              setSheet(opt.name);
               setPickingSource(false);
             }}
             accessibilityRole="radio"
-            accessibilityState={{ selected: sourceId === opt.id }}
+            accessibilityState={{ selected: sheet === opt.name }}
             style={[styles.dropdownRow, { minHeight: touchTarget.min, paddingVertical: spacing.sm }]}
           >
-            <Text style={[sourceId === opt.id ? typography.bodyStrong : typography.body, { color: colors.text, flex: 1 }]}>{opt.label}</Text>
-            {sourceId === opt.id ? <Ionicons name="checkmark" size={20} color={colors.primary} /> : null}
+            <Text style={[sheet === opt.name ? typography.bodyStrong : typography.body, { color: colors.text, flex: 1 }]}>{opt.label}</Text>
+            {opt.count !== undefined ? (
+              <Text style={[typography.caption, { color: colors.textMuted }]}>{opt.count.toLocaleString("en-IN")}</Text>
+            ) : null}
+            {sheet === opt.name ? <Ionicons name="checkmark" size={20} color={colors.primary} /> : null}
           </Pressable>
         ))}
       </BottomSheet>
