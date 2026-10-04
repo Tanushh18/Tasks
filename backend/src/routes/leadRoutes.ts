@@ -17,6 +17,7 @@ router.get("/meta", c.meta);
 router.get("/", c.listLeads);
 router.get("/origins", c.listOrigins);
 router.post("/origins/rename", c.renameOrigin);
+router.post("/lists", c.createList);
 router.post("/import", c.importLeads);
 router.post("/lookup", c.lookupPhones);
 router.post("/admin/import", c.adminImport);

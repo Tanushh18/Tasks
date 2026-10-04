@@ -1032,3 +1032,14 @@ The **Media** tab manages the photos and videos shown on the ShineOne Estate web
 - Uploads go from the phone straight to Cloudinary with a signature from the server (`POST /api/shine-media/sign`), so large videos don't pass through the server.
 - The website reads `GET /api/public/shine/media` (no sign-in, read-only, cached 60 s) and falls back to its built-in list if the server can't be reached. The older photos that sit outside the project folders are listed by name in `shineMediaService.ts`.
 - Server variables (Render): `CLOUDINARY_CLOUD_NAME_shine`, `CLOUDINARY_API_KEY_shine`, `CLOUDINARY_API_SECRET_shine`.
+
+## Lists (the sheet filter's names)
+
+- Every lead stores the name of the list it is filed under (`origin`): "Meta Sheet", "Calling Data", "My contacts", or any name you add. The Leads dropdown filters by these names.
+- **My contacts is one shared list.** Leads added by hand or scanned from any phone's contacts all join the same list, so three phones don't make three lists. (Lists created earlier per person are left as they are; new leads join the oldest, and the Lead Sheets screen shows one row.)
+- **Add a new list:** in the Leads dropdown choose "Add a new list", or type a new name under "Save under" when adding a lead. A name that already exists in any capitalisation is reused, never duplicated, and an empty list shows in the dropdown with 0 leads.
+- **Add lead** has a "Save under" choice (default My contacts). A number that is already a lead stays in the list it is in.
+
+## After-call popup
+
+When a call ends the popup lists every lead stage at once (Interested, Called — no answer and Not interested first, then the rest of the lead stages, including any the admin adds), with a note box. The over-other-apps card on Android lists up to 8 stages; phones on an older APK still show the first 4 until they install a newer APK.

@@ -13,7 +13,7 @@ import { SearchBar } from "../../components/SearchBar";
 import { Skeleton } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
-import { QUICK_STATUSES, registerCall } from "../../leads/callFollowUp";
+import { callStatusOptions, registerCall } from "../../leads/callFollowUp";
 import {
   getOverlaySetup,
   overlaySupported,
@@ -96,6 +96,9 @@ export function LeadsScreen({ navigation }: any) {
   const [renamingSheet, setRenamingSheet] = useState<string | null>(null);
   const [sheetNewName, setSheetNewName] = useState("");
   const [renameBusy, setRenameBusy] = useState(false);
+  // Adding a new list (a new name in the sheet filter, like "Meta Sheet" or "Calling Data").
+  const [creatingList, setCreatingList] = useState(false);
+  const [newListName, setNewListName] = useState("");
   const [offline, setOffline] = useState(false);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -289,6 +292,27 @@ export function LeadsScreen({ navigation }: any) {
     }
   };
 
+  const saveNewList = async () => {
+    const name = newListName.trim();
+    if (!name) {
+      Alert.alert("Name required");
+      return;
+    }
+    setRenameBusy(true);
+    try {
+      const made = await api.createList(name);
+      setSheets((cur) => (cur.some((s) => s.name === made.name) ? cur : [...cur, { name: made.name, count: 0 }]));
+      setSheet(made.name);
+      setCreatingList(false);
+      setNewListName("");
+      loadSheets();
+    } catch (e) {
+      Alert.alert("Couldn't add list", getApiErrorMessage(e));
+    } finally {
+      setRenameBusy(false);
+    }
+  };
+
   const sheetName = (name: string) => (name === ALL ? "All leads" : name);
 
   const goToPage = (next: number) => {
@@ -317,7 +341,7 @@ export function LeadsScreen({ navigation }: any) {
     try {
       // Remember the call so the app asks for the outcome when they're back.
       await registerCall(lead).catch(() => undefined);
-      if (overlay?.overlay && overlay.phoneState) startCallWatch({ leadId: lead.id, name: lead.name, phone: lead.phone }, QUICK_STATUSES);
+      if (overlay?.overlay && overlay.phoneState) startCallWatch({ leadId: lead.id, name: lead.name, phone: lead.phone }, callStatusOptions(statusOptions));
       await Linking.openURL(`tel:+${digits}`);
     } catch {
       Alert.alert("Unable to open dialer", "No phone app is available to handle this number.");
@@ -781,6 +805,33 @@ export function LeadsScreen({ navigation }: any) {
             ) : null}
           </Pressable>
         ))}
+        <Pressable
+          onPress={() => {
+            setPickingSource(false);
+            setNewListName("");
+            setCreatingList(true);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Add a new list"
+          style={[styles.dropdownRow, { minHeight: touchTarget.min, paddingVertical: spacing.sm }]}
+        >
+          <Ionicons name="add-circle-outline" size={22} color={colors.primary} />
+          <Text style={[typography.bodyStrong, { color: colors.primary, flex: 1 }]}>Add a new list</Text>
+        </Pressable>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={creatingList}
+        onClose={() => setCreatingList(false)}
+        title="Add a new list"
+        subtitle="A name to file leads under, like Meta Sheet or Calling Data. You can pick it when adding a lead."
+        avoidKeyboard
+      >
+        <TextField label="List name" value={newListName} onChangeText={setNewListName} placeholder="e.g. Referrals" autoCapitalize="words" />
+        <View style={[styles.sheetButtons, { gap: spacing.md }]}>
+          <Button label="Cancel" variant="secondary" onPress={() => setCreatingList(false)} style={{ flex: 1 }} />
+          <Button label="Add list" onPress={() => void saveNewList()} loading={renameBusy} style={{ flex: 1 }} />
+        </View>
       </BottomSheet>
 
       <BottomSheet

@@ -87,7 +87,8 @@ jest.mock("../../../api/leads", () => ({
   isNotInterestedStatus: (s: string) => /not\s*int/i.test(s),
   getLeadMeta: jest.fn(async () => ({ statusSuggestions: ["New", "Interested", "Converted"], notInterestedTtlDays: 30 })),
   updateLead: (...a: unknown[]) => mockUpdateLead(...(a as [])),
-  importLeads: jest.fn(),
+  importLeads: jest.fn(async () => ({ added: 1, existing: 0, invalid: 0 })),
+  createList: jest.fn(async (name: string) => ({ name, created: true })),
   syncLeads: jest.fn(),
   listSources: jest.fn(async () => [
     { id: "s1", kind: "sheet", url: "https://docs.google.com/x", label: "FB ads", sheetId: "x", gid: "0", enabled: true, isOwner: true, sharedWith: [{ id: "u2", name: "Bob", mobileNumber: "9876500002" }] },
@@ -268,6 +269,64 @@ describe("lead screens render", () => {
     const save = r.root.findAll((n) => n.props.label === "Rename" && typeof n.props.onPress === "function").at(-1)!;
     await act(async () => save.props.onPress());
     expect((jest.requireMock("../../../api/leads") as { renameOrigin: jest.Mock }).renameOrigin).toHaveBeenCalledWith("Meta Sheet", "Calling Data");
+    await act(async () => r.unmount());
+  });
+
+  it("lets a new lead be filed under a chosen list, or a new list typed on the spot", async () => {
+    const api = jest.requireMock("../../../api/leads") as { importLeads: jest.Mock };
+    const open = async () => {
+      let r!: TestRenderer.ReactTestRenderer;
+      await act(async () => {
+        r = TestRenderer.create(<LeadSettingsScreen navigation={{ navigate: jest.fn() }} />);
+      });
+      await act(async () => r.root.findAll((n) => n.props.title === "Add a lead" && typeof n.props.onPress === "function")[0].props.onPress());
+      return r;
+    };
+    const fill = async (r: TestRenderer.ReactTestRenderer, label: string, value: string) =>
+      act(async () => r.root.findAll((n) => n.props.label === label && typeof n.props.onChangeText === "function")[0].props.onChangeText(value));
+    const add = async (r: TestRenderer.ReactTestRenderer) =>
+      act(async () => r.root.findAll((n) => n.props.label === "Add" && typeof n.props.onPress === "function").at(-1)!.props.onPress());
+
+    // Existing names come from the filter's names, with My contacts first and picked by default.
+    let r = await open();
+    expect(textOf(r)).toContain("Save under");
+    const chips = r.root.findAll((n) => n.props.accessibilityState?.selected !== undefined && typeof n.props.accessibilityLabel === "string").map((n) => n.props.accessibilityLabel);
+    expect(chips).toEqual(expect.arrayContaining(["My contacts", "Calling Data", "Meta Sheet", "New list"]));
+    await fill(r, "Mobile number", "9876511111");
+    await add(r);
+    expect(api.importLeads).toHaveBeenLastCalledWith([{ name: "", phone: "9876511111" }], "My contacts");
+
+    // Choosing another list files the lead there.
+    await act(async () => r.unmount());
+    r = await open();
+    await act(async () => r.root.findAll((n) => n.props.accessibilityLabel === "Calling Data" && typeof n.props.onPress === "function")[0].props.onPress());
+    await fill(r, "Mobile number", "9876522222");
+    await add(r);
+    expect(api.importLeads).toHaveBeenLastCalledWith([{ name: "", phone: "9876522222" }], "Calling Data");
+
+    // A new list is typed in the same form.
+    await act(async () => r.unmount());
+    r = await open();
+    await act(async () => r.root.findAll((n) => n.props.accessibilityLabel === "New list" && typeof n.props.onPress === "function")[0].props.onPress());
+    await fill(r, "Mobile number", "9876533333");
+    await add(r); // no name typed yet: nothing is sent
+    const callsBefore = api.importLeads.mock.calls.length;
+    await fill(r, "New list name", "Referrals");
+    await add(r);
+    expect(api.importLeads.mock.calls.length).toBe(callsBefore + 1);
+    expect(api.importLeads).toHaveBeenLastCalledWith([{ name: "", phone: "9876533333" }], "Referrals");
+    await act(async () => r.unmount());
+  });
+
+  it("adds a new list from the sheet dropdown and switches to it", async () => {
+    const api = jest.requireMock("../../../api/leads") as { createList: jest.Mock };
+    const r = await renderLeads();
+    await act(async () => byLabel(r, "Sheet: All leads. Tap to change.").props.onPress());
+    await act(async () => byLabel(r, "Add a new list").props.onPress());
+    await act(async () => r.root.findAll((n) => n.props.label === "List name")[0].props.onChangeText("Referrals"));
+    await act(async () => r.root.findAll((n) => n.props.label === "Add list" && typeof n.props.onPress === "function").at(-1)!.props.onPress());
+    expect(api.createList).toHaveBeenCalledWith("Referrals");
+    expect(mockListPage).toHaveBeenLastCalledWith(expect.objectContaining({ origin: "Referrals", page: 1 }));
     await act(async () => r.unmount());
   });
 

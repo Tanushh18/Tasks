@@ -8,6 +8,7 @@ import * as api from "../../api/leads";
 import { useAuth } from "../../auth/AuthContext";
 import { BottomSheet } from "../../components/BottomSheet";
 import { Button } from "../../components/Button";
+import { FilterChip, FilterChipGroup } from "../../components/FilterChip";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { TextField } from "../../components/TextField";
 import { runAdminCsvImport } from "../../leads/adminCsvImport";
@@ -26,7 +27,7 @@ import {
   type AutoSyncStatus,
 } from "../../leads/contactAutoSync";
 import { emitLeadEvent } from "../../leads/leadEvents";
-import { localUpdatedAt, refreshLeadStore } from "../../leads/leadStore";
+import { getLocalOrigins, localUpdatedAt, refreshLeadStore } from "../../leads/leadStore";
 import { useTheme } from "../../theme/useTheme";
 import { formatStamp } from "./LeadsScreen";
 
@@ -50,6 +51,12 @@ export function LeadSettingsScreen({ navigation }: any) {
   const [adding, setAdding] = useState(false);
   const [newLead, setNewLead] = useState({ name: "", phone: "" });
   const [saving, setSaving] = useState(false);
+  // Which list a hand-added lead is filed under: an existing name, or a new one typed here.
+  const DEFAULT_LIST = "My contacts";
+  const [lists, setLists] = useState<string[]>([DEFAULT_LIST]);
+  const [listChoice, setListChoice] = useState(DEFAULT_LIST);
+  const [newListMode, setNewListMode] = useState(false);
+  const [newListName, setNewListName] = useState("");
 
   const [autoAdd, setAutoAdd] = useState(false);
   const [autoBusy, setAutoBusy] = useState(false);
@@ -111,14 +118,34 @@ export function LeadSettingsScreen({ navigation }: any) {
     }
   };
 
+  const openAddLead = () => {
+    setListChoice(DEFAULT_LIST);
+    setNewListMode(false);
+    setNewListName("");
+    setAdding(true);
+    const names = (found: { name: string }[]) =>
+      setLists([DEFAULT_LIST, ...found.map((o) => o.name).filter((n) => n !== DEFAULT_LIST)]);
+    api
+      .listOrigins()
+      .then(names)
+      // Offline: the names from the copy on the phone.
+      .catch(() => void getLocalOrigins().then(names));
+  };
+
   const addLead = async () => {
     if (!newLead.phone.trim()) {
       Alert.alert("Phone number required");
       return;
     }
+    const typedList = newListMode ? newListName.trim() : "";
+    if (newListMode && !typedList) {
+      Alert.alert("List name required", "Type a name for the new list, or pick one of the existing lists.");
+      return;
+    }
+    const list = typedList || listChoice;
     setSaving(true);
     try {
-      const r = await api.importLeads([{ name: newLead.name.trim(), phone: newLead.phone.trim() }]);
+      const r = await api.importLeads([{ name: newLead.name.trim(), phone: newLead.phone.trim() }], list);
       if (r.invalid) {
         Alert.alert("Invalid number", "Enter a valid 10-digit Indian mobile number.");
         return;
@@ -203,7 +230,7 @@ export function LeadSettingsScreen({ navigation }: any) {
   return (
     <ScreenContainer>
       <Section title="ADD LEADS" />
-      <Row icon="person-add-outline" title="Add a lead" subtitle="Type a name and mobile number" onPress={() => setAdding(true)} />
+      <Row icon="person-add-outline" title="Add a lead" subtitle="Type a name and mobile number" onPress={openAddLead} />
       <Row icon="people-outline" title="From contacts" subtitle="Pick phone contacts to add" onPress={() => navigation.navigate("LeadImport")} />
       <Row
         icon="scan-outline"
@@ -298,6 +325,24 @@ export function LeadSettingsScreen({ navigation }: any) {
           onChangeText={(t) => setNewLead((n) => ({ ...n, phone: t }))}
           keyboardType="phone-pad"
         />
+        <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>Save under</Text>
+        <FilterChipGroup>
+          {lists.map((name) => (
+            <FilterChip
+              key={name}
+              label={name}
+              selected={!newListMode && listChoice === name}
+              onPress={() => {
+                setNewListMode(false);
+                setListChoice(name);
+              }}
+            />
+          ))}
+          <FilterChip label="New list" icon="add" selected={newListMode} onPress={() => setNewListMode(true)} />
+        </FilterChipGroup>
+        {newListMode ? (
+          <TextField label="New list name" value={newListName} onChangeText={setNewListName} placeholder="e.g. Referrals" autoCapitalize="words" />
+        ) : null}
         <View style={styles.sheetButtons}>
           <Button label="Cancel" variant="secondary" onPress={() => setAdding(false)} style={{ flex: 1, marginRight: 8 }} />
           <Button label={saving ? "Adding…" : "Add"} onPress={() => void addLead()} disabled={saving} style={{ flex: 1 }} />

@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { Types } from "mongoose";
 import { Lead } from "../models/Lead";
+import { LeadList } from "../models/LeadList";
 import { LeadSource } from "../models/LeadSource";
 import { LeadTombstone } from "../models/LeadTombstone";
 import { User } from "../models/User";
@@ -10,6 +11,8 @@ import {
   NOT_INTERESTED_TTL_DAYS,
   addManualLeads,
   accessibleSources,
+  cleanListName,
+  resolveList,
   existingPhones,
   importParsedLeads,
   isNotInterested,
@@ -126,14 +129,31 @@ export async function listLeads(req: Request, res: Response) {
   });
 }
 
-/** Every sheet name leads came from, with how many active leads each has: the options of the sheet filter. */
+/**
+ * Every sheet name leads came from, with how many active leads each has: the options of the sheet filter. Lists created
+ * in the app but still empty are included too (count 0), so they can be picked right away.
+ */
 export async function listOrigins(_req: Request, res: Response) {
   const rows = await Lead.aggregate<{ _id: string; count: number }>([
     { $match: { archived: false, origin: { $nin: ["", null] } } },
     { $group: { _id: "$origin", count: { $sum: 1 } } },
     { $sort: { _id: 1 } },
   ]);
-  res.json({ origins: rows.map((r) => ({ name: r._id, count: r.count })) });
+  const origins = rows.map((r) => ({ name: r._id, count: r.count }));
+  const have = new Set(origins.map((o) => o.name.toLowerCase()));
+  for (const l of await LeadList.find({}).lean()) {
+    if (!have.has(l.name.toLowerCase())) origins.push({ name: l.name, count: 0 });
+  }
+  origins.sort((a, b) => a.name.localeCompare(b.name));
+  res.json({ origins });
+}
+
+/** Anyone signed in. Creates a new list name (like "Meta Sheet" or "Calling Data") that leads can be filed under. */
+export async function createList(req: Request, res: Response) {
+  const name = cleanListName(req.body?.name);
+  if (!name) return badRequest(res, "Enter a name for the list");
+  const { name: canonical, isNew } = await resolveList(name, req.userId!);
+  return res.status(isNew ? 201 : 200).json({ name: canonical, created: isNew });
 }
 
 /**
@@ -151,6 +171,12 @@ export async function renameOrigin(req: Request, res: Response) {
   const result = await Lead.updateMany({ origin: from }, { $set: { origin: to } });
   const lists = await LeadSource.find({ label: from, sheetId: { $nin: Object.keys(KNOWN_SHEET_LABELS) } }, { _id: 1 }).lean();
   if (lists.length) await LeadSource.updateMany({ _id: { $in: lists.map((l) => l._id) } }, { $set: { label: to } });
+  // The remembered list name follows the rename; renaming into a name that already exists just merges the two.
+  const saved = await LeadList.findOne({ key: from.toLowerCase() });
+  if (saved) {
+    if (await LeadList.exists({ key: to.toLowerCase() })) await LeadList.deleteOne({ _id: saved._id });
+    else await LeadList.updateOne({ _id: saved._id }, { $set: { name: to, key: to.toLowerCase() } });
+  }
   return res.json({ renamed: result.modifiedCount ?? 0, from, to });
 }
 
@@ -270,9 +296,17 @@ const adminOnly = (res: Response) =>
   res.status(403).json({ error: { code: "FORBIDDEN", message: "Only the admin can do this" } });
 
 export async function listSources(req: Request, res: Response) {
-  const sources = (await accessibleSources(req.userId!)).sort(
+  const all = (await accessibleSources(req.userId!)).sort(
     (a: any, b: any) => +new Date(a.createdAt) - +new Date(b.createdAt)
   );
+  // Older per-user "My contacts" lists are one shared list now: show only the oldest.
+  let manualShown = false;
+  const sources = all.filter((s: any) => {
+    if (s.kind !== "manual") return true;
+    if (manualShown) return false;
+    manualShown = true;
+    return true;
+  });
   const out = await Promise.all(sources.map((s) => serializeSource(s.toObject(), req.userId!, !!req.isAdmin)));
   res.json({ sources: out });
 }
@@ -420,7 +454,7 @@ export async function importLeads(req: Request, res: Response) {
     category: str(c?.category, 80),
     notes: str(c?.notes, 4000),
   }));
-  const { added, existing, invalid } = await addManualLeads(req.userId!, contacts);
+  const { added, existing, invalid } = await addManualLeads(req.userId!, contacts, cleanListName(req.body?.list));
   return res.status(201).json({ added, existing, invalid });
 }
 

@@ -256,7 +256,7 @@ class LeadCallService : Service() {
     }
 
     val spacing = dp(8)
-    for (s in statuses.take(4)) {
+    for (s in statuses.take(8)) {
       card.addView(
         button(s, true) { choose(s) },
         LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = spacing }

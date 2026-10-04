@@ -1,9 +1,11 @@
 import crypto from "node:crypto";
 import { Types } from "mongoose";
 import { Lead } from "../models/Lead";
+import { LeadList } from "../models/LeadList";
 import { LeadSource } from "../models/LeadSource";
 import { LeadTombstone } from "../models/LeadTombstone";
 import { logger } from "../utils/logger";
+import { escapeRegex } from "./rules/text";
 import { fetchSheet, fetchSheetCsv, normalizePhone, parseCsv, parseSheetUrl, parseTabs, type ParsedLead, type ParseResult } from "./leadImport";
 
 export { normalizePhone };
@@ -141,7 +143,14 @@ export function startLeadCleanupScheduler(intervalHours=6){
 }
 
 /** The per-user source that holds leads added from phone contacts or typed in by hand; shareable like a sheet. */
+/**
+ * One shared "My contacts" list for everyone: leads added by hand or scanned from any phone's contacts all go into
+ * the same list (the oldest one that exists), so three phones never make three lists. Lists that earlier per-user
+ * versions already created are left as they are; new leads simply join the oldest.
+ */
 export async function manualSourceFor(userId:string){
+  const existing=await LeadSource.findOne({kind:"manual"}).sort({createdAt:1,_id:1});
+  if(existing)return existing;
   return LeadSource.findOneAndUpdate({ownerId:userId,sheetId:"manual",gid:"0"},{$setOnInsert:{ownerId:userId,sheetId:"manual",gid:"0",kind:"manual",label:"My contacts",url:""}},{upsert:true,new:true});
 }
 
@@ -151,9 +160,34 @@ export async function importSourceFor(userId:string,label:string){
   return LeadSource.findOneAndUpdate({ownerId:userId,sheetId:`import:${slug}`,gid:"0"},{$setOnInsert:{ownerId:userId,sheetId:`import:${slug}`,gid:"0",kind:"import",url:""},$set:{label:label.slice(0,80)}},{upsert:true,new:true});
 }
 
+/** Trims a typed list name and collapses inner spaces; empty when nothing usable was typed. */
+export function cleanListName(raw:unknown){
+  return typeof raw==="string"?raw.replace(/\s+/g," ").trim().slice(0,80):"";
+}
+
+/**
+ * Makes sure a list name exists and returns the spelling to use. "referrals" finds an existing "Referrals" (a saved
+ * list name, or a name some leads already carry) instead of making a second one.
+ */
+export async function resolveList(name:string,createdBy?:string):Promise<{name:string;isNew:boolean}>{
+  const key=name.toLowerCase();
+  const saved=await LeadList.findOne({key}).lean();
+  if(saved)return{name:saved.name,isNew:false};
+  const used=await Lead.findOne({origin:new RegExp(`^${escapeRegex(name)}$`,"i")},{origin:1}).lean();
+  const canonical=used?.origin||name;
+  try{await LeadList.create({name:canonical,key:canonical.toLowerCase(),createdBy})}
+  catch{/* created at the same moment by someone else: same name, nothing to do */}
+  return{name:canonical,isNew:!used};
+}
+export async function ensureList(name:string,createdBy?:string){
+  return(await resolveList(name,createdBy)).name;
+}
+
 export interface NewLead{name?:string;phone?:string;status?:string;category?:string;notes?:string}
-export async function addManualLeads(userId:string,items:NewLead[]){
+export async function addManualLeads(userId:string,items:NewLead[],list?:string){
   const source=await manualSourceFor(userId);
+  const listName=cleanListName(list);
+  const origin=listName?await ensureList(listName,userId):sourceDisplayName(source);
   const access=await leadAccessFilter(userId);
   let added=0,existing=0,invalid=0;
   const seen=new Set<string>();
@@ -170,7 +204,7 @@ export async function addManualLeads(userId:string,items:NewLead[]){
       existing++;continue;
     }
     const status=clean(item.status,200);
-    await Lead.create({ownerId:userId,phone,name:clean(item.name,120),status,category:clean(item.category,80),notes:clean(item.notes,4000),sourceIds:[source._id],origin:sourceDisplayName(source),originId:source._id,sheetDate:new Date(),...(isNotInterested(status)?{notInterestedAt:new Date()}:{})});
+    await Lead.create({ownerId:userId,phone,name:clean(item.name,120),status,category:clean(item.category,80),notes:clean(item.notes,4000),sourceIds:[source._id],origin,originId:source._id,sheetDate:new Date(),...(isNotInterested(status)?{notInterestedAt:new Date()}:{})});
     // Someone deliberately re-adding a number lifts the "deleted by cleanup" mark.
     await LeadTombstone.deleteOne({ownerId:userId,phone});
     addedPhones.push(phone);

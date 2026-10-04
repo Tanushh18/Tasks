@@ -11,7 +11,7 @@ import { TextField } from "../components/TextField";
 import { useFeatureFlags } from "../features/FeatureFlagsContext";
 import { useTheme } from "../theme/useTheme";
 import {
-  QUICK_STATUSES,
+  callStatusOptions,
   cancelNotification,
   resolveCall,
   dueCall,
@@ -72,7 +72,8 @@ export function CallFollowUpHost() {
   const [pendingCount, setPendingCount] = useState(0);
   const [status, setStatus] = useState("");
   const [note, setNote] = useState("");
-  const [showAll, setShowAll] = useState(false);
+  // Every lead stage, so the popup offers all of them at once (the server's list, with the built-in one as a fallback).
+  const [stages, setStages] = useState<string[]>(api.DEFAULT_STATUS_OPTIONS);
   const [saving, setSaving] = useState(false);
   const keyboardOpen = useRef(false);
   const showing = useRef(false);
@@ -92,13 +93,20 @@ export function CallFollowUpHost() {
       setPendingCount(list.length);
       setStatus("");
       setNote("");
-      setShowAll(false);
       void cancelNotification(due.leadId);
       return;
     }
     const next = Math.min(...list.map((c) => c.nextAt));
     const wait = Math.min(Math.max(next - Date.now(), 1_000), 60_000) + 300;
     timer.current = setTimeout(() => void check(), keyboardOpen.current ? 5_000 : wait);
+  }, [active]);
+
+  useEffect(() => {
+    if (!active) return;
+    api
+      .getLeadMeta()
+      .then((m) => m.statusSuggestions?.length && setStages(m.statusSuggestions))
+      .catch(() => undefined);
   }, [active]);
 
   // Answers given on the over-other-apps card (Android).
@@ -180,7 +188,7 @@ export function CallFollowUpHost() {
     }
   };
 
-  const options = showAll ? api.DEFAULT_STATUS_OPTIONS.filter((s) => s !== "New") : QUICK_STATUSES;
+  const options = callStatusOptions(stages);
 
   return (
     <PopupCard visible={!!call} onClose={() => void later()}>
@@ -208,7 +216,6 @@ export function CallFollowUpHost() {
             {options.map((s) => (
               <FilterChip key={s} label={s} selected={status === s} onPress={() => setStatus(status === s ? "" : s)} />
             ))}
-            {!showAll ? <FilterChip label="More…" icon="ellipsis-horizontal" onPress={() => setShowAll(true)} /> : null}
           </FilterChipGroup>
           <View style={{ marginTop: spacing.md }}>
             <TextField label="Note (optional)" value={note} onChangeText={setNote} placeholder="e.g. Call back Monday" multiline />

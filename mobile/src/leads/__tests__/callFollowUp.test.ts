@@ -24,6 +24,8 @@ jest.mock("../../api/leads", () => ({ updateLead: (...a: unknown[]) => mockUpdat
 import {
   ACTION_PREFIX,
   FIRST_DELAY_MS,
+  QUICK_STATUSES,
+  callStatusOptions,
   FOLLOWUP_KIND,
   MAX_REMINDERS,
   MIN_CALL_MS,
@@ -142,5 +144,23 @@ describe("pending calls", () => {
     await registerCall(lead);
     await resolveCall("l1");
     expect(await getPendingCalls()).toEqual([]);
+  });
+});
+
+describe("callStatusOptions", () => {
+  it("offers every stage: the quick three first, then the rest, without New or repeats", () => {
+    const all = ["New", "Called — no answer", "Interested", "Site visit planned", "Follow-up", "Quotation sent", "Not interested", "Converted", "Follow-up"];
+    expect(callStatusOptions(all)).toEqual([
+      ...QUICK_STATUSES,
+      "Site visit planned",
+      "Follow-up",
+      "Quotation sent",
+      "Converted",
+    ]);
+  });
+
+  it("still offers the quick three when the list is empty, and keeps custom stages", () => {
+    expect(callStatusOptions([])).toEqual(QUICK_STATUSES);
+    expect(callStatusOptions(["Hot lead", "  ", "new"])).toEqual([...QUICK_STATUSES, "Hot lead"]);
   });
 });

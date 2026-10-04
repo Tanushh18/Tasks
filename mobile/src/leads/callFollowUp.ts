@@ -43,6 +43,15 @@ const MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
 /** Quick stages offered on the popup and as notification buttons (Android shows at most 3). */
 export const QUICK_STATUSES = ["Interested", "Called — no answer", "Not interested"];
 
+/**
+ * Every stage a call can end in, for the after-call popup: the three quick ones first, then the rest of the lead
+ * stages in their usual order. "New" is left out (a call just made isn't "New" any more).
+ */
+export function callStatusOptions(stages: readonly string[]): string[] {
+  const rest = stages.filter((s) => s.trim() && !/^\s*new\s*$/i.test(s) && !QUICK_STATUSES.includes(s));
+  return [...QUICK_STATUSES, ...rest.filter((s, i) => rest.indexOf(s) === i)];
+}
+
 async function load(): Promise<PendingCall[]> {
   try {
     const raw = await AsyncStorage.getItem(KEY);

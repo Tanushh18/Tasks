@@ -198,8 +198,15 @@ export interface ImportResult {
   invalid: number;
 }
 
-export async function importLeads(contacts: ImportContact[]): Promise<ImportResult> {
-  const { data } = await apiClient.post<ImportResult>("/leads/import", { contacts });
+/** `list` is the list name to file the new leads under (default "My contacts"). */
+export async function importLeads(contacts: ImportContact[], list?: string): Promise<ImportResult> {
+  const { data } = await apiClient.post<ImportResult>("/leads/import", list ? { contacts, list } : { contacts });
+  return data;
+}
+
+/** Anyone signed in. Creates a list name to file leads under (like "Meta Sheet" or "Calling Data"). */
+export async function createList(name: string): Promise<{ name: string; created: boolean }> {
+  const { data } = await apiClient.post<{ name: string; created: boolean }>("/leads/lists", { name });
   return data;
 }
 
