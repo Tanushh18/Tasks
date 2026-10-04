@@ -255,6 +255,23 @@ describe("lead screens render", () => {
     await act(async () => r.unmount());
   });
 
+  it("tells a phone without the native pop-up module why it has no call pop-up", async () => {
+    const rn = jest.requireActual("react-native");
+    const original = rn.Platform.OS;
+    rn.Platform.OS = "android";
+    try {
+      let r!: TestRenderer.ReactTestRenderer;
+      await act(async () => {
+        r = TestRenderer.create(<LeadSettingsScreen navigation={{ navigate: jest.fn() }} />);
+      });
+      expect(textOf(r)).toContain("Call pop-up over other apps");
+      expect(textOf(r)).toContain("Not in this phone's app version");
+      await act(async () => r.unmount());
+    } finally {
+      rn.Platform.OS = original;
+    }
+  });
+
   it("has a settings button at the top right of the Leads screen", async () => {
     const setOptions = jest.fn();
     await act(async () => {

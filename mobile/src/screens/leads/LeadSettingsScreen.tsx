@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Contacts from "expo-contacts/legacy";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, AppState, Linking, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Alert, AppState, Linking, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import * as api from "../../api/leads";
 import { useAuth } from "../../auth/AuthContext";
@@ -265,6 +265,17 @@ export function LeadSettingsScreen({ navigation }: any) {
             subtitleColor={overlayOn ? colors.success : undefined}
             onPress={overlayOn ? showTestOverlay : () => void requestOverlaySetup().then(setOverlay)}
             right={<Text style={[typography.captionStrong, { color: colors.primary }]}>{overlayOn ? "Test" : "Set up"}</Text>}
+          />
+        </>
+      ) : null}
+
+      {Platform.OS === "android" && overlay && !overlay.supported ? (
+        <>
+          <Section title="CALLS" />
+          <Row
+            icon="albums-outline"
+            title="Call pop-up over other apps"
+            subtitle="Not in this phone's app version. It needs the newest APK (install it from the Firebase tester email). Until then the question still appears inside the app after a call."
           />
         </>
       ) : null}
