@@ -20,14 +20,20 @@ const imageUrl = z
     return Math.floor((b64.length * 3) / 4) <= MAX_TEMPLATE_IMAGE_BYTES;
   }, "Image is too large (2 MB max)");
 
-export const createTemplateSchema = z.object({
+const templateFields = z.object({
   name: z.string().trim().min(1, "Give the template a name").max(80),
-  text: z.string().trim().min(1, "Write the message").max(2000),
+  /** Optional when the template has an image: an image-only template sends just the picture. */
+  text: z.string().trim().max(2000).optional().default(""),
   imageUrl: imageUrl.optional(),
   sheets: sheets.optional().default([]),
 });
 
-export const updateTemplateSchema = createTemplateSchema.partial();
+export const createTemplateSchema = templateFields.refine((v) => v.text.length > 0 || !!v.imageUrl, {
+  message: "Add a message or an image",
+  path: ["text"],
+});
+
+export const updateTemplateSchema = templateFields.partial();
 
 export const idParamSchema = z.object({ id: z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid id") });
 

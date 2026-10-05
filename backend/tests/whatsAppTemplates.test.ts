@@ -20,6 +20,16 @@ describe("WhatsApp templates API", () => {
     expect((await request(app).get("/api/leads/whatsapp-templates")).status).toBe(401);
   });
 
+  it("allows an image-only template, but never one with neither text nor image", async () => {
+    const a = authed(app, (await registerUser(app, "9876500399", "4821", "Img")).token);
+    const made = await a.post("/api/leads/whatsapp-templates").send({ name: "Pic", imageUrl: PNG, sheets: ["Meta Sheet"] });
+    expect(made.status).toBe(201);
+    expect(made.body.template).toMatchObject({ text: "", imageUrl: PNG });
+    const id = made.body.template.id;
+    expect((await a.patch(`/api/leads/whatsapp-templates/${id}`).send({ imageUrl: null })).status).toBe(400);
+    expect((await a.patch(`/api/leads/whatsapp-templates/${id}`).send({ text: "Hello" })).status).toBe(200);
+  });
+
   it("creates, lists, edits and deletes a template shared by every user", async () => {
     const u1 = await registerUser(app, "9876500301", "4821", "One");
     const u2 = await registerUser(app, "9876500302", "4821", "Two");
@@ -47,6 +57,7 @@ describe("WhatsApp templates API", () => {
     const a = authed(app, u.token);
     expect((await a.post("/api/leads/whatsapp-templates").send({ name: "", text: "x" })).status).toBe(400);
     expect((await a.post("/api/leads/whatsapp-templates").send({ name: "n", text: "" })).status).toBe(400);
+    expect((await a.post("/api/leads/whatsapp-templates").send({ name: "n" })).status).toBe(400);
     expect((await a.post("/api/leads/whatsapp-templates").send({ name: "n", text: "x", imageUrl: "data:text/html;base64,AAAA" })).status).toBe(400);
     const big = `data:image/png;base64,${"A".repeat(3_000_000)}`;
     const tooBig = await a.post("/api/leads/whatsapp-templates").send({ name: "n", text: "x", imageUrl: big });

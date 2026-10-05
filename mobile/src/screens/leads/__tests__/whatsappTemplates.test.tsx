@@ -176,6 +176,19 @@ describe("WhatsApp button on lead cards", () => {
     await act(async () => r.unmount());
   });
 
+  it("an image-only template has no text box or Send: Send image shares the picture and marks the lead sent", async () => {
+    mockApi.listWhatsAppTemplates.mockResolvedValueOnce([{ ...template, text: "" }]);
+    (jest.requireMock("expo-file-system/legacy") as { downloadAsync: jest.Mock }).downloadAsync.mockResolvedValueOnce({ status: 200 });
+    const r = await renderLeads();
+    await act(async () => byLabel(r, "WhatsApp Ramesh").props.onPress());
+    expect(field(r, "Message")).toBeUndefined();
+    expect(r.root.findAll((n) => n.props.label === "Send" && typeof n.props.onPress === "function")).toHaveLength(0);
+    await act(async () => byButton(r, "Send image").props.onPress());
+    expect(open).not.toHaveBeenCalled();
+    expect(mockApi.setWhatsAppSent).toHaveBeenCalledWith("l1", true, "t1");
+    await act(async () => r.unmount());
+  });
+
   it("shows a sent chip on sent leads and lets it be un-marked", async () => {
     const r = await renderLeads();
     expect(textOf(r).match(/WhatsApp sent ✓/g)).toHaveLength(1);

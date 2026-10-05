@@ -68,7 +68,7 @@ export interface TemplateInput {
 }
 
 export async function createTemplate(userId: string, input: TemplateInput) {
-  const doc = new WhatsAppTemplate({ name: input.name, text: input.text, sheets: input.sheets ?? [], createdBy: userId });
+  const doc = new WhatsAppTemplate({ name: input.name, text: input.text ?? "", sheets: input.sheets ?? [], createdBy: userId });
   if (input.imageUrl) await applyImage(doc, input.imageUrl);
   await doc.save();
   await moveSheetsHere(doc._id, doc.sheets);
@@ -82,6 +82,7 @@ export async function updateTemplate(id: string, input: TemplateInput) {
   if (input.text !== undefined) doc.text = input.text;
   if (input.sheets !== undefined) doc.sheets = input.sheets as any;
   if (input.imageUrl !== undefined) await applyImage(doc, input.imageUrl);
+  if (!doc.text && !doc.imageUrl) throw ApiError.badRequest("Add a message or an image");
   await doc.save();
   await moveSheetsHere(doc._id, doc.sheets);
   return doc;

@@ -8,7 +8,8 @@ import { Schema, model, type HydratedDocument, type InferSchemaType } from "mong
 const schema = new Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 80 },
-    text: { type: String, required: true, trim: true, maxlength: 2000 },
+    /** May be empty when the template is image-only. */
+    text: { type: String, default: "", trim: true, maxlength: 2000 },
     /** https Cloudinary URL, or a data URL when Cloudinary isn't configured. */
     imageUrl: { type: String, default: "" },
     imagePublicId: { type: String, default: null },

@@ -50,10 +50,17 @@ export function WhatsAppPreviewSheet({ visible, onClose, template, lead, onSent 
     onSent(template);
   };
 
+  const imageOnly = !fillTemplate(template.text, lead.name) && !!template.imageUrl;
+
   const sendImage = async () => {
     setBusy(true);
     try {
       await shareTemplateImage(template.imageUrl);
+      // An image-only template has no text step, so sharing the picture is the send.
+      if (imageOnly && !sent) {
+        setSent(true);
+        onSent(template);
+      }
     } catch {
       Alert.alert("Couldn't share the image", "Please try again.");
     } finally {
@@ -63,7 +70,9 @@ export function WhatsAppPreviewSheet({ visible, onClose, template, lead, onSent 
 
   return (
     <BottomSheet visible={visible} onClose={onClose} title="WhatsApp message" subtitle={`Template: ${template.name}`} avoidKeyboard>
-      <TextField label="Message (you can edit it for this lead)" value={text} onChangeText={setText} multiline autoCapitalize="sentences" />
+      {imageOnly ? null : (
+        <TextField label="Message (you can edit it for this lead)" value={text} onChangeText={setText} multiline autoCapitalize="sentences" />
+      )}
       {template.imageUrl ? (
         <View style={{ marginBottom: spacing.lg }}>
           <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.xs }]}>Image</Text>
@@ -74,7 +83,9 @@ export function WhatsAppPreviewSheet({ visible, onClose, template, lead, onSent 
             resizeMode="cover"
           />
           <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.xs }]}>
-            WhatsApp can't take text and an image together from this app. Send the text first, then tap "Send image" to share the picture to the same chat.
+            {imageOnly
+              ? 'This template sends only the image. Tap "Send image" and pick WhatsApp and this chat.'
+              : 'WhatsApp can\'t take text and an image together from this app. Send the text first, then tap "Send image" to share the picture to the same chat.'}
           </Text>
         </View>
       ) : null}
@@ -85,10 +96,10 @@ export function WhatsAppPreviewSheet({ visible, onClose, template, lead, onSent 
       ) : null}
       <View style={styles.buttons}>
         <Button label="Close" variant="secondary" onPress={onClose} style={{ flex: 1, marginRight: 8 }} />
-        {template.imageUrl && sent ? (
+        {template.imageUrl && (sent || imageOnly) ? (
           <Button label={busy ? "Opening…" : "Send image"} variant="secondary" onPress={() => void sendImage()} disabled={busy} style={{ flex: 1, marginRight: 8 }} />
         ) : null}
-        <Button label={sent ? "Send again" : "Send"} onPress={() => void send()} disabled={!text.trim()} style={{ flex: 1 }} />
+        {imageOnly ? null : <Button label={sent ? "Send again" : "Send"} onPress={() => void send()} disabled={!text.trim()} style={{ flex: 1 }} />}
       </View>
     </BottomSheet>
   );

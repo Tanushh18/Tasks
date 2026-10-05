@@ -105,7 +105,7 @@ export function LeadWhatsAppScreen() {
   const save = async () => {
     if (!draft) return;
     if (!draft.name.trim()) return Alert.alert("Name required", "Give the template a name.");
-    if (!draft.text.trim()) return Alert.alert("Message required", "Write the message (or use Improve with AI).");
+    if (!draft.text.trim() && !draft.imageUrl) return Alert.alert("Message or image required", "Write a message, or add an image to send only the picture.");
     setSaving(true);
     try {
       const body = { name: draft.name.trim(), text: draft.text.trim(), imageUrl: draft.imageUrl || null, sheets: draft.sheets };
@@ -166,14 +166,14 @@ export function LeadWhatsAppScreen() {
 
         <View style={{ height: spacing.lg }} />
         <TextField
-          label="Final message (edit freely). {name} becomes the lead's name"
+          label="Final message (edit freely; leave empty to send only the image). {name} becomes the lead's name"
           value={draft.text}
           onChangeText={(text) => setDraft({ ...draft, text })}
           multiline
           maxLength={2000}
         />
 
-        {label("Image (optional, up to 2 MB)")}
+        {label("Image (optional with a message, up to 2 MB)")}
         {draft.imageUrl ? (
           <Image
             source={{ uri: draft.imageUrl }}
