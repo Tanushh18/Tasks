@@ -26,6 +26,9 @@ export interface Lead {
   origin?: string;
   /** Read-only context from an imported sheet (tower, flat, dealer…). */
   info?: string;
+  /** Set when "Send" was pressed in the WhatsApp preview. Delivery can't be verified, so this only means "marked as sent". */
+  whatsappSentAt?: string | null;
+  whatsappTemplateId?: string | null;
 }
 
 export interface StageCount {
@@ -257,3 +260,65 @@ export function isLeadAdmin(user: { isAdmin?: boolean; mobileNumber?: string } |
 }
 
 export const isNotInterestedStatus = (status: string) => /not\s*int[e]?rest/i.test(status);
+
+export interface WhatsAppTemplate {
+  id: string;
+  name: string;
+  text: string;
+  /** https URL, or a data URL when the server has no image storage. "" when there is no image. */
+  imageUrl: string;
+  /** Sheet names (lead origins) this template applies to. A sheet uses at most one template. */
+  sheets: string[];
+}
+
+export interface WhatsAppTemplateInput {
+  name: string;
+  text: string;
+  imageUrl?: string | null;
+  sheets: string[];
+}
+
+export async function listWhatsAppTemplates(): Promise<WhatsAppTemplate[]> {
+  const { data } = await apiClient.get<{ templates: WhatsAppTemplate[] }>("/leads/whatsapp-templates", { _noCache: true } as object);
+  return data.templates;
+}
+
+export async function createWhatsAppTemplate(body: WhatsAppTemplateInput): Promise<WhatsAppTemplate> {
+  const { data } = await apiClient.post<{ template: WhatsAppTemplate }>("/leads/whatsapp-templates", body, { timeout: 60_000 });
+  return data.template;
+}
+
+export async function updateWhatsAppTemplate(id: string, body: Partial<WhatsAppTemplateInput>): Promise<WhatsAppTemplate> {
+  const { data } = await apiClient.patch<{ template: WhatsAppTemplate }>(`/leads/whatsapp-templates/${id}`, body, { timeout: 60_000 });
+  return data.template;
+}
+
+export async function deleteWhatsAppTemplate(id: string): Promise<void> {
+  await apiClient.delete(`/leads/whatsapp-templates/${id}`);
+}
+
+/** Rewrites a rough message with the server's AI. Rejects with a 503 "AI is not set up on the server" when no key is configured. */
+export async function improveWhatsAppText(text: string): Promise<string> {
+  const { data } = await apiClient.post<{ text: string }>("/leads/whatsapp-templates/improve", { text }, { timeout: 60_000 });
+  return data.text;
+}
+
+export interface AiStatus {
+  connected: boolean;
+  provider: string;
+}
+
+/** Whether the server has an AI model set up. Keys live on the server only. */
+export async function getAiStatus(): Promise<AiStatus> {
+  const { data } = await apiClient.get<AiStatus>("/leads/whatsapp-templates/status", { _noCache: true } as object);
+  return data;
+}
+
+/**
+ * Marks a lead's WhatsApp as sent (or not sent). "Sent" only means the person pressed Send in the preview: the app can't
+ * see whether WhatsApp actually delivered anything.
+ */
+export async function setWhatsAppSent(id: string, sent: boolean, templateId?: string | null): Promise<void> {
+  await apiClient.patch(`/leads/${id}`, { whatsappSent: sent, ...(sent && templateId ? { whatsappTemplateId: templateId } : {}) });
+  void applyLocalEdit(id, { whatsappSentAt: sent ? new Date().toISOString() : null, whatsappTemplateId: sent ? templateId ?? null : null }).catch(() => undefined);
+}

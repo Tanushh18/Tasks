@@ -3,6 +3,7 @@ import React from "react";
 import { LeadsScreen } from "../screens/leads/LeadsScreen";
 import { LeadImportScreen } from "../screens/leads/LeadImportScreen";
 import { LeadSettingsScreen } from "../screens/leads/LeadSettingsScreen";
+import { LeadWhatsAppScreen } from "../screens/leads/LeadWhatsAppScreen";
 import { LeadSourcesScreen } from "../screens/leads/LeadSourcesScreen";
 
 const Stack = createNativeStackNavigator();
@@ -24,6 +25,11 @@ export function LeadsNavigator() {
         name="LeadSources"
         component={LeadSourcesScreen}
         options={{ title: "Lead Sheets" }}
+      />
+      <Stack.Screen
+        name="LeadWhatsApp"
+        component={LeadWhatsAppScreen}
+        options={{ title: "WhatsApp templates" }}
       />
       <Stack.Screen
         name="LeadImport"

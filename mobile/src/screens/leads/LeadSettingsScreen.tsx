@@ -62,6 +62,7 @@ export function LeadSettingsScreen({ navigation }: any) {
   const [autoBusy, setAutoBusy] = useState(false);
   const [autoStatus, setAutoStatus] = useState<AutoSyncStatus | null>(null);
   const [overlay, setOverlay] = useState<OverlaySetup | null>(null);
+  const [ai, setAi] = useState<api.AiStatus | null>(null);
 
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -77,6 +78,8 @@ export function LeadSettingsScreen({ navigation }: any) {
       refreshAutoStatus();
       void localUpdatedAt().then(setSavedAt);
       void getOverlaySetup().then(setOverlay);
+      // Status only: the AI key lives on the server, never in the app.
+      api.getAiStatus().then(setAi).catch(() => setAi({ connected: false, provider: "" }));
     }, [refreshAutoStatus])
   );
 
@@ -306,6 +309,20 @@ export function LeadSettingsScreen({ navigation }: any) {
           />
         </>
       ) : null}
+
+      <Section title="WHATSAPP TEMPLATES" />
+      <Row
+        icon="logo-whatsapp"
+        title="WhatsApp templates"
+        subtitle="A message and image for each sheet, filled in when you tap WhatsApp on a lead"
+        onPress={() => navigation.navigate("LeadWhatsApp")}
+      />
+      <Row
+        icon="sparkles-outline"
+        title="Connect AI model"
+        subtitle={ai === null ? "Checking…" : ai.connected ? "Connected: Improve with AI is on" : "Not set up on the server"}
+        subtitleColor={ai?.connected ? colors.success : undefined}
+      />
 
       <Section title="OFFLINE" />
       <Row

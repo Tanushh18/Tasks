@@ -163,13 +163,15 @@ export async function queryLocalLeads(opts: {
   if (!memo) {
     // `leads` is already newest first, so filtering keeps the order and nothing needs sorting here.
     const digits = q.replace(/\D/g, "");
-    const base = leads.filter(
+    const matching = leads.filter(
       (l) =>
         !l.archived &&
         (!sourceId || (l as Lead & { sourceIds?: string[] }).sourceIds?.includes(sourceId)) &&
         (!origin || l.origin === origin) &&
         (!q || hayFor(l).includes(q) || (digits.length >= 3 && (l.phone ?? "").replace(/\D/g, "").includes(digits)))
     );
+    // Same as the server: leads whose WhatsApp was sent go to the end, newest first inside each group.
+    const base = [...matching.filter((l) => !l.whatsappSentAt), ...matching.filter((l) => l.whatsappSentAt)];
     const counts = new Map<string, number>();
     for (const l of base) {
       const key = NEW_STATUS.test(l.status ?? "") ? "New" : String(l.status).trim();

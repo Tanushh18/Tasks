@@ -1,11 +1,18 @@
 import express, { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import * as controller from "../controllers/leadController";
+import * as templateController from "../controllers/whatsAppTemplateController";
+import { validateRequest } from "../middleware/validateRequest";
+import { createTemplateSchema, idParamSchema, improveSchema, updateTemplateSchema } from "../validators/whatsAppTemplateValidators";
 import { asyncHandler } from "../utils/asyncHandler";
 
 const c = Object.fromEntries(
   Object.entries(controller).map(([k, f]) => [k, asyncHandler(f as Parameters<typeof asyncHandler>[0])])
 ) as typeof controller;
+
+const t = Object.fromEntries(
+  Object.entries(templateController).map(([k, f]) => [k, asyncHandler(f as Parameters<typeof asyncHandler>[0])])
+) as typeof templateController;
 
 const router = Router();
 
@@ -21,6 +28,16 @@ router.post("/lists", c.createList);
 router.post("/import", c.importLeads);
 router.post("/lookup", c.lookupPhones);
 router.post("/admin/import", c.adminImport);
+router.post("/admin/seed-olf", c.seedOlf);
+
+// WhatsApp message templates (shared by everyone, applied per sheet). Registered before "/:id".
+router.get("/whatsapp-templates", t.listTemplates);
+router.get("/whatsapp-templates/status", t.templateStatus);
+router.post("/whatsapp-templates/improve", validateRequest({ body: improveSchema }), t.improveTemplate);
+router.post("/whatsapp-templates", validateRequest({ body: createTemplateSchema }), t.createTemplate);
+router.patch("/whatsapp-templates/:id", validateRequest({ params: idParamSchema, body: updateTemplateSchema }), t.updateTemplate);
+router.delete("/whatsapp-templates/:id", validateRequest({ params: idParamSchema }), t.deleteTemplate);
+
 router.patch("/:id", c.updateLead);
 router.delete("/:id", c.deleteLead);
 router.get("/sources/list", c.listSources);

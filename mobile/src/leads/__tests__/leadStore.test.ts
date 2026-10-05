@@ -86,6 +86,18 @@ describe("on-device lead store", () => {
     expect(ids).toEqual([...ids].sort().reverse());
   });
 
+  it("puts leads whose WhatsApp was marked sent last, newest first inside each group", async () => {
+    mockGet.mockImplementation(async (url: string) =>
+      url === "/leads" ? { data: { leads: [mk(4), mk(3, { whatsappSentAt: "2026-10-09T00:00:00.000Z" }), mk(2), mk(1)], totalPages: 1 } } : { data: { sources: [] } }
+    );
+    await refreshLeadStore();
+    expect((await queryLocalLeads({ page: 1, limit: 10, status: "all" }))!.leads.map((l) => l.id)).toEqual(["l4", "l2", "l1", "l3"]);
+    await applyLocalEdit("l4", { whatsappSentAt: "2026-10-09T00:00:00.000Z" });
+    expect((await queryLocalLeads({ page: 1, limit: 10, status: "all" }))!.leads.map((l) => l.id)).toEqual(["l2", "l1", "l4", "l3"]);
+    await applyLocalEdit("l3", { whatsappSentAt: null });
+    expect((await queryLocalLeads({ page: 1, limit: 10, status: "all" }))!.leads.map((l) => l.id)).toEqual(["l3", "l2", "l1", "l4"]);
+  });
+
   it("answers search, filter and paging over 5,000 leads in a few milliseconds", async () => {
     const big = Array.from({ length: 5000 }, (_, i) => mk(i + 1, { name: `Lead ${i}`, status: i % 7 ? "" : "Follow-up" }));
     mockGet.mockImplementation(async (url: string, cfg: { params: { page: number } }) =>

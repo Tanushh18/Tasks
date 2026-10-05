@@ -119,6 +119,16 @@ export async function sendFunctionResults(params: {
   return extractResult(interaction);
 }
 
+/** One-shot text generation with no tools and no stored conversation (used for rewriting short texts). */
+export async function generateText(params: { prompt: string; systemInstruction: string }): Promise<string> {
+  const interaction = await getClient().interactions.create({
+    model: env.geminiModel,
+    input: params.prompt,
+    system_instruction: params.systemInstruction,
+  });
+  return (interaction.output_text ?? "").trim();
+}
+
 export function isAiConfigured(): boolean {
   return Boolean(env.geminiApiKey);
 }
