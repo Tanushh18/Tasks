@@ -4,6 +4,8 @@ export interface Vehicle {
   id: string;
   name: string;
   ownerId: string;
+  /** Display name of the user who added the vehicle (null if unknown). */
+  ownerName?: string | null;
   sharedWith: string[];
   createdAt: string;
   updatedAt: string;

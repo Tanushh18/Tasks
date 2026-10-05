@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import { FeatureFlagsProvider, useFeatureFlags } from "./src/features/FeatureFlagsContext";
 import { CallFollowUpHost, ContactSuggestionsHost } from "./src/leads/LeadPopups";
 import { useLeadContactSync } from "./src/leads/useLeadContactSync";
+import { useVehicleReminderSync } from "./src/notifications/useVehicleReminderSync";
 import { startLocationTracking } from "./src/location/backgroundLocationTask";
 import { useNotificationResponseHandler } from "./src/notifications/useNotificationResponseHandler";
 import { useOfflineSync } from "./src/offline/useOfflineSync";
@@ -24,6 +25,7 @@ function AppContent() {
   useOfflineSync();
   useOtaUpdates();
   useLeadContactSync();
+  useVehicleReminderSync();
 
   const { isAuthenticated } = useAuth();
   const { flags } = useFeatureFlags();

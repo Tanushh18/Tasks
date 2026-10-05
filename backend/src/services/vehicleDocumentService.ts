@@ -6,7 +6,7 @@ import {
 import { Vehicle } from "../models/Vehicle";
 import { ApiError } from "../utils/ApiError";
 import { isDataUrl, removeFile, storeFile } from "./cloudinaryService";
-import { scopedQuery } from "./vehicleService";
+import { VEHICLE_POOL_QUERY } from "./vehicleService";
 
 export interface VehicleDocumentInput {
   type?: VehicleDocumentType;
@@ -19,18 +19,11 @@ export interface VehicleDocumentInput {
   notes?: string;
 }
 
-async function getVisibleVehicle(userId: string, vehicleId: string) {
-  const vehicle = await Vehicle.findOne({ _id: vehicleId, ...scopedQuery(userId) });
+// Vehicles and their documents are a shared pool: any signed-in user can view, add, edit and delete
+// documents on any vehicle. Only renaming/deleting the vehicle itself is restricted (vehicleService).
+async function getVisibleVehicle(_userId: string, vehicleId: string) {
+  const vehicle = await Vehicle.findOne({ _id: vehicleId, ...VEHICLE_POOL_QUERY });
   if (!vehicle) throw ApiError.notFound("Vehicle not found");
-  return vehicle;
-}
-
-async function getOwnedVehicle(userId: string, vehicleId: string) {
-  const vehicle = await Vehicle.findById(vehicleId);
-  if (!vehicle) throw ApiError.notFound("Vehicle not found");
-  if (String(vehicle.ownerId) !== String(userId)) {
-    throw ApiError.forbidden("Only the vehicle's owner can make this change");
-  }
   return vehicle;
 }
 
@@ -51,7 +44,7 @@ export async function createDocument(
   vehicleId: string,
   input: VehicleDocumentInput
 ): Promise<VehicleDocumentDocument> {
-  const vehicle = await getOwnedVehicle(userId, vehicleId);
+  const vehicle = await getVisibleVehicle(userId, vehicleId);
   const stored = input.fileData && isDataUrl(input.fileData) ? await storeFile(input.fileData, "vehicles") : null;
   return VehicleDocument.create({
     vehicleId: vehicle._id,
@@ -74,7 +67,7 @@ export async function updateDocument(
   id: string,
   input: Partial<VehicleDocumentInput>
 ): Promise<VehicleDocumentDocument> {
-  await getOwnedVehicle(userId, vehicleId);
+  await getVisibleVehicle(userId, vehicleId);
   const doc = await VehicleDocument.findOne({ _id: id, vehicleId });
   if (!doc) throw ApiError.notFound("Document not found");
   if (input.type !== undefined) doc.type = input.type;
@@ -103,7 +96,7 @@ export async function updateDocument(
 }
 
 export async function deleteDocument(userId: string, vehicleId: string, id: string): Promise<void> {
-  await getOwnedVehicle(userId, vehicleId);
+  await getVisibleVehicle(userId, vehicleId);
   const doc = await VehicleDocument.findOne({ _id: id, vehicleId });
   if (!doc) throw ApiError.notFound("Document not found");
   await VehicleDocument.deleteOne({ _id: doc._id });

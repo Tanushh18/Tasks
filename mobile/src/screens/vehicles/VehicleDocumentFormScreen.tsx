@@ -13,7 +13,8 @@ import { FilePreview } from "../../components/FilePreview";
 import { LoadingState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
 import type { VehicleStackParamList } from "../../navigation/types";
-import { ensureNotificationSetup, scheduleVehicleDocumentReminder } from "../../notifications/notificationService";
+import { ensureNotificationSetup } from "../../notifications/notificationService";
+import { applyDocumentReminder, removeDocumentReminder } from "../../notifications/vehicleReminderSync";
 import { useTheme } from "../../theme/useTheme";
 import { formatDateLabel, toIsoDate } from "../../utils/date";
 import { pickDocumentFile, pickImage, showFilePickerSheet } from "../../utils/filePicker";
@@ -48,7 +49,6 @@ export function VehicleDocumentFormScreen({ navigation, route }: Props) {
   // Set when an already-saved file is removed, so the save sends `null` rather than omitting it.
   const [fileRemoved, setFileRemoved] = useState(false);
   const [notes, setNotes] = useState("");
-  const [localNotificationId, setLocalNotificationId] = useState<string | null>(null);
   const [pendingDeleteConfirm, setPendingDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -106,7 +106,6 @@ export function VehicleDocumentFormScreen({ navigation, route }: Props) {
     }
     setSaving(true);
 
-    const label = type === "other" ? customLabel.trim() : TYPES.find((t) => t.key === type)!.label;
     // The backend expects a full ISO 8601 datetime (zod's `.datetime()`), not the date-only
     // "YYYY-MM-DD" string `toIsoDate` produces for display — send `toISOString()` instead.
     const expiresAtIso = expiresAt ? expiresAt.toISOString() : null;
@@ -127,13 +126,7 @@ export function VehicleDocumentFormScreen({ navigation, route }: Props) {
           : await vehicleDocumentsApi.createVehicleDocument(vehicleId, input);
 
       try {
-        await scheduleVehicleDocumentReminder({
-          id: saved.id,
-          label,
-          expiresAt: expiresAtIso,
-          reminderEnabled,
-          localNotificationId,
-        });
+        await applyDocumentReminder(saved);
       } catch {
         // Never block saving the document on a notification scheduling failure.
       }
@@ -151,6 +144,7 @@ export function VehicleDocumentFormScreen({ navigation, route }: Props) {
     setDeleting(true);
     try {
       await vehicleDocumentsApi.deleteVehicleDocument(vehicleId, documentId);
+      void removeDocumentReminder(documentId);
       navigation.goBack();
     } catch (err) {
       setError(getApiErrorMessage(err, "Could not delete this document."));

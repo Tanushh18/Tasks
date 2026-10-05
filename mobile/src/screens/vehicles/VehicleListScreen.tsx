@@ -12,6 +12,7 @@ import { ConfirmationSheet } from "../../components/ConfirmationSheet";
 import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import type { VehicleStackParamList } from "../../navigation/types";
+import { syncVehicleReminders } from "../../notifications/vehicleReminderSync";
 import { useTheme } from "../../theme/useTheme";
 
 type Props = NativeStackScreenProps<VehicleStackParamList, "VehicleList">;
@@ -30,6 +31,8 @@ export function VehicleListScreen({ navigation }: Props) {
     try {
       const result = await vehiclesApi.listVehicles();
       setVehicles(result);
+      // Shared pool: make sure this device has reminders for every visible document.
+      void syncVehicleReminders();
     } catch (err) {
       setError(getApiErrorMessage(err, "We couldn't load your vehicles."));
     } finally {
@@ -52,6 +55,7 @@ export function VehicleListScreen({ navigation }: Props) {
       await vehiclesApi.deleteVehicle(vehicle.id);
       setVehicles((prev) => prev.filter((v) => v.id !== vehicle.id));
       setPendingDelete(null);
+      void syncVehicleReminders(); // its documents' reminders are now orphaned
     } catch (err) {
       setError(getApiErrorMessage(err, "We couldn't delete that vehicle."));
     } finally {
@@ -100,9 +104,9 @@ export function VehicleListScreen({ navigation }: Props) {
                 accessibilityLabel={`Open vehicle ${vehicle.name}`}
               >
                 <Text style={[typography.bodyStrong, { color: colors.text }]}>{vehicle.name}</Text>
-                {vehicle.sharedWith.length > 0 ? (
+                {vehicle.ownerName ? (
                   <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
-                    Shared with {vehicle.sharedWith.length} {vehicle.sharedWith.length === 1 ? "person" : "people"}
+                    Added by {vehicle.ownerName}
                   </Text>
                 ) : null}
               </Pressable>
