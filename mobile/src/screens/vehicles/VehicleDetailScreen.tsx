@@ -13,6 +13,7 @@ import { ConfirmationSheet } from "../../components/ConfirmationSheet";
 import { SkeletonLines } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import type { VehicleStackParamList } from "../../navigation/types";
+import { reconcileVehicleReminders, removeDocumentReminder } from "../../notifications/vehicleReminderSync";
 import { useTheme } from "../../theme/useTheme";
 
 type Props = NativeStackScreenProps<VehicleStackParamList, "VehicleDetail">;
@@ -42,6 +43,7 @@ export function VehicleDetailScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState(initialName);
+  const [ownerName, setOwnerName] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<VehicleDocument | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -54,7 +56,15 @@ export function VehicleDetailScreen({ navigation, route }: Props) {
         vehiclesApi.getVehicle(vehicleId).catch(() => null),
       ]);
       setDocuments(result);
-      if (vehicle) setName(vehicle.name);
+      if (vehicle) {
+        setName(vehicle.name);
+        setOwnerName(vehicle.ownerName ?? null);
+      }
+      // Shared pool: schedule reminders for every document here, whoever added it.
+      void reconcileVehicleReminders(
+        result.map((doc) => ({ doc, vehicleName: vehicle?.name })),
+        { cancelMissing: false }
+      ).catch(() => undefined);
     } catch (err) {
       setError(getApiErrorMessage(err, "We couldn't load this vehicle's documents."));
     } finally {
@@ -76,6 +86,7 @@ export function VehicleDetailScreen({ navigation, route }: Props) {
     try {
       await vehicleDocumentsApi.deleteVehicleDocument(vehicleId, doc.id);
       setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
+      void removeDocumentReminder(doc.id);
       setPendingDelete(null);
     } catch (err) {
       setPendingDelete(null);
@@ -101,6 +112,11 @@ export function VehicleDetailScreen({ navigation, route }: Props) {
           <Ionicons name="create-outline" size={22} color={colors.primary} />
         </Pressable>
       </View>
+      {ownerName ? (
+        <Text style={[typography.caption, { color: colors.textMuted, paddingHorizontal: spacing.lg, marginTop: 2 }]}>
+          Added by {ownerName}
+        </Text>
+      ) : null}
 
       {loading ? (
         <View style={{ padding: spacing.lg }}>

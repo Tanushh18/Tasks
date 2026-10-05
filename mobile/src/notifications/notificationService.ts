@@ -114,6 +114,32 @@ export async function cancelTaskReminder(localNotificationId: string | null): Pr
 const VEHICLE_DOC_CHANNEL_ID = "vehicle-doc-reminders";
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 
+/** Deterministic notification id per document, so rescheduling replaces rather than duplicates. */
+export const vehicleDocumentNotificationId = (docId: string): string => `vehicle-doc-${docId}`;
+
+/** Cancels the pending expiry reminder for a document (no-op if there isn't one). */
+export async function cancelVehicleDocumentReminder(docId: string): Promise<void> {
+  await notifee.cancelTriggerNotification(vehicleDocumentNotificationId(docId)).catch(() => undefined);
+}
+
+/**
+ * Pending vehicle-document reminders on this device, including ones scheduled by older builds under
+ * random notification ids (those carry the document id in their data).
+ */
+export async function listPendingVehicleReminders(): Promise<{ notificationId: string; docId: string }[]> {
+  const pending = await notifee.getTriggerNotifications().catch(() => []);
+  const out: { notificationId: string; docId: string }[] = [];
+  for (const { notification } of pending) {
+    const docId = notification.data?.vehicleDocumentId;
+    if (notification.id && typeof docId === "string") out.push({ notificationId: notification.id, docId });
+  }
+  return out;
+}
+
+export async function cancelNotificationById(notificationId: string): Promise<void> {
+  await notifee.cancelTriggerNotification(notificationId).catch(() => undefined);
+}
+
 /**
  * Schedules (or reschedules) a lightweight reminder for a vehicle document nearing its expiry.
  * Unlike task alarms this is a plain notification — no full-screen alarm treatment — fired once,
@@ -152,6 +178,7 @@ export async function scheduleVehicleDocumentReminder(doc: {
 
   return notifee.createTriggerNotification(
     {
+      id: vehicleDocumentNotificationId(doc.id),
       title: "Document expiring soon",
       body: `${doc.label} expires soon`,
       data: { vehicleDocumentId: doc.id },
