@@ -57,7 +57,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "build:bundle": "react-native bundle --platform android --dev false --entry-file index.ts --bundle-output ./android/app/src/main/assets/index.android.bundle --assets-dest ./android/app/src/main/res"
   },
   "private": true,
   "jest": {

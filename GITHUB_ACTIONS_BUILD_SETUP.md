@@ -1,178 +1,171 @@
-# GitHub Actions APK Build & OTA Setup (No Expo)
+# GitHub Actions APK Build & OTA Setup (GitHub Releases)
 
-This guide replaces Expo with GitHub Actions for building APKs and CodePush for OTA updates.
+This guide sets up GitHub Actions to build APKs and GitHub Releases for OTA (Over-The-Air) updates.
 
-## 1. **Add GitHub Secrets**
+## How it works
 
-Go to Repo → Settings → Secrets and variables → Actions:
+```
+Push to main
+      ↓
+GitHub Actions builds APK + JS bundle
+      ↓
+APK → Firebase App Distribution (testers)
+JS bundle → GitHub Release (OTA)
+      ↓
+App checks GitHub for new releases
+      ↓
+Downloads and installs update on next restart
+```
 
-### For APK Signing
-- **ANDROID_KEYSTORE_B64**: Base64-encoded keystore file
+## Setup Steps
+
+### 1. Add GitHub Secrets
+
+Go to Repo → Settings → Secrets and variables → Actions
+
+**For APK Signing:**
+
+Generate a keystore if you don't have one:
+```bash
+cd mobile/android/app
+keytool -genkey -v -keystore debug.keystore \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -alias my-key-alias
+```
+
+Then add these secrets:
+
+- **ANDROID_KEYSTORE_B64**: Base64-encoded keystore
   ```bash
-  base64 -i debug.keystore | pbcopy  # macOS
-  base64 -w 0 debug.keystore | xclip -selection clipboard  # Linux
-  ```
-  If you don't have a keystore yet:
-  ```bash
-  cd mobile/android/app
-  keytool -genkey -v -keystore debug.keystore \
-    -keyalg RSA -keysize 2048 -validity 10000 \
-    -alias my-key-alias
+  # macOS
+  base64 -i debug.keystore | pbcopy
+  
+  # Linux
+  base64 -w 0 debug.keystore | xclip -selection clipboard
   ```
 
-- **ANDROID_KEYSTORE_PASSWORD**: Keystore password
-- **ANDROID_KEY_ALIAS**: Key alias (default: `my-key-alias`)
-- **ANDROID_KEY_PASSWORD**: Key password (same as keystore password usually)
+- **ANDROID_KEYSTORE_PASSWORD**: Keystore password (from keytool)
+- **ANDROID_KEY_ALIAS**: Key alias (use: `my-key-alias`)
+- **ANDROID_KEY_PASSWORD**: Key password (same as keystore password)
 
-### For Firebase Distribution (optional)
-- **FIREBASE_ANDROID_APP_ID**: From Firebase Console → Project Settings → Android App
-- **FIREBASE_SERVICE_ACCOUNT**: Full JSON of a Firebase service account with "Firebase App Distribution Admin" role
+**For Firebase Distribution (optional):**
 
-### For CodePush OTA
-- **APPCENTER_ACCESS_TOKEN**: Create at [appcenter.ms](https://appcenter.ms) → Account settings → API tokens
+- **FIREBASE_ANDROID_APP_ID**: From Firebase Console → Your Android App → App ID
+- **FIREBASE_SERVICE_ACCOUNT**: Service account JSON with "Firebase App Distribution Admin" role
 
-## 2. **Install CodePush in your app**
+### 2. Verify React Native is properly set up
+
+The `build:bundle` script is already added to `package.json`. It builds the JavaScript bundle for OTA:
+```bash
+npm run build:bundle
+```
+
+This outputs: `mobile/android/app/src/main/assets/index.android.bundle`
+
+### 3. Test locally (optional)
 
 ```bash
 cd mobile
-npm install react-native-code-push
-npx appcenter-cli login
+npm ci
+npm run build:bundle
 ```
 
-## 3. **Register app with CodePush**
+### 4. Run the workflow
 
+**Option A: Automatic (on every push to main)**
 ```bash
-appcenter apps create \
-  -d We-Three-Android \
-  -o tanush18 \
-  -p Android
+git push origin main
+# GitHub Actions automatically runs the workflow
 ```
 
-Get your deployment key:
-```bash
-appcenter codepush deployment list \
-  -a tanush18/We-Three-Android
-```
-
-## 4. **Update app.json** (remove Expo updates, add CodePush)
-
-Replace your `app.json` updates section:
-```json
-{
-  "react-native-code-push": {
-    "CodePushDeploymentKey": "YOUR_CODEPUSH_KEY_HERE"
-  }
-}
-```
-
-## 5. **Update App.tsx** to use CodePush
-
-Replace `expo-updates` usage with CodePush:
-
-```javascript
-import codePush from "react-native-code-push";
-
-let App = () => {
-  // Your app code
-};
-
-App = codePush({
-  checkFrequency: codePush.CheckFrequency.ON_APP_START,
-  installMode: codePush.InstallMode.ON_NEXT_RESTART,
-  mandatoryInstallMode: codePush.InstallMode.IMMEDIATE,
-})(App);
-
-export default App;
-```
-
-## 6. **Update package.json scripts**
-
-Add to scripts section:
-```json
-"build:codepush": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output ./android/app/src/main/assets/index.android.bundle --assets-dest ./android/app/src/main/res"
-```
-
-## 7. **Configure build.gradle.kts** (Android)
-
-If you don't have `android/build.gradle.kts`, create it:
-
-```kotlin
-plugins {
-    id("com.android.application") version "8.1.0" apply false
-    id("com.android.library") version "8.1.0" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.0" apply false
-}
-```
-
-Update `android/app/build.gradle.kts`:
-```kotlin
-plugins {
-    id("com.android.application")
-    id("kotlin-android")
-}
-
-android {
-    compileSdk = 34
-    
-    defaultConfig {
-        applicationId = "com.tanush.wethree"
-        minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
-    }
-    
-    signingConfigs {
-        create("release") {
-            storeFile = file(System.getenv("MYAPP_UPLOAD_STORE_FILE") ?: "debug.keystore")
-            storePassword = System.getenv("MYAPP_UPLOAD_STORE_PASSWORD") ?: ""
-            keyAlias = System.getenv("MYAPP_UPLOAD_KEY_ALIAS") ?: "android"
-            keyPassword = System.getenv("MYAPP_UPLOAD_KEY_PASSWORD") ?: ""
-        }
-    }
-    
-    buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("release")
-        }
-    }
-}
-
-dependencies {
-    implementation("com.microsoft.appcenter:appcenter-crashes:5.0.0")
-    implementation("com.microsoft.appcenter:appcenter-analytics:5.0.0")
-    // Add React Native and CodePush dependencies
-}
-```
-
-## 8. **Run the workflows**
-
-### Manual APK Build
+**Option B: Manual**
 Go to Actions → "Build Android APK" → Run workflow
 
-### Manual OTA Deploy
-Go to Actions → "Deploy OTA Update (CodePush)" → Run workflow
+### 5. What happens
 
-### Automatic builds
-On every push to `main` that touches `mobile/**`, the APK workflow runs automatically.
+1. **APK is built** with Gradle and signing credentials
+2. **JavaScript bundle is built** for OTA updates
+3. **GitHub Release is created** with the bundle attached
+4. **APK is sent to Firebase** for testers to download
+
+## How OTA Updates Work
+
+### For testers
+
+1. Download and install APK from Firebase
+2. App automatically checks GitHub Releases on startup
+3. If new release found, downloads the JavaScript bundle
+4. On next app restart, new code runs
+
+### For you (developer)
+
+**After initial APK:**
+
+1. Make JavaScript changes (no native code)
+2. Push to main
+3. Wait for workflow to complete
+4. GitHub Release is created automatically
+5. Testers get update on next app restart (automatic)
+
+**To force an update for testing:**
+```bash
+# Add to app code temporarily
+import { clearStoredUpdate } from "./src/updates/githubReleaseUpdater";
+await clearStoredUpdate();
+```
+
+## File Structure
+
+```
+mobile/
+├── src/updates/
+│   ├── useOtaUpdates.ts          ← Hook that checks for updates
+│   └── githubReleaseUpdater.ts   ← GitHub API integration
+├── android/app/src/main/assets/
+│   └── index.android.bundle      ← Built by npm run build:bundle
+└── package.json
+    └── "build:bundle": "react-native bundle..."
+```
 
 ## Troubleshooting
 
-**APK build fails with "react-native: command not found"**
-- Add `npm ci` to install dependencies in workflow (already in the workflow)
+**Workflow fails: "react-native: command not found"**
+- Already handled in workflow with `npm ci`
+- If still fails, check Node version (should be 22)
 
-**CodePush says "No deployment found"**
-- Ensure you created the app and deployment:
-  ```bash
-  appcenter apps list
-  appcenter codepush deployment list -a tanush18/We-Three-Android
-  ```
+**Bundle not uploaded to release**
+- Ensure `npm run build:bundle` succeeds locally first
+- Check that `android/app/src/main/assets/index.android.bundle` exists
 
 **APK won't install**
-- Check that package name matches in `build.gradle.kts` and signing config
-- Verify keystore is valid: `keytool -list -v -keystore debug.keystore`
+- Verify keystore password is correct
+- Test keystore: `keytool -list -v -keystore debug.keystore`
+- Check package name in `android/app/build.gradle.kts` is `com.tanush.wethree`
 
-**OTA update not showing on app**
-- Check app is calling `codePush.sync()` 
-- Ensure `CodePushDeploymentKey` is set in app.json
-- Force update with: `appcenter codepush deployment clear -a tanush18/We-Three-Android -d Production`
+**App doesn't download update**
+- Ensure `useOtaUpdates()` is called in `App.tsx` (already is)
+- Check GitHub repo is public (for unauthenticated API access)
+- Check version comparison in `githubReleaseUpdater.ts` (semantic versioning)
+
+**Need to debug update checking**
+- Add to App.tsx temporarily:
+  ```javascript
+  import { getCustomBundlePath } from "./src/updates/githubReleaseUpdater";
+  useEffect(() => {
+    getCustomBundlePath().then(path => console.log("Custom bundle:", path));
+  }, []);
+  ```
+
+## Limits
+
+- **GitHub Releases storage**: Unlimited (free)
+- **GitHub API**: 60 requests/hour unauthenticated (app checks every 30 min, so ~48/day = OK)
+- **Release assets**: No size limit per file
+
+## Next Steps
+
+1. Add the 4 GitHub secrets
+2. Push to main or manually run the workflow
+3. Download APK from Firebase and test
+4. Make a JS change and push again
+5. Verify update is downloaded on next app restart

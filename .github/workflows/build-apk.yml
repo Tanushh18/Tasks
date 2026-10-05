@@ -1,10 +1,6 @@
 name: Build Android APK
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "mobile/**"
   workflow_dispatch:
     inputs:
       send_to_firebase:
@@ -53,12 +49,40 @@ jobs:
             -PMYAPP_UPLOAD_KEY_ALIAS=$ANDROID_KEY_ALIAS \
             -PMYAPP_UPLOAD_KEY_PASSWORD=$ANDROID_KEY_PASSWORD
 
+      - name: Build JavaScript bundle for OTA
+        working-directory: mobile
+        run: |
+          npm run build:bundle
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: mobile/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
+
+      - name: Create or update GitHub Release with bundle
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ota-release-${{ github.sha }}
+          release_name: OTA Update ${{ github.run_number }}
+          body: |
+            JavaScript bundle update
+            Commit: ${{ github.event.head_commit.message || github.sha }}
+          draft: false
+          prerelease: false
+
+      - name: Upload bundle to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./mobile/android/app/src/main/assets/index.android.bundle
+          asset_name: index.android.bundle
+          asset_content_type: application/octet-stream
 
       - name: Distribute to Firebase App Distribution
         if: ${{ inputs.send_to_firebase || github.event_name == 'push' }}
