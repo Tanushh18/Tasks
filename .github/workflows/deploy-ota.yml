@@ -1,0 +1,50 @@
+name: Deploy OTA Update (CodePush)
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_name:
+        description: "CodePush deployment (Staging or Production)"
+        type: choice
+        options: [Staging, Production]
+        default: Staging
+      description:
+        description: "Release notes/description"
+        required: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install CodePush CLI
+        run: npm install -g appcenter-cli
+
+      - name: Login to AppCenter
+        env:
+          APPCENTER_ACCESS_TOKEN: ${{ secrets.APPCENTER_ACCESS_TOKEN }}
+        run: appcenter login --token "$APPCENTER_ACCESS_TOKEN"
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Build JavaScript bundle
+        working-directory: mobile
+        run: npm run build:codepush
+
+      - name: Deploy update to ${{ inputs.deployment_name }}
+        working-directory: mobile
+        env:
+          APPCENTER_ACCESS_TOKEN: ${{ secrets.APPCENTER_ACCESS_TOKEN }}
+        run: |
+          appcenter codepush release-react \
+            -a tanush18/We-Three-Android \
+            -d ${{ inputs.deployment_name }} \
+            --description "${{ inputs.description || format('Update from {0}', github.ref_name) }}" \
+            --mandatory false
