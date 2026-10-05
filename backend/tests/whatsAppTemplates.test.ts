@@ -138,12 +138,20 @@ describe("WhatsApp sent tracking and ordering", () => {
 
     // stage filter and search still apply
     await Lead.updateMany({ name: { $in: ["L6", "L5"] } }, { status: "Interested" });
-    expect(await names("page=1&limit=10&status=Interested&origin=Meta%20Sheet")).toEqual(["L5", "L6"]);
+    expect(await names("page=1&limit=10&status=Interested&origin=Meta%20Sheet")).toEqual(["L6", "L5"]);
+    // a sent lead that has a stage is not pushed to the end; sent leads without one still are
+    expect(await names("page=1&limit=100&status=all&origin=Meta%20Sheet")).toEqual(["L6", "L5", "L4", "L2", "L1", "L3"]);
     expect(await names("page=1&limit=10&status=all&origin=Meta%20Sheet&search=L3")).toEqual(["L3"]);
 
-    // un-marking brings a lead back to the unsent group
-    const l6 = await Lead.findOne({ name: "L6" });
-    await a.patch(`/api/leads/${l6!._id}`).send({ whatsappSent: false });
-    expect(await names("page=1&limit=100&status=all&origin=Meta%20Sheet")).toEqual(["L6", "L5", "L4", "L2", "L1", "L3"]);
+    // history: each Send is logged, un-marking removes the latest entry
+    const l3 = await Lead.findOne({ name: "L3" });
+    await a.patch(`/api/leads/${l3!._id}`).send({ whatsappSent: true });
+    let hist = (await a.get("/api/leads?origin=Meta%20Sheet")).body.leads.find((l: any) => l.name === "L3").whatsappHistory;
+    expect(hist).toHaveLength(1);
+    expect(hist[0].byName).toBe("O");
+    await a.patch(`/api/leads/${l3!._id}`).send({ whatsappSent: false });
+    hist = (await a.get("/api/leads?origin=Meta%20Sheet")).body.leads.find((l: any) => l.name === "L3").whatsappHistory;
+    expect(hist).toHaveLength(0);
+    expect(await names("page=1&limit=100&status=all&origin=Meta%20Sheet")).toEqual(["L6", "L5", "L4", "L3", "L2", "L1"]);
   });
 });
