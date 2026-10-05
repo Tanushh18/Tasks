@@ -1,6 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useCallback, useState } from "react";
-import { Alert, Pressable, Switch, Text, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { Alert, AppState, Pressable, Switch, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { AdminBadge } from "../../components/AdminBadge";
@@ -11,7 +11,20 @@ import { SectionHeader } from "../../components/SectionHeader";
 import { SegmentedControl } from "../../components/SegmentedControl";
 import { TextField } from "../../components/TextField";
 import { ALLOWED_SENDERS_LABEL } from "../../expenses/senderAllowList";
-import { hasSmsPermission, requestSmsPermission, smsReaderAvailable } from "../../expenses/smsReader";
+import {
+  areNotificationsEnabled,
+  backgroundTrackingAvailable,
+  hasSmsPermission,
+  isIgnoringBatteryOptimizations,
+  isTrackingRunning,
+  openAutoStartSettings,
+  requestIgnoreBatteryOptimizations,
+  requestNotificationPermission,
+  requestSmsPermission,
+  smsReaderAvailable,
+  startTracking,
+  stopTracking,
+} from "../../expenses/smsReader";
 import {
   BACKFILL_LABELS,
   getUpiHistory,
@@ -59,10 +72,24 @@ export function UpiExpenseTrackerScreen() {
   const [sample, setSample] = useState("");
   const [tested, setTested] = useState<{ text: string; parsed: ParsedUpiSms | null } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [bg, setBg] = useState({ running: false, batteryOk: false, notificationsOk: true });
+
+  const refreshBackground = useCallback(() => {
+    setBg({ running: isTrackingRunning(), batteryOk: isIgnoringBatteryOptimizations(), notificationsOk: areNotificationsEnabled() });
+  }, []);
+
+  // The battery / notification dialogs return to the app: re-read the status.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshBackground();
+    });
+    return () => sub.remove();
+  }, [refreshBackground]);
 
   const refresh = useCallback(async () => {
     setSettings(await getUpiSettings());
     setPermission(hasSmsPermission());
+    refreshBackground();
     setHistory(await getUpiHistory());
     try {
       setMonths(await loadUpiMonths());
@@ -70,7 +97,7 @@ export function UpiExpenseTrackerScreen() {
     } catch (err) {
       setMonthsError(getApiErrorMessage(err, "Couldn't load the monthly totals."));
     }
-  }, []);
+  }, [refreshBackground]);
 
   useFocusEffect(
     useCallback(() => {
@@ -95,7 +122,9 @@ export function UpiExpenseTrackerScreen() {
 
   async function toggle(next: boolean) {
     if (!next) {
+      stopTracking();
       setSettings(await setUpiTrackingEnabled(false));
+      refreshBackground();
       return;
     }
     let granted = hasSmsPermission();
@@ -104,12 +133,28 @@ export function UpiExpenseTrackerScreen() {
     // Turning ON reads the old messages too (range chosen below; default: everything).
     const s = await setUpiTrackingEnabled(true, user?.id);
     setSettings(s);
+    if (granted && backgroundTrackingAvailable) {
+      if (!areNotificationsEnabled()) await requestNotificationPermission();
+      startTracking();
+      refreshBackground();
+    }
     if (granted) await run(s.range);
   }
 
   async function grant() {
     setPermission(await requestSmsPermission());
     await refresh();
+  }
+
+  async function startService() {
+    if (!areNotificationsEnabled()) await requestNotificationPermission();
+    startTracking();
+    refreshBackground();
+  }
+
+  async function allowNotifications() {
+    await requestNotificationPermission();
+    refreshBackground();
   }
 
   async function chooseRange(range: BackfillRange) {
@@ -200,6 +245,69 @@ export function UpiExpenseTrackerScreen() {
           </>
         ) : null}
       </Card>
+
+      {smsReaderAvailable ? (
+        <Card style={{ marginBottom: spacing.lg }}>
+          <Text style={[typography.bodyStrong, { color: colors.text }]}>Keep running in the background</Text>
+          {!backgroundTrackingAvailable ? (
+            <Text testID="bg-unavailable" style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]}>
+              Install the latest APK to keep tracking running while the app is closed.
+            </Text>
+          ) : (
+            <>
+              <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
+                A small silent notification keeps the app alive so new bank SMS are saved even when it is closed.
+              </Text>
+              <View style={{ marginTop: spacing.md }}>
+                <Text style={[typography.caption, { color: colors.textMuted }]}>Background service</Text>
+                <Text testID="bg-service-status" style={[typography.bodyStrong, { color: bg.running ? colors.success : colors.text }]}>
+                  {bg.running ? "Running" : "Not running"}
+                </Text>
+                {!bg.running ? (
+                  <Button label="Start" variant="secondary" onPress={startService} disabled={!enabled || !permission} style={{ marginTop: spacing.xs }} />
+                ) : null}
+              </View>
+              <View style={{ marginTop: spacing.md }}>
+                <Text style={[typography.caption, { color: colors.textMuted }]}>Battery optimisation</Text>
+                <Text testID="bg-battery-status" style={[typography.bodyStrong, { color: bg.batteryOk ? colors.success : colors.text }]}>
+                  {bg.batteryOk ? "Unrestricted" : "Restricted — tap to allow"}
+                </Text>
+                {!bg.batteryOk ? (
+                  <Button
+                    label="Allow background activity"
+                    variant="secondary"
+                    onPress={() => {
+                      requestIgnoreBatteryOptimizations();
+                    }}
+                    style={{ marginTop: spacing.xs }}
+                  />
+                ) : null}
+              </View>
+              <View style={{ marginTop: spacing.md }}>
+                <Text style={[typography.caption, { color: colors.textMuted }]}>Auto-start / background activity</Text>
+                <Button
+                  label="Open auto-start settings"
+                  variant="secondary"
+                  onPress={() => {
+                    openAutoStartSettings();
+                  }}
+                  style={{ marginTop: spacing.xs }}
+                />
+                <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.xs }]}>
+                  On Oppo/Realme/Xiaomi/Vivo: allow auto-start and set battery to Unrestricted.
+                </Text>
+              </View>
+              {!bg.notificationsOk ? (
+                <View style={{ marginTop: spacing.md }}>
+                  <Text style={[typography.caption, { color: colors.textMuted }]}>Notifications</Text>
+                  <Text testID="bg-notifications-status" style={[typography.bodyStrong, { color: colors.danger }]}>Blocked — the service notice is hidden</Text>
+                  <Button label="Allow notifications" variant="secondary" onPress={allowNotifications} style={{ marginTop: spacing.xs }} />
+                </View>
+              ) : null}
+            </>
+          )}
+        </Card>
+      ) : null}
 
       <SectionHeader title="Month by month" subtitle="UPI transactions grouped per month" />
       {monthsError ? <Text style={[typography.caption, { color: colors.danger, marginBottom: spacing.md }]}>{monthsError}</Text> : null}

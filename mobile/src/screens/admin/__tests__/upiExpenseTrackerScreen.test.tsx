@@ -16,12 +16,30 @@ jest.mock("@react-navigation/native", () => ({
 }));
 jest.mock("../../../auth/AuthContext", () => ({ useAuth: () => ({ user: { id: "u1", isAdmin: true } }) }));
 
-const mockSms = { available: true, permission: true };
+const mockSms = { available: true, permission: true, bgAvailable: true, running: false, battery: false, notifications: true };
+const mockBg = {
+  startTracking: jest.fn(() => true),
+  stopTracking: jest.fn(),
+  requestIgnoreBatteryOptimizations: jest.fn(() => true),
+  openAutoStartSettings: jest.fn(() => true),
+  requestNotificationPermission: jest.fn(async () => true),
+};
 jest.mock("../../../expenses/smsReader", () => ({
   get smsReaderAvailable() {
     return mockSms.available;
   },
+  get backgroundTrackingAvailable() {
+    return mockSms.bgAvailable;
+  },
   hasSmsPermission: () => mockSms.permission,
+  isTrackingRunning: () => mockSms.running,
+  isIgnoringBatteryOptimizations: () => mockSms.battery,
+  areNotificationsEnabled: () => mockSms.notifications,
+  startTracking: () => mockBg.startTracking(),
+  stopTracking: () => mockBg.stopTracking(),
+  requestIgnoreBatteryOptimizations: () => mockBg.requestIgnoreBatteryOptimizations(),
+  openAutoStartSettings: () => mockBg.openAutoStartSettings(),
+  requestNotificationPermission: () => mockBg.requestNotificationPermission(),
   requestSmsPermission: jest.fn(async () => true),
   readInbox: jest.fn(async () => []),
   peekQueuedSms: jest.fn(() => []),
@@ -59,6 +77,11 @@ beforeEach(async () => {
   await AsyncStorage.clear();
   mockSms.available = true;
   mockSms.permission = true;
+  mockSms.bgAvailable = true;
+  mockSms.running = false;
+  mockSms.battery = false;
+  mockSms.notifications = true;
+  Object.values(mockBg).forEach((f) => f.mockClear());
   api.getCategoryMonths.mockResolvedValue([]);
   api.listTransactions.mockResolvedValue([]);
   api.createTransactionsBulk.mockClear();
@@ -92,6 +115,72 @@ describe("UpiExpenseTrackerScreen", () => {
     const out = texts(await render());
     expect(out).toContain("Needs SMS permission");
     expect(out).toContain("Allow SMS access");
+  });
+
+  describe("Keep running in the background card", () => {
+    const press = async (r: TestRenderer.ReactTestRenderer, label: string) => {
+      const node = r.root.findAll((n) => n.props.onPress && [n.props.label, n.props.accessibilityLabel].includes(label))[0];
+      await act(async () => {
+        node.props.onPress();
+      });
+    };
+
+    it("shows Not running + Restricted and the buttons call the right functions", async () => {
+      const r = await render();
+      const out = texts(r);
+      expect(out).toContain("Keep running in the background");
+      expect(out).toContain("Not running");
+      expect(out).toContain("Restricted — tap to allow");
+      expect(out).toContain("On Oppo/Realme/Xiaomi/Vivo: allow auto-start and set battery to Unrestricted.");
+      await press(r, "Allow background activity");
+      expect(mockBg.requestIgnoreBatteryOptimizations).toHaveBeenCalled();
+      await press(r, "Open auto-start settings");
+      expect(mockBg.openAutoStartSettings).toHaveBeenCalled();
+    });
+
+    it("Start button starts the service", async () => {
+      await setUpiTrackingEnabled(true, "u1");
+      const r = await render();
+      await press(r, "Start");
+      expect(mockBg.startTracking).toHaveBeenCalled();
+    });
+
+    it("shows Running + Unrestricted without fix buttons", async () => {
+      mockSms.running = true;
+      mockSms.battery = true;
+      const out = texts(await render());
+      expect(out).toContain("Running");
+      expect(out).not.toContain("Not running");
+      expect(out).toContain("Unrestricted");
+      expect(out).not.toContain("Allow background activity");
+    });
+
+    it("offers to allow notifications when blocked", async () => {
+      mockSms.notifications = false;
+      const r = await render();
+      expect(texts(r)).toContain("Allow notifications");
+      await press(r, "Allow notifications");
+      expect(mockBg.requestNotificationPermission).toHaveBeenCalled();
+    });
+
+    it("asks for the latest APK when the native service functions are missing", async () => {
+      mockSms.bgAvailable = false;
+      const out = texts(await render());
+      expect(out).toContain("Install the latest APK to keep tracking running while the app is closed.");
+      expect(out).not.toContain("Open auto-start settings");
+    });
+
+    it("toggle ON starts tracking and OFF stops it", async () => {
+      const r = await render();
+      await act(async () => {
+        r.root.findByType(Switch).props.onValueChange(true);
+      });
+      expect(mockBg.startTracking).toHaveBeenCalled();
+      await act(async () => {
+        r.root.findByType(Switch).props.onValueChange(false);
+      });
+      expect(mockBg.stopTracking).toHaveBeenCalled();
+    });
   });
 
   it("lists months with totals and expands to the month's transactions", async () => {

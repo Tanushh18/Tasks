@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -37,6 +38,40 @@ class SmsExpenseReaderModule : Module() {
     /** Allowed-sender inbox messages newer than sinceMs, oldest first, at most `limit` of them. */
     AsyncFunction("readInbox") { sinceMs: Double, limit: Int ->
       readInbox(context, sinceMs.toLong(), limit)
+    }
+
+    /** Starts the always-on foreground service and remembers "tracking is ON" for the boot receiver. */
+    Function("startTracking") {
+      TrackingPrefs.setEnabled(context, true)
+      SmsTrackingService.ensureRunning(context)
+    }
+
+    /** Stops the service and clears the native "ON" flag (toggle OFF / sign-out). */
+    Function("stopTracking") {
+      TrackingPrefs.setEnabled(context, false)
+      SmsTrackingService.stop(context)
+      true
+    }
+
+    Function("isTrackingRunning") {
+      SmsTrackingService.running
+    }
+
+    Function("isIgnoringBatteryOptimizations") {
+      BackgroundSettings.isIgnoringBatteryOptimizations(context)
+    }
+
+    Function("requestIgnoreBatteryOptimizations") {
+      BackgroundSettings.requestIgnoreBatteryOptimizations(context)
+    }
+
+    Function("openAutoStartSettings") {
+      BackgroundSettings.openAutoStartSettings(context)
+    }
+
+    /** False when notifications are blocked (Android 13+ default until allowed), which hides the service's notice. */
+    Function("areNotificationsEnabled") {
+      NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 
     /** SMS that arrived while no JS runtime was alive. They stay queued until removeQueuedSms. */

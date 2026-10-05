@@ -55,7 +55,9 @@
         "android.permission.READ_PHONE_STATE",
         "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
         "android.permission.READ_SMS",
-        "android.permission.RECEIVE_SMS"
+        "android.permission.RECEIVE_SMS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
       ],
       "package": "com.tanush.wethree"
     },

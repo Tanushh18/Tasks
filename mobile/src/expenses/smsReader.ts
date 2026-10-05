@@ -19,6 +19,14 @@ interface NativeSmsReader {
   readInbox(sinceMs: number, limit: number): Promise<SmsMessage[]>;
   peekQueuedSms(): SmsMessage[];
   removeQueuedSms(ids: string[]): void;
+  // Background tracking (added later: an APK built before that lacks these, see backgroundTrackingAvailable).
+  startTracking?(): boolean;
+  stopTracking?(): boolean;
+  isTrackingRunning?(): boolean;
+  isIgnoringBatteryOptimizations?(): boolean;
+  requestIgnoreBatteryOptimizations?(): boolean;
+  openAutoStartSettings?(): boolean;
+  areNotificationsEnabled?(): boolean;
   addListener(event: string, listener: (e: { address: string; body: string; date: number }) => void): { remove(): void };
 }
 
@@ -93,4 +101,81 @@ export function onSmsReceived(listener: (m: { address: string; body: string; dat
   } catch {
     return () => undefined;
   }
+}
+
+/** True only on an APK that has the always-on tracking service (older APKs have the reader but not this). */
+export const backgroundTrackingAvailable: boolean = typeof Native?.startTracking === "function";
+
+/** Starts the always-on foreground service and remembers "ON" natively (for reboot). False if unavailable/refused. */
+export function startTracking(): boolean {
+  try {
+    return !!Native?.startTracking?.();
+  } catch {
+    return false;
+  }
+}
+
+/** Stops the service and clears the native "ON" flag. Safe to call anywhere (sign-out, toggle OFF). */
+export function stopTracking(): void {
+  try {
+    Native?.stopTracking?.();
+  } catch {
+    // ignore
+  }
+}
+
+export function isTrackingRunning(): boolean {
+  try {
+    return !!Native?.isTrackingRunning?.();
+  } catch {
+    return false;
+  }
+}
+
+/** True when the app is exempt from battery optimisation. False when unknown/unavailable. */
+export function isIgnoringBatteryOptimizations(): boolean {
+  try {
+    return !!Native?.isIgnoringBatteryOptimizations?.();
+  } catch {
+    return false;
+  }
+}
+
+export function requestIgnoreBatteryOptimizations(): boolean {
+  try {
+    return !!Native?.requestIgnoreBatteryOptimizations?.();
+  } catch {
+    return false;
+  }
+}
+
+/** Opens the phone maker's auto-start screen (Oppo/Realme/Xiaomi/Vivo/...), else this app's settings. */
+export function openAutoStartSettings(): boolean {
+  try {
+    return !!Native?.openAutoStartSettings?.();
+  } catch {
+    return false;
+  }
+}
+
+/** Whether notifications are allowed (needed for the tracking notice to show). True when unknown. */
+export function areNotificationsEnabled(): boolean {
+  try {
+    const fn = Native?.areNotificationsEnabled;
+    return fn ? !!fn.call(Native) : true;
+  } catch {
+    return true;
+  }
+}
+
+/** Android 13+ runtime prompt for notifications. Resolves to whether they are now allowed. */
+export async function requestNotificationPermission(): Promise<boolean> {
+  if (Platform.OS !== "android") return true;
+  try {
+    const perm = (PermissionsAndroid.PERMISSIONS as Record<string, string>).POST_NOTIFICATIONS;
+    if (perm && Number(Platform.Version) >= 33) await PermissionsAndroid.request(perm as never);
+  } catch {
+    // fall through
+  }
+  return areNotificationsEnabled();
 }
