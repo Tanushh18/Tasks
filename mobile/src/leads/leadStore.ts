@@ -170,8 +170,10 @@ export async function queryLocalLeads(opts: {
         (!origin || l.origin === origin) &&
         (!q || hayFor(l).includes(q) || (digits.length >= 3 && (l.phone ?? "").replace(/\D/g, "").includes(digits)))
     );
-    // Same as the server: leads whose WhatsApp was sent go to the end, newest first inside each group.
-    const base = [...matching.filter((l) => !l.whatsappSentAt), ...matching.filter((l) => l.whatsappSentAt)];
+    // Same as the server: leads whose WhatsApp was sent and that have no stage yet go to the end of the list; a lead
+    // with a stage stays where it is. Newest first inside each group.
+    const isBack = (l: Lead) => !!l.whatsappSentAt && NEW_STATUS.test(l.status ?? "");
+    const base = [...matching.filter((l) => !isBack(l)), ...matching.filter(isBack)];
     const counts = new Map<string, number>();
     for (const l of base) {
       const key = NEW_STATUS.test(l.status ?? "") ? "New" : String(l.status).trim();

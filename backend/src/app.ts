@@ -30,6 +30,7 @@ import shoppingListRoutes from "./routes/shoppingListRoutes";
 import taskRoutes from "./routes/taskRoutes";
 import userRoutes from "./routes/userRoutes";
 import vaultDocumentRoutes from "./routes/vaultDocumentRoutes";
+import sharedDocumentRoutes from "./routes/sharedDocumentRoutes";
 import vehicleRoutes from "./routes/vehicleRoutes";
 import weeklySummaryRoutes from "./routes/weeklySummaryRoutes";
 import leadRoutes from "./routes/leadRoutes";
@@ -76,6 +77,7 @@ export function createApp(): Express {
   app.use("/api/notes", noteRoutes);
   app.use("/api/group-expenses", groupExpenseRoutes);
   app.use("/api/vault-documents", vaultDocumentRoutes);
+  app.use("/api/shared-documents", sharedDocumentRoutes);
   app.use("/api/vehicles", vehicleRoutes);
   app.use("/api/inventory-items", inventoryItemRoutes);
   app.use("/api/emergency-info", emergencyInfoRoutes);

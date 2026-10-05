@@ -10,6 +10,7 @@ import { Button } from "../../components/Button";
 import { FilterChip, FilterChipGroup } from "../../components/FilterChip";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SearchBar } from "../../components/SearchBar";
+import { SegmentedControl } from "../../components/SegmentedControl";
 import { Skeleton } from "../../components/Skeleton";
 import { EmptyState, ErrorState } from "../../components/StateViews";
 import { TextField } from "../../components/TextField";
@@ -29,6 +30,7 @@ import { isUnreachableError } from "../../offline/httpQueue";
 import { bypassCacheBriefly } from "../../offline/httpCache";
 import { templateForOrigin } from "../../leads/whatsapp";
 import { useTheme, type Theme } from "../../theme/useTheme";
+import { WhatsAppHistory } from "./WhatsAppHistory";
 import { WhatsAppPreviewSheet } from "./WhatsAppPreviewSheet";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -124,6 +126,7 @@ export function LeadsScreen({ navigation }: any) {
 
   // WhatsApp templates (shared, attached per sheet) and the lead whose preview is open.
   const [templates, setTemplates] = useState<api.WhatsAppTemplate[]>([]);
+  const [editorTab, setEditorTab] = useState<"details" | "history">("details");
   const [waTarget, setWaTarget] = useState<{ lead: api.Lead; template: api.WhatsAppTemplate; digits: string } | null>(null);
 
   // Top-right button that opens the Leads settings (add, import, share, call pop-up, offline copy).
@@ -377,7 +380,11 @@ export function LeadsScreen({ navigation }: any) {
   /** Send was pressed in the preview. We can't verify delivery, so this only records "marked as sent". */
   const markSent = (lead: api.Lead, template: api.WhatsAppTemplate) => {
     const stamp = new Date().toISOString();
-    patchLead(lead.id, { whatsappSentAt: stamp, whatsappTemplateId: template.id });
+    patchLead(lead.id, {
+      whatsappSentAt: stamp,
+      whatsappTemplateId: template.id,
+      whatsappHistory: [...(lead.whatsappHistory ?? []), { at: stamp, templateName: template.name }].slice(-50),
+    });
     api.setWhatsAppSent(lead.id, true, template.id).catch((e) => Alert.alert("Couldn't save \"sent\"", getApiErrorMessage(e)));
   };
 
@@ -387,7 +394,7 @@ export function LeadsScreen({ navigation }: any) {
       {
         text: "Mark as not sent",
         onPress: () => {
-          patchLead(lead.id, { whatsappSentAt: null, whatsappTemplateId: null });
+          patchLead(lead.id, { whatsappSentAt: null, whatsappTemplateId: null, whatsappHistory: (lead.whatsappHistory ?? []).slice(0, -1) });
           api.setWhatsAppSent(lead.id, false).catch((e) => Alert.alert("Couldn't update", getApiErrorMessage(e)));
         },
       },
@@ -409,6 +416,7 @@ export function LeadsScreen({ navigation }: any) {
   };
 
   const openEditor = (lead: api.Lead) => {
+    setEditorTab("details");
     const next = {
       status: lead.status || "",
       notes: lead.notes || "",
@@ -906,6 +914,17 @@ export function LeadsScreen({ navigation }: any) {
       </BottomSheet>
 
       <BottomSheet visible={!!editing} onClose={() => setEditing(null)} title={editing?.name || "Lead"} subtitle={editing?.phone} avoidKeyboard>
+        <View style={{ marginBottom: spacing.md }}>
+          <SegmentedControl
+            segments={[{ value: "details", label: "Details" }, { value: "history", label: "History" }]}
+            value={editorTab}
+            onChange={setEditorTab}
+          />
+        </View>
+        {editorTab === "history" ? (
+          <WhatsAppHistory entries={(data?.leads.find((l) => l.id === editing?.id) ?? editing)?.whatsappHistory ?? []} />
+        ) : (
+        <>
         <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>Stage</Text>
         <FilterChipGroup>
           {statusOptions.map((opt) => (
@@ -975,6 +994,8 @@ export function LeadsScreen({ navigation }: any) {
           <Button label="Cancel" variant="secondary" onPress={() => setEditing(null)} style={{ flex: 1 }} />
           <Button label="Save" onPress={save} loading={saving} style={{ flex: 1 }} />
         </View>
+        </>
+        )}
       </BottomSheet>
 
       <BottomSheet visible={!!renaming} onClose={() => setRenaming(null)} title="Edit lead" subtitle="Name and mobile number" avoidKeyboard>

@@ -42,6 +42,7 @@ export function MoreScreen({ navigation }: Props) {
           onPress={() => navigation.navigate("Notes", { screen: "NotesList", params: undefined })}
         />
       ) : null}
+      <MoreRow icon="document-attach-outline" label="Documents" onPress={() => navigation.navigate("Documents")} />
       {flags.documentVault ? (
         <MoreRow
           icon="folder-outline"

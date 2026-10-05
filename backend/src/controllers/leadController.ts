@@ -5,6 +5,7 @@ import { LeadList } from "../models/LeadList";
 import { LeadSource } from "../models/LeadSource";
 import { LeadTombstone } from "../models/LeadTombstone";
 import { User } from "../models/User";
+import { WhatsAppTemplate } from "../models/WhatsAppTemplate";
 import { fetchSheet, objectsToRows, parseCsv, parseTabs } from "../services/leadImport";
 import {
   STATUS_SUGGESTIONS,
@@ -46,6 +47,7 @@ function serializeLead(l: any) {
     alternatePhones: l.alternatePhones ?? [],
     whatsappSentAt: l.whatsappSentAt ?? null,
     whatsappTemplateId: l.whatsappTemplateId ? String(l.whatsappTemplateId) : null,
+    whatsappHistory: l.whatsappHistory ?? [],
   };
 }
 
@@ -97,7 +99,8 @@ export async function listLeads(req: Request, res: Response) {
   }
 
   // The grouped count gives the totals and also how many leads in this filter are still unsent. Pages are read as
-  // "unsent first (whatsappSentAt empty), then sent", each newest first, so a page that straddles the boundary is
+  // "front first, then back", each newest first. The back is leads whose WhatsApp was sent and that are still unclassified
+  // (no stage); a lead with a stage stays where it is. The whole list is ordered this way, not just one page, so a page that straddles the boundary is
   // filled from both ranges and the stage filter / search / paging all keep working unchanged.
   const grouped = await Lead.aggregate<{ _id: { status: string; sent: boolean }; count: number }>([
     { $match: { $and: base } },
@@ -107,7 +110,7 @@ export async function listLeads(req: Request, res: Response) {
   const counts = new Map<string, number>();
   let totalAll = 0;
   let total = 0;
-  let unsentInFilter = 0;
+  let frontInFilter = 0;
   const wantAll = !status || status.toLowerCase() === "all";
   const wantNew = !wantAll && NEW_STATUS.test(status!);
   for (const g of grouped) {
@@ -117,17 +120,18 @@ export async function listLeads(req: Request, res: Response) {
     totalAll += g.count;
     if (wantAll || (wantNew ? NEW_STATUS.test(raw) : raw === status)) {
       total += g.count;
-      if (!g._id.sent) unsentInFilter += g.count;
+      if (!(g._id.sent && NEW_STATUS.test(raw))) frontInFilter += g.count;
     }
   }
 
   const skip = (page - 1) * limit;
-  const unsentPart = skip < unsentInFilter
-    ? await Lead.find({ $and: [filter, { whatsappSentAt: null }] }).sort(sort).skip(skip).limit(limit).lean()
+  const backCond = { whatsappSentAt: { $ne: null }, status: { $regex: NEW_STATUS } };
+  const unsentPart = skip < frontInFilter
+    ? await Lead.find({ $and: [filter, { $nor: [backCond] }] }).sort(sort).skip(skip).limit(limit).lean()
     : [];
   const need = limit - unsentPart.length;
   const sentPart = need > 0
-    ? await Lead.find({ $and: [filter, { whatsappSentAt: { $ne: null } }] }).sort(sort).skip(Math.max(0, skip - unsentInFilter)).limit(need).lean()
+    ? await Lead.find({ $and: [filter, backCond] }).sort(sort).skip(Math.max(0, skip - frontInFilter)).limit(need).lean()
     : [];
   const leads = [...unsentPart, ...sentPart];
 
@@ -239,6 +243,16 @@ export async function updateLead(req: Request, res: Response) {
     lead.whatsappSentAt = b.whatsappSent ? new Date() : null;
     const tid = typeof b.whatsappTemplateId === "string" && Types.ObjectId.isValid(b.whatsappTemplateId) ? b.whatsappTemplateId : null;
     lead.whatsappTemplateId = b.whatsappSent && tid ? (new Types.ObjectId(tid) as any) : null;
+    if (b.whatsappSent) {
+      const [tpl, who] = await Promise.all([
+        tid ? WhatsAppTemplate.findById(tid).select("name").lean() : null,
+        User.findById(req.userId).select("name").lean(),
+      ]);
+      lead.whatsappHistory.push({ at: lead.whatsappSentAt!, templateName: tpl?.name ?? "", byName: who?.name ?? "" } as any);
+      if (lead.whatsappHistory.length > 50) lead.whatsappHistory.splice(0, lead.whatsappHistory.length - 50);
+    } else {
+      lead.whatsappHistory.pop(); // un-marking undoes the most recent entry
+    }
   }
 
   if ("plotInFarukhNagar" in b) {

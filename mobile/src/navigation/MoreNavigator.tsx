@@ -23,6 +23,7 @@ import { WeeklySummaryScreen } from "../screens/summary/WeeklySummaryScreen";
 import { NotesNavigator } from "./NotesNavigator";
 import { PollsNavigator } from "./PollsNavigator";
 import { SettingsNavigator } from "./SettingsNavigator";
+import { DocumentsScreen } from "../screens/more/DocumentsScreen";
 import { VaultNavigator } from "./VaultNavigator";
 import { VehicleNavigator } from "./VehicleNavigator";
 import type { MoreStackParamList } from "./types";
@@ -37,6 +38,7 @@ export function MoreNavigator() {
       <Stack.Screen name="Assistant" component={AssistantScreen} />
       <Stack.Screen name="Settings" component={SettingsNavigator} />
       <Stack.Screen name="Notes" component={NotesNavigator} />
+      <Stack.Screen name="Documents" component={DocumentsScreen} options={{ headerShown: true, title: "Documents" }} />
       <Stack.Screen name="Vault" component={VaultNavigator} />
       <Stack.Screen name="Vehicles" component={VehicleNavigator} />
       <Stack.Screen name="Inventory" component={InventoryNavigator} />

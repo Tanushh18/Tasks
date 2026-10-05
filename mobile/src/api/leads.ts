@@ -29,6 +29,8 @@ export interface Lead {
   /** Set when "Send" was pressed in the WhatsApp preview. Delivery can't be verified, so this only means "marked as sent". */
   whatsappSentAt?: string | null;
   whatsappTemplateId?: string | null;
+  /** Each time Send was pressed, oldest first (the server keeps the last 50). */
+  whatsappHistory?: { at: string; templateName?: string; byName?: string }[];
 }
 
 export interface StageCount {

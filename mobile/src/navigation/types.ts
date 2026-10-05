@@ -117,6 +117,7 @@ export type MoreStackParamList = {
   EmergencyInfo: NavigatorScreenParams<EmergencyStackParamList>;
   Polls: NavigatorScreenParams<PollsStackParamList>;
   WeeklySummary: undefined;
+  Documents: undefined;
   AdminUsers: undefined;
   FeatureFlags: undefined;
   DatabaseStorage: undefined;
