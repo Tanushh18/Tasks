@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       apk_url:
-        description: "URL of the APK to distribute (e.g. an EAS build artifact URL)"
+        description: "URL of the APK to distribute (e.g. https://github.com/Tanushh18/Tasks/releases/download/apk-latest/app-release.apk)"
         required: true
       testers:
         description: "Comma-separated tester emails"

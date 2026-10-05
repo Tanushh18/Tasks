@@ -106,19 +106,8 @@
       ],
       "./plugins/withAlarmSound.js",
       "./plugins/withGradleMemory.js",
-      "expo-sharing"
-    ],
-    "owner": "tanush18",
-    "updates": {
-      "url": "https://u.expo.dev/e767730c-591b-4400-8666-8aab6bbde252"
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "e767730c-591b-4400-8666-8aab6bbde252"
-      }
-    }
+      "expo-sharing",
+      "./plugins/withGithubOta.js"
+    ]
   }
 }

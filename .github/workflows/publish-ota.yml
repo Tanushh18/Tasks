@@ -1,0 +1,71 @@
+name: Publish OTA
+
+# Manual only: Actions -> Publish OTA -> Run workflow. Installed apps pick the bundle up within ~30 minutes of
+# being opened and run it the launch after. JS-only changes: native code, permissions, plugins and new images
+# need "Build APK" with a bumped `version` in mobile/app.json instead.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # uploads the bundle to the ota-<version> release
+
+env:
+  EXPO_PUBLIC_API_URLS: https://tasks-g9h1.onrender.com/api, https://we-three-api.onrender.com/api
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set build versions
+        run: |
+          echo "EXPO_PUBLIC_OTA_VERSION=$(date +%s)" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_RUNTIME_VERSION=$(node -p "require('./app.json').expo.version")" >> "$GITHUB_ENV"
+
+      # Same two steps Gradle runs for the APK: Metro bundle, then Hermes bytecode.
+      - name: Bundle JavaScript
+        run: |
+          mkdir -p "$RUNNER_TEMP/ota"
+          npx expo export:embed --platform android --dev false --entry-file index.ts \
+            --bundle-output "$RUNNER_TEMP/ota/index.js" --assets-dest "$RUNNER_TEMP/ota/res"
+          node_modules/hermes-compiler/hermesc/linux64-bin/hermesc -O -emit-binary \
+            -out "$RUNNER_TEMP/ota/index.android.bundle" "$RUNNER_TEMP/ota/index.js"
+
+      - name: Write manifest
+        run: |
+          SIZE=$(stat -c %s "$RUNNER_TEMP/ota/index.android.bundle")
+          node -e "
+            const fs=require('fs');
+            fs.writeFileSync(process.argv[1], JSON.stringify({
+              version: Number(process.env.EXPO_PUBLIC_OTA_VERSION),
+              runtimeVersion: process.env.EXPO_PUBLIC_RUNTIME_VERSION,
+              size: Number(process.argv[2]),
+              commit: process.env.GITHUB_SHA,
+            }));" "$RUNNER_TEMP/ota/ota-manifest.json" "$SIZE"
+          cat "$RUNNER_TEMP/ota/ota-manifest.json"
+
+      # One rolling release per runtime version; the app reads
+      # https://github.com/<owner>/<repo>/releases/download/ota-<version>/ota-manifest.json
+      - name: Upload to the ota-${{ env.EXPO_PUBLIC_RUNTIME_VERSION }} release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="ota-$EXPO_PUBLIC_RUNTIME_VERSION"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "OTA $EXPO_PUBLIC_RUNTIME_VERSION" --notes "Over-the-air JS bundles for app version $EXPO_PUBLIC_RUNTIME_VERSION" --latest=false
+          # Bundle first, manifest last: the app only looks at the bundle once the manifest points to it.
+          gh release upload "$TAG" "$RUNNER_TEMP/ota/index.android.bundle" --clobber
+          gh release upload "$TAG" "$RUNNER_TEMP/ota/ota-manifest.json" --clobber

@@ -171,7 +171,7 @@ The application consists of three components:
 - **Docker**: Multi-stage build for production backend
 - **Deployment Platform**: Render.com (via render.yaml)
 - **Database Hosting**: MongoDB Atlas
-- **Mobile Build**: EAS (Expo Application Services)
+- **Mobile Build & OTA**: GitHub Actions (APK) and GitHub Releases (over-the-air JS updates) — see [docs/BUILD_AND_OTA.md](docs/BUILD_AND_OTA.md)
 - **Code Quality**: TypeScript for static type checking
 
 ## Project Structure
@@ -218,7 +218,6 @@ Tasks/
 │   │   ├── voice/             # Speech recognition & TTS
 │   │   └── features/          # Feature flags
 │   ├── .env.example           # Environment variables template
-│   ├── eas.json               # EAS build configuration
 │   ├── package.json           # Dependencies
 │   ├── tsconfig.json          # TypeScript configuration
 │   └── app.json               # Expo app manifest
@@ -369,7 +368,7 @@ The backend exposes the following API routes (all prefixed with `/api`):
    - The app uses `expo-speech-recognition` which requires native code
    - **Cannot** run on Expo Go anymore
    - **Must** use a dev-client build: `npx expo run:android` or `npx expo run:ios`
-   - Or build via EAS: `eas build --platform android --profile preview`
+   - Or build an APK on GitHub: Actions → Build APK (see [docs/BUILD_AND_OTA.md](docs/BUILD_AND_OTA.md))
 
 6. **Start development**:
    ```bash
@@ -718,22 +717,11 @@ docker run -p 4000:4000 \
 
 ### Mobile App Deployment
 
-**iOS App Store**:
-```bash
-cd mobile
-eas build --platform ios
-eas submit --platform ios
-```
+**Android APK / OTA**: built by GitHub Actions, no Expo account needed. See [docs/BUILD_AND_OTA.md](docs/BUILD_AND_OTA.md).
 
-**Google Play Store**:
-```bash
-cd mobile
-eas build --platform android
-eas submit --platform android
-```
+**iOS App Store / Google Play Store**: not set up. Generate the native project with `npx expo prebuild`, then build and submit it with Xcode / Android Studio.
 
 **Requires**:
-- EAS account (free tier available)
 - Apple Developer account (paid, $99/year)
 - Google Play Developer account (paid, $25 one-time)
 
