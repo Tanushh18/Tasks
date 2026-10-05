@@ -1,5 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, Switch, Text, View } from "react-native";
 import { getApiErrorMessage } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
@@ -14,7 +14,9 @@ import { ALLOWED_SENDERS_LABEL } from "../../expenses/senderAllowList";
 import { hasSmsPermission, requestSmsPermission, smsReaderAvailable } from "../../expenses/smsReader";
 import {
   BACKFILL_LABELS,
+  cancelUpiBackfill,
   getUpiHistory,
+  onUpiSettingsChanged,
   getUpiSettings,
   saveParsedMessage,
   setUpiTrackingEnabled,
@@ -25,6 +27,7 @@ import {
   type SyncProgress,
   type UpiSettings,
 } from "../../expenses/upiExpenseSync";
+import { clearSmsLog, exportSmsLog, getSmsLogStats } from "../../expenses/upiSmsLog";
 import { loadUpiMonths, loadUpiMonthTransactions, type MonthRow } from "../../expenses/upiMonths";
 import { parseUpiSms, type ParsedUpiSms } from "../../expenses/upiSmsParser";
 import { useTheme } from "../../theme/useTheme";
@@ -44,6 +47,12 @@ function formatWhen(ms?: number): string {
   return ms ? new Date(ms).toLocaleString() : "Never";
 }
 
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function UpiExpenseTrackerScreen() {
   const { colors, spacing, typography } = useTheme();
   const { user } = useAuth();
@@ -59,11 +68,16 @@ export function UpiExpenseTrackerScreen() {
   const [sample, setSample] = useState("");
   const [tested, setTested] = useState<{ text: string; parsed: ParsedUpiSms | null } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [log, setLog] = useState({ count: 0, bytes: 0 });
+
+  // The import saves its progress after every batch, so the screen follows it live.
+  useEffect(() => onUpiSettingsChanged(setSettings), []);
 
   const refresh = useCallback(async () => {
     setSettings(await getUpiSettings());
     setPermission(hasSmsPermission());
     setHistory(await getUpiHistory());
+    setLog(await getSmsLogStats());
     try {
       setMonths(await loadUpiMonths());
       setMonthsError(null);
@@ -105,6 +119,33 @@ export function UpiExpenseTrackerScreen() {
     const s = await setUpiTrackingEnabled(true, user?.id);
     setSettings(s);
     if (granted) await run(s.range);
+  }
+
+  async function cancelImport() {
+    await cancelUpiBackfill();
+    await refresh();
+  }
+
+  async function exportLog() {
+    try {
+      const uri = await exportSmsLog();
+      if (!uri) Alert.alert("Nothing to export", "The message log is empty.");
+    } catch (err) {
+      Alert.alert("Couldn't export", getApiErrorMessage(err));
+    }
+  }
+
+  function confirmClearLog() {
+    Alert.alert("Clear message log?", "This deletes the saved message text on this phone. Your Money transactions are not affected.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Clear log",
+        style: "destructive",
+        onPress: () => {
+          void clearSmsLog().then(refresh);
+        },
+      },
+    ]);
   }
 
   async function grant() {
@@ -176,7 +217,7 @@ export function UpiExpenseTrackerScreen() {
           />
         </View>
         <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.sm }]}>
-          {`Reading only ${ALLOWED_SENDERS_LABEL}. Message text is never stored; only the amount, date, payee and reference are saved to Money.`}
+          {`Reading only ${ALLOWED_SENDERS_LABEL}. Only the amount, date, payee and reference are saved to Money; the message text stays in a log file on this phone (see Message log below).`}
         </Text>
         {smsReaderAvailable && enabled && !permission ? (
           <Button label="Allow SMS access" onPress={grant} style={{ marginTop: spacing.md }} />
@@ -190,6 +231,16 @@ export function UpiExpenseTrackerScreen() {
               <Text testID="upi-progress" style={[typography.captionStrong, { color: colors.primary, marginTop: spacing.sm }]}>
                 {`Scanning… ${progress.scanned} messages read, ${progress.saved} saved`}
               </Text>
+            ) : null}
+            {settings?.backfill?.active ? (
+              <View style={{ marginTop: spacing.sm }}>
+                <Text testID="upi-backfill" style={[typography.captionStrong, { color: colors.primary }]}>
+                  {busy
+                    ? `Import in progress — ${settings.backfill.scanned} messages read, ${settings.backfill.saved} saved`
+                    : `Import paused — will continue automatically (${settings.backfill.scanned} read, ${settings.backfill.saved} saved so far)`}
+                </Text>
+                <Button label="Cancel import" accessibilityLabel="Cancel import" variant="secondary" onPress={() => void cancelImport()} style={{ marginTop: spacing.xs }} />
+              </View>
             ) : null}
             <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.xs }]}>Old messages to import</Text>
             <SegmentedControl segments={RANGE_SEGMENTS} value={settings?.range ?? "all"} onChange={(v) => void chooseRange(v)} scrollable />
@@ -246,6 +297,20 @@ export function UpiExpenseTrackerScreen() {
           </View>
         ))
       )}
+
+      <SectionHeader title="Message log" subtitle="Every bank message read, saved as JSON on this phone" />
+      <Card style={{ marginBottom: spacing.lg }}>
+        <Text testID="upi-log-stats" style={[typography.bodyStrong, { color: colors.text }]}>
+          {`${log.count} ${log.count === 1 ? "message" : "messages"} · ${formatBytes(log.bytes)}`}
+        </Text>
+        <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.xs }]}>
+          This log is stored only on this phone. It contains the full text of each message, including any OTPs the bank sent. It is never uploaded and is shared only when you tap Export.
+        </Text>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: spacing.md }}>
+          <Button label="Export log (JSON)" accessibilityLabel="Export log (JSON)" variant="secondary" onPress={() => void exportLog()} disabled={log.count === 0} style={{ flex: 1 }} />
+          <Button label="Clear log" accessibilityLabel="Clear log" variant="secondary" onPress={confirmClearLog} disabled={log.count === 0} style={{ flex: 1 }} />
+        </View>
+      </Card>
 
       <SectionHeader title="Test a message" subtitle="Paste a bank SMS to see what is read from it" />
       <TextField label="SMS text" value={sample} onChangeText={setSample} multiline autoCapitalize="none" placeholder="Debited Rs 200.00 from a/c X1234 …" />
