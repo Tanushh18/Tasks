@@ -41,10 +41,32 @@ jobs:
         working-directory: mobile
         run: npm ci
 
-      - name: Create or link new EAS project
+      # The EXPO_TOKEN secret decides which Expo account builds: ask Expo who the token belongs to,
+      # drop the old account's project id/owner from app.json (it would be "not authorized" for a
+      # different account) and let `eas init` create/link the project under the token's own account.
+      - name: Create or link EAS project under the token's own account
         if: ${{ !inputs.apk_url }}
         working-directory: mobile
-        run: eas init --account tanushhhhh18 --force --non-interactive
+        run: |
+          EXPO_USER=$(eas whoami | head -n 1 | awk '{print $1}')
+          if [ -z "$EXPO_USER" ]; then echo "Could not read the Expo username from the token" >&2; exit 1; fi
+          echo "Building as Expo account: $EXPO_USER"
+          node -e "
+            const fs=require('fs'); const f='app.json'; const j=JSON.parse(fs.readFileSync(f,'utf8'));
+            const e=j.expo||j; e.owner=process.argv[1];
+            if(e.extra&&e.extra.eas) delete e.extra.eas.projectId;
+            if(e.updates) delete e.updates.url;
+            fs.writeFileSync(f, JSON.stringify(j,null,2));
+          " "$EXPO_USER"
+          eas init --account "$EXPO_USER" --force --non-interactive
+          node -e "
+            const fs=require('fs'); const f='app.json'; const j=JSON.parse(fs.readFileSync(f,'utf8'));
+            const e=j.expo||j; const id=e.extra&&e.extra.eas&&e.extra.eas.projectId;
+            if(!id){console.error('eas init did not set a projectId');process.exit(1);}
+            e.updates=Object.assign({}, e.updates, {url:'https://u.expo.dev/'+id});
+            fs.writeFileSync(f, JSON.stringify(j,null,2));
+            console.log('EXPO_OWNER='+e.owner+' EXPO_PROJECT_ID='+id);
+          "
 
       - name: Build Android APK (${{ inputs.profile || 'preview' }})
         if: ${{ !inputs.apk_url }}
