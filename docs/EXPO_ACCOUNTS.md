@@ -8,9 +8,10 @@
 | Used by | `.github/workflows/eas-build.yml` (APK + Firebase + OTA) and `.github/workflows/eas-update.yml` (OTA only) |
 | Which Expo account | `tanush18` (project `we-three-t23`, project id `e767730c-591b-4400-8666-8aab6bbde252`, saved in `mobile/app.json`) |
 
-This one account is the **main account for both APK builds and OTA updates**. Keep using it until its
-free Android build limit is used up (the error reads "This account has used its Android builds from the
-Free plan this month"; it resets monthly).
+APKs are now built **on the GitHub Actions runner** (`eas build --local`), not on Expo's servers, so the Expo
+free-plan build limit no longer applies. The Expo account is still used for signing credentials, the project
+link and OTA updates (`eas update`), which have their own, much larger limits. GitHub Actions minutes are the
+new limit (private repos: about 2,000 free minutes a month; an Android build takes roughly 15-20 minutes).
 
 ## Secret to add when the main account runs out
 
