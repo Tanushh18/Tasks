@@ -105,6 +105,7 @@
         }
       ],
       "./plugins/withAlarmSound.js",
+      "./plugins/withGradleMemory.js",
       "expo-sharing"
     ],
     "owner": "tanush18",
