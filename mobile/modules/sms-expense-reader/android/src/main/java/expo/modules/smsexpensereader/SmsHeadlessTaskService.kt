@@ -26,7 +26,14 @@ class SmsHeadlessTaskService : HeadlessJsTaskService() {
         context.startService(Intent(context, SmsHeadlessTaskService::class.java))
         acquireWakeLockNow(context)
       } catch (_: Exception) {
-        // Background start not allowed right now.
+        // Background start not allowed right now. The SMS stays queued natively; make sure the
+        // foreground tracking service is up (it keeps the process alive); the queue is drained
+        // the next time the app opens.
+        try {
+          SmsTrackingService.ensureRunning(context)
+        } catch (_: Exception) {
+          // ignore
+        }
       }
     }
   }

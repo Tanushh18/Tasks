@@ -5,6 +5,14 @@
   <uses-permission android:name="android.permission.RECEIVE_SMS" />
   <!-- Keep the phone awake for the few seconds the background save takes. -->
   <uses-permission android:name="android.permission.WAKE_LOCK" />
+  <!-- Always-on tracking service (foreground, specialUse) and its notification (Android 13+ asks at runtime). -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <!-- Restart the tracking service after a reboot / app update. -->
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <!-- One-tap "allow running in the background" (battery optimisation) prompt. -->
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
   <application>
     <receiver
@@ -18,5 +26,23 @@
     <service
       android:name="expo.modules.smsexpensereader.SmsHeadlessTaskService"
       android:exported="false" />
+    <service
+      android:name="expo.modules.smsexpensereader.SmsTrackingService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Keeps the app running so incoming bank SMS can be saved as UPI expenses while the app is closed" />
+    </service>
+    <receiver
+      android:name="expo.modules.smsexpensereader.BootReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+    </receiver>
   </application>
 </manifest>

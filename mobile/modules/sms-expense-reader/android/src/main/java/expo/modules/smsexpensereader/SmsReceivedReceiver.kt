@@ -32,6 +32,12 @@ class SmsReceivedReceiver : BroadcastReceiver() {
           needsHeadless = true
         }
       }
+      // Self-heal: if tracking is ON but the service died (OEM kill), bring it back now.
+      try {
+        SmsTrackingService.ensureRunning(context)
+      } catch (_: Exception) {
+        // ignore
+      }
       if (needsHeadless) SmsHeadlessTaskService.start(context)
     } catch (_: Exception) {
       // Never crash the receiver.
