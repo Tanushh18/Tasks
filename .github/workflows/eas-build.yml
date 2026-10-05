@@ -20,6 +20,11 @@ on:
       apk_url:
         description: "Optional: skip the build and distribute this existing EAS APK URL to the testers"
         default: ""
+      builder:
+        description: "expo = build on Expo's servers (uses the monthly free-plan build limit); github = build on this GitHub runner (no Expo build limit, uses free GitHub Actions minutes)"
+        type: choice
+        options: [expo, github]
+        default: expo
 
 jobs:
   build:
@@ -68,15 +73,28 @@ jobs:
             console.log('EXPO_OWNER='+e.owner+' EXPO_PROJECT_ID='+id);
           "
 
+      - uses: actions/setup-java@v4
+        if: ${{ !inputs.apk_url && inputs.builder == 'github' }}
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Same build as EAS runs, but executed on this runner: it does not use Expo's build quota. Signing
+      # credentials still come from the Expo project, so the APK installs over the existing app.
+      - name: Build Android APK on GitHub (${{ inputs.profile || 'preview' }})
+        if: ${{ !inputs.apk_url && inputs.builder == 'github' }}
+        working-directory: mobile
+        run: eas build --platform android --profile ${{ inputs.profile || 'preview' }} --local --non-interactive --output "$GITHUB_WORKSPACE/app-preview.apk"
+
       - name: Build Android APK (${{ inputs.profile || 'preview' }})
-        if: ${{ !inputs.apk_url }}
+        if: ${{ !inputs.apk_url && inputs.builder != 'github' }}
         working-directory: mobile
         # --no-wait is removed so the job blocks until the build finishes and
         # we can fetch the resulting APK URL for Firebase distribution below.
         run: eas build --platform android --profile ${{ inputs.profile || 'preview' }} --non-interactive --json > eas-build-output.json
 
       - name: Resolve build artifact URL
-        if: ${{ !inputs.apk_url }}
+        if: ${{ !inputs.apk_url && inputs.builder != 'github' }}
         working-directory: mobile
         run: |
           ARTIFACT_URL=$(node -e "console.log(require('./eas-build-output.json')[0].artifacts.buildUrl)")
@@ -87,6 +105,7 @@ jobs:
           echo "ARTIFACT_URL=$ARTIFACT_URL" >> "$GITHUB_ENV"
 
       - name: Download APK
+        if: ${{ inputs.apk_url || inputs.builder != 'github' }}
         env:
           APK_URL: ${{ inputs.apk_url }}
         run: curl -fL "${APK_URL:-$ARTIFACT_URL}" -o app-preview.apk
