@@ -1,9 +1,12 @@
 import { Router } from "express";
 import * as financeController from "../controllers/financeController";
-import { requireAuth } from "../middleware/auth";
+import { requireAdmin, requireAuth } from "../middleware/auth";
 import { validateRequest } from "../middleware/validateRequest";
 import {
   assignTransactionSchema,
+  bulkTransactionsSchema,
+  categoryMonthsQuerySchema,
+  parseSmsSchema,
   createAccountSchema,
   createTransactionSchema,
   emailExportSchema,
@@ -37,6 +40,18 @@ router.post(
 
 router.post("/export", validateRequest({ body: exportSchema }), financeController.exportReport);
 router.post("/export/email", validateRequest({ body: emailExportSchema }), financeController.emailReport);
+
+router.post(
+  "/transactions/bulk",
+  validateRequest({ body: bulkTransactionsSchema }),
+  financeController.createTransactionsBulk
+);
+router.get(
+  "/category-months",
+  validateRequest({ query: categoryMonthsQuerySchema }),
+  financeController.getCategoryMonths
+);
+router.post("/parse-sms", requireAdmin, validateRequest({ body: parseSmsSchema }), financeController.parseSms);
 
 router.get(
   "/transactions",

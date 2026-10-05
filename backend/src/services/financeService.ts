@@ -142,6 +142,73 @@ export async function createTransaction(userId: string, input: TransactionInput)
   });
 }
 
+export interface BulkResultRow {
+  index: number;
+  status: "created" | "duplicate" | "failed";
+  error?: string;
+  /** True when the failure is the caller's data (bad account, settled period): retrying won't help. */
+  permanent?: boolean;
+}
+
+/**
+ * Creates many transactions in one request (used by the UPI SMS back-fill). Each item is independent and
+ * idempotent via its idempotencyKey; a failure on one never stops the rest. Dates of any age are accepted.
+ */
+export async function createTransactionsBulk(userId: string, items: TransactionInput[]): Promise<BulkResultRow[]> {
+  const rows: BulkResultRow[] = [];
+  for (let index = 0; index < items.length; index++) {
+    const item = items[index];
+    try {
+      const existing = item.idempotencyKey
+        ? await Transaction.exists({ userId, idempotencyKey: item.idempotencyKey })
+        : null;
+      if (existing) {
+        rows.push({ index, status: "duplicate" });
+        continue;
+      }
+      await createTransaction(userId, item);
+      rows.push({ index, status: "created" });
+    } catch (err) {
+      // A parallel request may have created the same key between the check and the insert.
+      if ((err as { code?: number }).code === 11000) {
+        rows.push({ index, status: "duplicate" });
+      } else {
+        const status = (err as { status?: number }).status ?? 500;
+        rows.push({
+          index,
+          status: "failed",
+          error: err instanceof Error ? err.message : "Failed",
+          permanent: status >= 400 && status < 500,
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+/** Cash in / out and entry count per calendar month (YYYY-MM) for one category, newest month first. */
+export async function getCategoryMonths(userId: string, category: string) {
+  const rows = await Transaction.aggregate([
+    { $match: { userId: new Types.ObjectId(userId), category } },
+    {
+      $group: {
+        _id: { month: { $substr: ["$date", 0, 7] }, type: "$type" },
+        total: { $sum: "$amount" },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+  const months = new Map<string, { month: string; cashIn: number; cashOut: number; count: number }>();
+  for (const r of rows) {
+    const m = months.get(r._id.month) ?? { month: r._id.month as string, cashIn: 0, cashOut: 0, count: 0 };
+    if (r._id.type === "IN") m.cashIn += r.total;
+    else m.cashOut += r.total;
+    m.count += r.count;
+    months.set(m.month, m);
+  }
+  return [...months.values()].sort((a, b) => b.month.localeCompare(a.month));
+}
+
 export async function updateTransaction(
   userId: string,
   transactionId: string,

@@ -120,6 +120,7 @@ export type MoreStackParamList = {
   AdminUsers: undefined;
   FeatureFlags: undefined;
   DatabaseStorage: undefined;
+  UpiExpenseTracker: undefined;
   SyncCenter: undefined;
   EventsList: undefined;
   EventForm: { eventId?: string } | undefined;

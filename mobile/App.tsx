@@ -7,6 +7,7 @@ import { refreshServerList } from "./src/api/registry";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
 import { FeatureFlagsProvider, useFeatureFlags } from "./src/features/FeatureFlagsContext";
 import { CallFollowUpHost, ContactSuggestionsHost } from "./src/leads/LeadPopups";
+import { useUpiExpenseSync } from "./src/expenses/useUpiExpenseSync";
 import { useLeadContactSync } from "./src/leads/useLeadContactSync";
 import { useVehicleReminderSync } from "./src/notifications/useVehicleReminderSync";
 import { startLocationTracking } from "./src/location/backgroundLocationTask";
@@ -26,6 +27,7 @@ function AppContent() {
   useOtaUpdates();
   useLeadContactSync();
   useVehicleReminderSync();
+  useUpiExpenseSync();
 
   const { isAuthenticated } = useAuth();
   const { flags } = useFeatureFlags();

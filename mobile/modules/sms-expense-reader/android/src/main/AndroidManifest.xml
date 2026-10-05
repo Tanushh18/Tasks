@@ -1,0 +1,22 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Read bank SMS in the inbox to find UPI debits/credits (admin-only "UPI expense tracking"). -->
+  <uses-permission android:name="android.permission.READ_SMS" />
+  <!-- Be told the moment a new SMS arrives (even when the app is closed). -->
+  <uses-permission android:name="android.permission.RECEIVE_SMS" />
+  <!-- Keep the phone awake for the few seconds the background save takes. -->
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <application>
+    <receiver
+      android:name="expo.modules.smsexpensereader.SmsReceivedReceiver"
+      android:exported="true"
+      android:permission="android.permission.BROADCAST_SMS">
+      <intent-filter>
+        <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+      </intent-filter>
+    </receiver>
+    <service
+      android:name="expo.modules.smsexpensereader.SmsHeadlessTaskService"
+      android:exported="false" />
+  </application>
+</manifest>

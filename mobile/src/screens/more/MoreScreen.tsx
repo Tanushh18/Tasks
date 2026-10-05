@@ -115,6 +115,9 @@ export function MoreScreen({ navigation }: Props) {
         <MoreRow icon="server-outline" label="Database storage" admin onPress={() => navigation.navigate("DatabaseStorage")} />
       ) : null}
       {user?.isAdmin ? (
+        <MoreRow icon="swap-vertical-outline" label="UPI expense tracking" admin onPress={() => navigation.navigate("UpiExpenseTracker")} />
+      ) : null}
+      {user?.isAdmin ? (
         <MoreRow icon="flag-outline" label="Feature Flags" admin onPress={() => navigation.navigate("FeatureFlags")} />
       ) : null}
     </ScreenContainer>

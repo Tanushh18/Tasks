@@ -53,7 +53,9 @@
         "android.permission.WRITE_CONTACTS",
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.READ_PHONE_STATE",
-        "android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+        "android.permission.READ_SMS",
+        "android.permission.RECEIVE_SMS"
       ],
       "package": "com.tanush.wethree"
     },

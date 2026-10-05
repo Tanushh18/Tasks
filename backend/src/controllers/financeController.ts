@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import * as financeService from "../services/financeService";
+import * as smsParseService from "../services/smsParseService";
 import { buildFinanceWorkbook, exportFileName, exportSummaryText, XLSX_MIME } from "../services/exportService";
 import { sendMail } from "../services/mailService";
 import { User } from "../models/User";
@@ -149,4 +150,23 @@ export const emailReport = asyncHandler(async (req: Request, res: Response) => {
     attachments: [{ filename: fileName, content: buffer, contentType: XLSX_MIME }],
   });
   res.json({ sent: true, recipients: req.body.recipients, entryCount: data.transactions.length });
+});
+
+export const createTransactionsBulk = asyncHandler(async (req: Request, res: Response) => {
+  const { items } = req.body as { items: Parameters<typeof financeService.createTransactionsBulk>[1] };
+  const results = await financeService.createTransactionsBulk(req.userId!, items);
+  res.json({ results });
+});
+
+export const getCategoryMonths = asyncHandler(async (req: Request, res: Response) => {
+  const { category } = req.query as { category: string };
+  const months = await financeService.getCategoryMonths(req.userId!, category);
+  res.json({ months });
+});
+
+/** Admin-only AI fallback for a bank SMS the app's own parser couldn't read. The text is not stored. */
+export const parseSms = asyncHandler(async (req: Request, res: Response) => {
+  const { body } = req.body as { body: string };
+  const transaction = await smsParseService.parseSmsWithAi(body);
+  res.json({ transaction });
 });

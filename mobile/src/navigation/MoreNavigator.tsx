@@ -3,6 +3,7 @@ import React from "react";
 import { AssistantScreen } from "../screens/assistant/AssistantScreen";
 import { AdminUsersScreen } from "../screens/admin/AdminUsersScreen";
 import { DatabaseStorageScreen } from "../screens/admin/DatabaseStorageScreen";
+import { UpiExpenseTrackerScreen } from "../screens/admin/UpiExpenseTrackerScreen";
 import { FeatureFlagsScreen } from "../screens/admin/FeatureFlagsScreen";
 import { EventFormScreen } from "../screens/events/EventFormScreen";
 import { EventsListScreen } from "../screens/events/EventsListScreen";
@@ -48,6 +49,7 @@ export function MoreNavigator() {
       />
       <Stack.Screen name="AdminUsers" component={AdminUsersScreen} options={{ headerShown: true, title: "Admin" }} />
       <Stack.Screen name="DatabaseStorage" component={DatabaseStorageScreen} options={{ headerShown: true, title: "Database storage" }} />
+      <Stack.Screen name="UpiExpenseTracker" component={UpiExpenseTrackerScreen} options={{ headerShown: true, title: "UPI expense tracking" }} />
       <Stack.Screen name="FeatureFlags" component={FeatureFlagsScreen} options={{ headerShown: true, title: "Feature Flags" }} />
       <Stack.Screen name="SyncCenter" component={SyncCenterScreen} options={{ headerShown: true, title: "Sync Center" }} />
       <Stack.Screen name="EventsList" component={EventsListScreen} options={{ headerShown: true, title: "Family Events" }} />

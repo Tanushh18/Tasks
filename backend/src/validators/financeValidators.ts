@@ -28,6 +28,19 @@ export const createTransactionSchema = z.object({
   idempotencyKey: z.string().min(1).max(100).optional(),
 });
 
+export const bulkTransactionsSchema = z.object({
+  items: z.array(createTransactionSchema).min(1).max(100),
+});
+
+export const parseSmsSchema = z.object({
+  // Only the SMS text is ever sent; it is not stored.
+  body: z.string().trim().min(1).max(600),
+});
+
+export const categoryMonthsQuerySchema = z.object({
+  category: z.string().trim().min(1).max(60),
+});
+
 export const updateTransactionSchema = createTransactionSchema.partial();
 
 export const listTransactionsQuerySchema = z.object({

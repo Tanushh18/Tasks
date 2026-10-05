@@ -112,6 +112,54 @@ export async function createTransaction(input: TransactionInput): Promise<Transa
   return data.transaction;
 }
 
+export interface BulkTransactionResult {
+  index: number;
+  status: "created" | "duplicate" | "failed";
+  error?: string;
+  /** True when retrying can't help (bad account, settled period). */
+  permanent?: boolean;
+}
+
+/** Creates up to 100 transactions in one request; each item is idempotent via its idempotencyKey. */
+export async function createTransactionsBulk(items: TransactionInput[]): Promise<BulkTransactionResult[]> {
+  const { data } = await apiClient.post<{ results: BulkTransactionResult[] }>(
+    "/finance/transactions/bulk",
+    { items },
+    { timeout: 60000 }
+  );
+  return data.results;
+}
+
+export interface AiParsedSms {
+  type: TransactionType;
+  amount: number;
+  date: string | null;
+  time: string | null;
+  merchant: string | null;
+  ref: string | null;
+  accountLast4: string | null;
+}
+
+/** Admin-only AI fallback for an SMS the on-device parser can't read. Sends only the message text; nothing is stored. */
+export async function parseSmsWithAi(body: string): Promise<AiParsedSms | null> {
+  const { data } = await apiClient.post<{ transaction: AiParsedSms | null }>("/finance/parse-sms", { body });
+  return data.transaction;
+}
+
+export interface CategoryMonth {
+  /** YYYY-MM */
+  month: string;
+  cashIn: number;
+  cashOut: number;
+  count: number;
+}
+
+/** Cash in / out and entry count per month for one category, newest month first. */
+export async function getCategoryMonths(category: string): Promise<CategoryMonth[]> {
+  const { data } = await apiClient.get<{ months: CategoryMonth[] }>("/finance/category-months", { params: { category } });
+  return data.months;
+}
+
 export async function updateTransaction(id: string, input: Partial<TransactionInput>): Promise<Transaction> {
   const { data } = await apiClient.put<{ transaction: Transaction }>(`/finance/transactions/${id}`, input);
   return data.transaction;

@@ -1,0 +1,6 @@
+{
+  "name": "sms-expense-reader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android-only: reads bank UPI debit/credit SMS on this phone so the admin's expenses can be tracked automatically."
+}
