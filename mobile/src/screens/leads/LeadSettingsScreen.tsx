@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, AppState, Linking, Platform, Pressable, Style
 import { getApiErrorMessage } from "../../api/client";
 import * as api from "../../api/leads";
 import { useAuth } from "../../auth/AuthContext";
+import { AdminBadge } from "../../components/AdminBadge";
 import { BottomSheet } from "../../components/BottomSheet";
 import { Button } from "../../components/Button";
 import { FilterChip, FilterChipGroup } from "../../components/FilterChip";
@@ -174,8 +175,11 @@ export function LeadSettingsScreen({ navigation }: any) {
     }
   };
 
-  const Section = ({ title }: { title: string }) => (
-    <Text style={[typography.captionStrong, { color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.sm }]}>{title}</Text>
+  const Section = ({ title, admin }: { title: string; admin?: boolean }) => (
+    <View style={{ flexDirection: "row", alignItems: "center", marginTop: spacing.lg, marginBottom: spacing.sm, gap: spacing.sm }}>
+      <Text style={[typography.captionStrong, { color: colors.textMuted }]}>{title}</Text>
+      {admin ? <AdminBadge /> : null}
+    </View>
   );
 
   const Row = ({
@@ -259,7 +263,7 @@ export function LeadSettingsScreen({ navigation }: any) {
 
       {isAdmin ? (
         <>
-          <Section title="SHEETS AND FILES" />
+          <Section title="SHEETS AND FILES" admin />
           <Row
             icon="grid-outline"
             title="Sheets"

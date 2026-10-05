@@ -119,6 +119,7 @@ export type MoreStackParamList = {
   WeeklySummary: undefined;
   AdminUsers: undefined;
   FeatureFlags: undefined;
+  DatabaseStorage: undefined;
   SyncCenter: undefined;
   EventsList: undefined;
   EventForm: { eventId?: string } | undefined;

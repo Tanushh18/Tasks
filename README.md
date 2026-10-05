@@ -469,6 +469,7 @@ All configuration is via environment variables in `backend/.env`:
 | `PORT` | 4000 | Server port |
 | `NODE_ENV` | development | Environment (development/production/test) |
 | `MONGO_URI` | (empty) | MongoDB connection string (empty = in-memory dev DB) |
+| `MONGODB_STORAGE_LIMIT_MB` | 512 | Storage quota shown in the admin "Database storage" screen (Atlas M0 free tier = 512) |
 | `JWT_ACCESS_SECRET` | (required) | Secret for signing access tokens |
 | `JWT_REFRESH_SECRET` | (required) | Secret for signing refresh tokens |
 | `JWT_ACCESS_EXPIRES_IN` | 15m | Access token expiry |

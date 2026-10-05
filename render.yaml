@@ -21,6 +21,9 @@ services:
         value: gemini-3.6-flash
       - key: MONGO_URI
         sync: false
+      # Quota shown in the admin Database storage screen (Atlas M0 free tier = 512 MB).
+      - key: MONGODB_STORAGE_LIMIT_MB
+        value: "512"
       - key: GEMINI_API_KEY
         sync: false
       # Cloudinary stores uploaded documents/photos. If unset, uploads fall back to MongoDB base64.

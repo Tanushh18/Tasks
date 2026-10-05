@@ -4,6 +4,7 @@ import { Alert, FlatList, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as adminApi from "../../api/admin";
 import { getApiErrorMessage } from "../../api/client";
+import { AdminBadge } from "../../components/AdminBadge";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -113,6 +114,7 @@ export function AdminUsersScreen() {
           contentContainerStyle={{ padding: spacing.lg, flexGrow: 1 }}
           ListHeaderComponent={
             <View style={{ marginBottom: spacing.lg }}>
+              <AdminBadge style={{ marginBottom: spacing.md }} />
               <SectionHeader title="Family Overview" subtitle="No enterprise roles here — every account is equal except who's admin." />
               <View style={{ flexDirection: "row", gap: spacing.sm }}>
                 <StatCard label="People" value={String(overview.totalUsers)} icon="people" tone={colors.primary} toneMuted={colors.primaryMuted} style={{ flex: 1 }} />

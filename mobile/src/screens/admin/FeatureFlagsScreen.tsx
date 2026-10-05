@@ -3,6 +3,7 @@ import { Alert, Switch, Text, View } from "react-native";
 import * as adminApi from "../../api/admin";
 import { getApiErrorMessage } from "../../api/client";
 import type { FeatureFlags } from "../../api/features";
+import { AdminBadge } from "../../components/AdminBadge";
 import { Card } from "../../components/Card";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { SkeletonLines } from "../../components/Skeleton";
@@ -68,6 +69,7 @@ export function FeatureFlagsScreen() {
 
   return (
     <ScreenContainer>
+      <AdminBadge style={{ marginBottom: spacing.md }} />
       <Text accessibilityRole="header" style={[typography.h1, { color: colors.text, marginBottom: spacing.xl }]}>
         Feature Flags
       </Text>

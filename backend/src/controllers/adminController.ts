@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import * as adminService from "../services/adminService";
+import { getStorageStatus } from "../services/storageService";
 
 function serializeUser(user: {
   _id: unknown;
@@ -90,4 +91,8 @@ export const getFeatures = asyncHandler(async (_req: Request, res: Response) => 
 export const updateFeatures = asyncHandler(async (req: Request, res: Response) => {
   const flags = await adminService.updateFeatureFlags(req.body);
   res.json({ features: serializeFlags(flags) });
+});
+
+export const getStorage = asyncHandler(async (_req: Request, res: Response) => {
+  res.json({ storage: await getStorageStatus() });
 });

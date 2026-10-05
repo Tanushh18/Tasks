@@ -3,6 +3,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../../auth/AuthContext";
+import { AdminBadge } from "../../components/AdminBadge";
 import { Card } from "../../components/Card";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { useFeatureFlags } from "../../features/FeatureFlagsContext";
@@ -108,10 +109,13 @@ export function MoreScreen({ navigation }: Props) {
         onPress={() => navigation.navigate("Settings", { screen: "SettingsMain", params: undefined })}
       />
       {user?.isAdmin ? (
-        <MoreRow icon="shield-checkmark-outline" label="Admin" onPress={() => navigation.navigate("AdminUsers")} />
+        <MoreRow icon="shield-checkmark-outline" label="Admin" admin onPress={() => navigation.navigate("AdminUsers")} />
       ) : null}
       {user?.isAdmin ? (
-        <MoreRow icon="flag-outline" label="Feature Flags" onPress={() => navigation.navigate("FeatureFlags")} />
+        <MoreRow icon="server-outline" label="Database storage" admin onPress={() => navigation.navigate("DatabaseStorage")} />
+      ) : null}
+      {user?.isAdmin ? (
+        <MoreRow icon="flag-outline" label="Feature Flags" admin onPress={() => navigation.navigate("FeatureFlags")} />
       ) : null}
     </ScreenContainer>
   );
@@ -120,10 +124,12 @@ export function MoreScreen({ navigation }: Props) {
 function MoreRow({
   icon,
   label,
+  admin,
   onPress,
 }: {
   icon: React.ComponentProps<typeof Ionicons>["name"];
   label: string;
+  admin?: boolean;
   onPress: () => void;
 }) {
   const { colors, spacing, typography, touchTarget } = useTheme();
@@ -134,6 +140,7 @@ function MoreRow({
         <View style={styles.flex}>
           <Text style={[typography.bodyStrong, { color: colors.text, marginLeft: spacing.md }]}>{label}</Text>
         </View>
+        {admin ? <AdminBadge style={{ marginRight: spacing.sm }} /> : null}
         <Ionicons name="chevron-forward" size={20} color={colors.textFaint} />
       </Card>
     </Pressable>

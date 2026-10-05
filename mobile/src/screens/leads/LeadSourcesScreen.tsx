@@ -6,6 +6,7 @@ import { getApiErrorMessage } from "../../api/client";
 import * as api from "../../api/leads";
 import { useAuth } from "../../auth/AuthContext";
 import { BottomSheet } from "../../components/BottomSheet";
+import { AdminBadge } from "../../components/AdminBadge";
 import { Button } from "../../components/Button";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { EmptyState, ErrorState, LoadingState } from "../../components/StateViews";
@@ -188,6 +189,7 @@ export function LeadSourcesScreen() {
       <Text style={[typography.body, { color: colors.textMuted, marginBottom: spacing.md }]}>
         Every signed-in user sees and edits all leads. A connected sheet only adds new ones, and each lead keeps its sheet name for the filter.
       </Text>
+      {isAdmin ? <AdminBadge style={{ marginBottom: spacing.sm }} /> : null}
       {isAdmin ? (
         <View style={[styles.buttons, { gap: spacing.sm, marginBottom: spacing.lg }]}>
           <Button label="Add Google Sheet" onPress={() => setAdding(true)} style={{ flex: 1 }} />

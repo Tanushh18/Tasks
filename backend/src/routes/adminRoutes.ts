@@ -12,6 +12,7 @@ router.get("/", adminController.listUsers);
 router.post("/:id/block", validateRequest({ params: idParamSchema }), adminController.blockUser);
 router.post("/:id/unblock", validateRequest({ params: idParamSchema }), adminController.unblockUser);
 router.post("/:id/reset-mpin", validateRequest({ params: idParamSchema }), adminController.resetMpin);
+router.get("/storage", adminController.getStorage);
 router.get("/features", adminController.getFeatures);
 router.patch(
   "/features",
