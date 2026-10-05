@@ -105,16 +105,16 @@
       "./plugins/withAlarmSound.js",
       "expo-sharing"
     ],
-    "owner": "tanushhhhh18",
+    "owner": "tanush18",
     "updates": {
-      "url": "https://u.expo.dev/d78e8fde-9b25-4197-a1fc-238021fae096"
+      "url": "https://u.expo.dev/e767730c-591b-4400-8666-8aab6bbde252"
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "extra": {
       "eas": {
-        "projectId": "d78e8fde-9b25-4197-a1fc-238021fae096"
+        "projectId": "e767730c-591b-4400-8666-8aab6bbde252"
       }
     }
   }

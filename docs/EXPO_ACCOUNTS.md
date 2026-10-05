@@ -6,7 +6,7 @@
 | --- | --- |
 | GitHub secret used by BOTH workflows | `EXPO_TOKEN_TANUSHCK84` |
 | Used by | `.github/workflows/eas-build.yml` (APK + Firebase + OTA) and `.github/workflows/eas-update.yml` (OTA only) |
-| Which Expo account | whichever account that token belongs to (the build detects it with `eas whoami`) |
+| Which Expo account | `tanush18` (project `we-three-t23`, project id `e767730c-591b-4400-8666-8aab6bbde252`, saved in `mobile/app.json`) |
 
 This one account is the **main account for both APK builds and OTA updates**. Keep using it until its
 free Android build limit is used up (the error reads "This account has used its Android builds from the
