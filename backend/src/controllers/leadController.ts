@@ -23,6 +23,7 @@ import {
   KNOWN_SHEET_LABELS,
   sourceDisplayName,
 } from "../services/leadService";
+import { OLF_LIST, seedOlfData } from "../services/olfSeed";
 import { escapeRegex } from "../services/rules/text";
 
 /** Owner of leads sent to the no-auth bulk import when no `ownerMobile` is given. */
@@ -43,6 +44,8 @@ function serializeLead(l: any) {
     id: String(_id),
     sourceIds: (l.sourceIds ?? []).map(String),
     alternatePhones: l.alternatePhones ?? [],
+    whatsappSentAt: l.whatsappSentAt ?? null,
+    whatsappTemplateId: l.whatsappTemplateId ? String(l.whatsappTemplateId) : null,
   };
 }
 
@@ -93,28 +96,40 @@ export async function listLeads(req: Request, res: Response) {
     return res.json({ leads: leads.map(serializeLead) });
   }
 
-  // Two queries per page: the page itself and one grouped count. Totals come from the group, so
-  // there is no separate countDocuments for the page total or for "all".
-  const [leads, grouped] = await Promise.all([
-    Lead.find(filter).sort(sort).skip((page - 1) * limit).limit(limit).lean(),
-    Lead.aggregate<{ _id: string; count: number }>([
-      { $match: { $and: base } },
-      { $group: { _id: "$status", count: { $sum: 1 } } },
-    ]),
+  // The grouped count gives the totals and also how many leads in this filter are still unsent. Pages are read as
+  // "unsent first (whatsappSentAt empty), then sent", each newest first, so a page that straddles the boundary is
+  // filled from both ranges and the stage filter / search / paging all keep working unchanged.
+  const grouped = await Lead.aggregate<{ _id: { status: string; sent: boolean }; count: number }>([
+    { $match: { $and: base } },
+    { $group: { _id: { status: "$status", sent: { $ne: [{ $ifNull: ["$whatsappSentAt", null] }, null] } }, count: { $sum: 1 } } },
   ]);
 
   const counts = new Map<string, number>();
   let totalAll = 0;
   let total = 0;
+  let unsentInFilter = 0;
   const wantAll = !status || status.toLowerCase() === "all";
   const wantNew = !wantAll && NEW_STATUS.test(status!);
   for (const g of grouped) {
-    const raw = g._id ?? "";
+    const raw = g._id.status ?? "";
     const key = NEW_STATUS.test(raw) ? "New" : String(raw).trim();
     counts.set(key, (counts.get(key) ?? 0) + g.count);
     totalAll += g.count;
-    if (wantAll || (wantNew ? NEW_STATUS.test(raw) : raw === status)) total += g.count;
+    if (wantAll || (wantNew ? NEW_STATUS.test(raw) : raw === status)) {
+      total += g.count;
+      if (!g._id.sent) unsentInFilter += g.count;
+    }
   }
+
+  const skip = (page - 1) * limit;
+  const unsentPart = skip < unsentInFilter
+    ? await Lead.find({ $and: [filter, { whatsappSentAt: null }] }).sort(sort).skip(skip).limit(limit).lean()
+    : [];
+  const need = limit - unsentPart.length;
+  const sentPart = need > 0
+    ? await Lead.find({ $and: [filter, { whatsappSentAt: { $ne: null } }] }).sort(sort).skip(Math.max(0, skip - unsentInFilter)).limit(need).lean()
+    : [];
+  const leads = [...unsentPart, ...sentPart];
 
   return res.json({
     leads: leads.map(serializeLead),
@@ -216,6 +231,14 @@ export async function updateLead(req: Request, res: Response) {
       lead.statusUpdatedAt = new Date();
       lead.notInterestedAt = isNotInterested(next) ? lead.notInterestedAt ?? new Date() : null;
     }
+  }
+
+  // "Sent" only means the person pressed Send in the WhatsApp preview; delivery can't be verified. Can be un-marked.
+  if ("whatsappSent" in b) {
+    if (typeof b.whatsappSent !== "boolean") return badRequest(res, "whatsappSent must be true or false");
+    lead.whatsappSentAt = b.whatsappSent ? new Date() : null;
+    const tid = typeof b.whatsappTemplateId === "string" && Types.ObjectId.isValid(b.whatsappTemplateId) ? b.whatsappTemplateId : null;
+    lead.whatsappTemplateId = b.whatsappSent && tid ? (new Types.ObjectId(tid) as any) : null;
   }
 
   if ("plotInFarukhNagar" in b) {
@@ -544,6 +567,16 @@ export async function adminImport(req: Request, res: Response) {
   if (!req.isAdmin) return adminOnly(res);
   const me = await User.findById(req.userId).select("name mobileNumber").lean();
   return runImport(req, res, req.userId!, { name: me?.name ?? "", mobileNumber: me?.mobileNumber ?? "" });
+}
+
+/**
+ * Admin-only: loads the built-in "OLF Data" list (backend/data/olfData.json) into the shared pool. Numbers that are
+ * already leads are left alone; anything not yet present is added, even if it was deleted earlier.
+ */
+export async function seedOlf(req: Request, res: Response) {
+  if (!req.isAdmin) return adminOnly(res);
+  const r = await seedOlfData({ userId: req.userId!, force: true });
+  return res.status(r.added ? 201 : 200).json({ list: OLF_LIST, ...r });
 }
 
 /**

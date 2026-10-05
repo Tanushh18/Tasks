@@ -183,7 +183,7 @@ export async function ensureList(name:string,createdBy?:string){
   return(await resolveList(name,createdBy)).name;
 }
 
-export interface NewLead{name?:string;phone?:string;status?:string;category?:string;notes?:string}
+export interface NewLead{name?:string;phone?:string;status?:string;category?:string;notes?:string;alternatePhones?:string[]}
 export async function addManualLeads(userId:string,items:NewLead[],list?:string){
   const source=await manualSourceFor(userId);
   const listName=cleanListName(list);
@@ -204,7 +204,8 @@ export async function addManualLeads(userId:string,items:NewLead[],list?:string)
       existing++;continue;
     }
     const status=clean(item.status,200);
-    await Lead.create({ownerId:userId,phone,name:clean(item.name,120),status,category:clean(item.category,80),notes:clean(item.notes,4000),sourceIds:[source._id],origin,originId:source._id,sheetDate:new Date(),...(isNotInterested(status)?{notInterestedAt:new Date()}:{})});
+    const alternatePhones=[...new Set((item.alternatePhones??[]).map(p=>normalizePhone(typeof p==="string"?p:"")).filter((p):p is string=>!!p&&p!==phone))];
+    await Lead.create({ownerId:userId,phone,name:clean(item.name,120),alternatePhones,status,category:clean(item.category,80),notes:clean(item.notes,4000),sourceIds:[source._id],origin,originId:source._id,sheetDate:new Date(),...(isNotInterested(status)?{notInterestedAt:new Date()}:{})});
     // Someone deliberately re-adding a number lifts the "deleted by cleanup" mark.
     await LeadTombstone.deleteOne({ownerId:userId,phone});
     addedPhones.push(phone);

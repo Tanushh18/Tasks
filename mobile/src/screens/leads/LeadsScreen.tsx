@@ -27,7 +27,9 @@ import { emitLeadEvent, onLeadEvent } from "../../leads/leadEvents";
 import { getLocalOrigins, isLocalFresh, queryLocalLeads, refreshLeadStoreIfStale, renameLocalOrigin } from "../../leads/leadStore";
 import { isUnreachableError } from "../../offline/httpQueue";
 import { bypassCacheBriefly } from "../../offline/httpCache";
+import { templateForOrigin } from "../../leads/whatsapp";
 import { useTheme, type Theme } from "../../theme/useTheme";
+import { WhatsAppPreviewSheet } from "./WhatsAppPreviewSheet";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -119,6 +121,10 @@ export function LeadsScreen({ navigation }: any) {
 
 
   const [overlay, setOverlay] = useState<OverlaySetup | null>(null);
+
+  // WhatsApp templates (shared, attached per sheet) and the lead whose preview is open.
+  const [templates, setTemplates] = useState<api.WhatsAppTemplate[]>([]);
+  const [waTarget, setWaTarget] = useState<{ lead: api.Lead; template: api.WhatsAppTemplate; digits: string } | null>(null);
 
   // Top-right button that opens the Leads settings (add, import, share, call pop-up, offline copy).
   useLayoutEffect(() => {
@@ -244,6 +250,8 @@ export function LeadsScreen({ navigation }: any) {
   useFocusEffect(
     useCallback(() => {
       loadSheets();
+      // Templates are edited in Leads settings; pick up changes when coming back. Offline: keep what we have.
+      api.listWhatsAppTemplates().then(setTemplates).catch(() => undefined);
     }, [loadSheets])
   );
 
@@ -350,15 +358,43 @@ export function LeadsScreen({ navigation }: any) {
 
   const requestOverlaySetupLater = () => AsyncStorage.setItem("leads.callOverlay.asked", "1").catch(() => undefined);
 
-  const whatsappLead = async (phone: string) => {
-    const digits = digitsFor(phone);
+  const whatsappLead = async (lead: api.Lead) => {
+    const digits = digitsFor(lead.phone);
     if (!digits) return;
+    // A sheet with a template opens the editable preview; any other lead opens the chat as before.
+    const template = templateForOrigin(templates, lead.origin);
+    if (template) {
+      setWaTarget({ lead, template, digits });
+      return;
+    }
     try {
       await Linking.openURL(`https://wa.me/${digits}`);
     } catch {
       Alert.alert("Unable to open WhatsApp");
     }
   };
+
+  /** Send was pressed in the preview. We can't verify delivery, so this only records "marked as sent". */
+  const markSent = (lead: api.Lead, template: api.WhatsAppTemplate) => {
+    const stamp = new Date().toISOString();
+    patchLead(lead.id, { whatsappSentAt: stamp, whatsappTemplateId: template.id });
+    api.setWhatsAppSent(lead.id, true, template.id).catch((e) => Alert.alert("Couldn't save \"sent\"", getApiErrorMessage(e)));
+  };
+
+  const confirmNotSent = (lead: api.Lead) =>
+    Alert.alert("WhatsApp sent", "This was marked as sent when Send was pressed. Mark it as not sent?", [
+      { text: "Keep", style: "cancel" },
+      {
+        text: "Mark as not sent",
+        onPress: () => {
+          patchLead(lead.id, { whatsappSentAt: null, whatsappTemplateId: null });
+          api.setWhatsAppSent(lead.id, false).catch((e) => Alert.alert("Couldn't update", getApiErrorMessage(e)));
+        },
+      },
+    ]);
+
+  const patchLead = (id: string, patch: Partial<api.Lead>) =>
+    setData((d) => (d ? { ...d, leads: d.leads.map((l) => (l.id === id ? { ...l, ...patch } : l)) } : d));
 
   const sync = async () => {
     setSyncing(true);
@@ -603,6 +639,19 @@ export function LeadsScreen({ navigation }: any) {
           </View>
         </View>
 
+        {item.whatsappSentAt ? (
+          <Pressable
+            onPress={() => confirmNotSent(item)}
+            onLongPress={() => confirmNotSent(item)}
+            accessibilityRole="button"
+            accessibilityLabel="WhatsApp sent. Tap to mark as not sent."
+            style={[styles.pill, { backgroundColor: colors.successMuted, alignSelf: "flex-start", marginTop: spacing.xs, flexDirection: "row", alignItems: "center", gap: 4 }]}
+          >
+            <Ionicons name="checkmark-done" size={12} color={colors.success} />
+            <Text style={[typography.captionStrong, { color: colors.success }]}>WhatsApp sent ✓</Text>
+          </Pressable>
+        ) : null}
+
         {added ? (
           <View style={[styles.stampRow, { marginTop: spacing.xs }]}>
             <Ionicons name="time-outline" size={12} color={colors.textFaint} />
@@ -667,7 +716,7 @@ export function LeadsScreen({ navigation }: any) {
             <Ionicons name="call" size={20} color={colors.onPrimary} />
           </Pressable>
           <Pressable
-            onPress={() => void whatsappLead(item.phone)}
+            onPress={() => void whatsappLead(item)}
             accessibilityRole="button"
             accessibilityLabel={`WhatsApp ${item.name || "lead"}`}
             style={({ pressed }) => [
@@ -771,7 +820,15 @@ export function LeadsScreen({ navigation }: any) {
         />
       )}
 
-      <BottomSheet visible={pickingSource} onClose={() => setPickingSource(false)} title="Show leads from" scrollable>
+      <WhatsAppPreviewSheet
+        visible={!!waTarget}
+        onClose={() => setWaTarget(null)}
+        template={waTarget?.template ?? null}
+        lead={waTarget ? { name: waTarget.lead.name, digits: waTarget.digits } : null}
+        onSent={(template) => waTarget && markSent(waTarget.lead, template)}
+      />
+
+      <BottomSheet visible={pickingSource}onClose={() => setPickingSource(false)} title="Show leads from" scrollable>
         {[{ name: ALL, label: "All leads", count: undefined as number | undefined }, ...sheets.map((x) => ({ name: x.name, label: x.name, count: x.count }))].map((opt) => (
           <Pressable
             key={opt.name}
