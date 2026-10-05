@@ -55,13 +55,16 @@ export async function requestSmsPermission(): Promise<boolean> {
   return hasSmsPermission();
 }
 
-/** Inbox messages newer than sinceMs, oldest first. [] when unavailable / not permitted / failing. */
-export async function readInbox(sinceMs: number, limit: number): Promise<SmsMessage[]> {
-  if (!Native) return [];
+/**
+ * Inbox messages newer than sinceMs, oldest first. [] means "nothing (more) there"; null means the read
+ * itself failed (so a resumable import pauses instead of believing the inbox ended).
+ */
+export async function readInbox(sinceMs: number, limit: number): Promise<SmsMessage[] | null> {
+  if (!Native) return null;
   try {
     return (await Native.readInbox(sinceMs, limit)) ?? [];
   } catch {
-    return [];
+    return null;
   }
 }
 

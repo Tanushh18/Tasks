@@ -2,6 +2,15 @@ import React from "react";
 import { Switch, Text } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { memFiles } from "../../../test-utils/fsMock";
+
+jest.mock("expo-file-system/legacy", () => require("../../../test-utils/fsMock").createFsMock());
+jest.mock("expo-sharing", () => ({ isAvailableAsync: jest.fn(async () => true), shareAsync: jest.fn(async () => undefined) }));
+jest.mock("../../../expenses/upiImportService", () => ({
+  SERVICE_SLICE_MS: 150000,
+  startImportService: jest.fn(async () => null),
+  registerUpiImportForegroundService: jest.fn(),
+}));
 
 jest.mock("@expo/vector-icons", () => {
   const { Text } = jest.requireActual("react-native");
@@ -38,7 +47,9 @@ jest.mock("../../../api/finance", () => ({
 }));
 
 import * as finance from "../../../api/finance";
-import { setUpiTrackingEnabled } from "../../../expenses/upiExpenseSync";
+import { setUpiTrackingEnabled, updateUpiSettings } from "../../../expenses/upiExpenseSync";
+import { logSmsBatch, resetSmsLogCache } from "../../../expenses/upiSmsLog";
+import * as Sharing from "expo-sharing";
 import { toMonthRow } from "../../../expenses/upiMonths";
 import { UpiExpenseTrackerScreen } from "../UpiExpenseTrackerScreen";
 
@@ -47,16 +58,25 @@ const api = finance as jest.Mocked<typeof finance>;
 const texts = (r: TestRenderer.ReactTestRenderer) =>
   r.root.findAllByType(Text).map((t) => [t.props.children].flat(Infinity).join("")).join("\n");
 
+const mounted: TestRenderer.ReactTestRenderer[] = [];
 async function render() {
   let r!: TestRenderer.ReactTestRenderer;
   await act(async () => {
     r = TestRenderer.create(<UpiExpenseTrackerScreen />);
   });
+  mounted.push(r);
   return r;
 }
 
+afterEach(() => {
+  // Unmount so a finished test's screen stops listening to settings changes.
+  act(() => mounted.splice(0).forEach((r) => r.unmount()));
+});
+
 beforeEach(async () => {
   await AsyncStorage.clear();
+  memFiles.clear();
+  resetSmsLogCache();
   mockSms.available = true;
   mockSms.permission = true;
   api.getCategoryMonths.mockResolvedValue([]);
@@ -133,6 +153,51 @@ describe("UpiExpenseTrackerScreen", () => {
     const payload = JSON.stringify(api.createTransactionsBulk.mock.calls[0][0]);
     expect(payload).toContain("upi-664394072564");
     expect(payload).not.toMatch(/Debited|Not you/);
+  });
+});
+
+describe("message log and import status", () => {
+  const FED = { id: "1", address: "VM-FEDBNK", body: "Debited Rs 200.00 from a/c X9229 on 04Oct26 13:35 via UPI to Facebook Ind. Ref 664394072564.Bal Rs 1.00 -Federal Bank", date: 1_700_000_000_000 };
+
+  it("shows the log count/size and the on-phone-only warning", async () => {
+    await logSmsBatch([FED], "inbox");
+    const out = texts(await render());
+    expect(out).toContain("Message log");
+    expect(out).toMatch(/1 message · \d/);
+    expect(out).toContain("stored only on this phone");
+    expect(out).toContain("including any OTPs");
+    expect(out).toContain("shared only when you tap Export");
+    expect(out).toContain("the message text stays in a log file on this phone");
+  });
+
+  it("exports the log through the share sheet and clears it after confirmation", async () => {
+    await logSmsBatch([FED], "inbox");
+    const r = await render();
+    await act(async () => {
+      r.root.findAllByProps({ accessibilityLabel: "Export log (JSON)" }).find((n) => n.props.onPress)!.props.onPress();
+    });
+    expect(Sharing.shareAsync).toHaveBeenCalledTimes(1);
+    const alert = jest.spyOn(require("react-native").Alert, "alert").mockImplementation(() => undefined);
+    await act(async () => {
+      r.root.findAllByProps({ accessibilityLabel: "Clear log" }).find((n) => n.props.onPress)!.props.onPress();
+    });
+    const buttons = alert.mock.calls[0][2] as Array<{ text: string; onPress?: () => void }>;
+    await act(async () => {
+      buttons.find((b) => b.text === "Clear log")!.onPress!();
+    });
+    expect(texts(r)).toContain("0 messages");
+    alert.mockRestore();
+  });
+
+  it("shows a paused import with counts and lets the owner cancel it", async () => {
+    await setUpiTrackingEnabled(true, "u1");
+    await updateUpiSettings({ backfill: { active: true, range: "all", cursorMs: 5, scanned: 400, saved: 120, startedAt: 1 } });
+    const r = await render();
+    expect(texts(r)).toContain("Import paused — will continue automatically (400 read, 120 saved so far)");
+    await act(async () => {
+      r.root.findAllByProps({ accessibilityLabel: "Cancel import" }).find((n) => n.props.onPress)!.props.onPress();
+    });
+    expect(texts(r)).not.toContain("Import paused");
   });
 });
 

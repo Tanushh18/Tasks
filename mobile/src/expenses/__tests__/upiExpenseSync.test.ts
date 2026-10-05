@@ -1,4 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { memFiles } from "../../test-utils/fsMock";
+
+jest.mock("expo-file-system/legacy", () => require("../../test-utils/fsMock").createFsMock());
+jest.mock("expo-sharing", () => ({ isAvailableAsync: jest.fn(async () => true), shareAsync: jest.fn(async () => undefined) }));
+jest.mock("../upiImportService", () => ({
+  SERVICE_SLICE_MS: 150000,
+  startImportService: jest.fn(async () => null),
+  registerUpiImportForegroundService: jest.fn(),
+}));
 
 const mockInbox: { current: { id: string; address: string; body: string; date: number }[] } = { current: [] };
 const mockQueue: { current: { id: string; address: string; body: string; date: number }[] } = { current: [] };
@@ -35,6 +44,7 @@ import {
   updateUpiSettings,
 } from "../upiExpenseSync";
 import { parseUpiSms } from "../upiSmsParser";
+import { readSmsLog, resetSmsLogCache } from "../upiSmsLog";
 
 const api = finance as jest.Mocked<typeof finance>;
 const rd = reader as jest.Mocked<typeof reader>;
@@ -54,6 +64,8 @@ let payloads: finance.TransactionInput[];
 
 beforeEach(async () => {
   await AsyncStorage.clear();
+  memFiles.clear();
+  resetSmsLogCache();
   jest.clearAllMocks();
   n = 0;
   mockInbox.current = [];
@@ -76,7 +88,7 @@ beforeEach(async () => {
 });
 
 describe("syncUpiExpenses", () => {
-  it("saves the three Federal Bank samples once, with no SMS text, and never calls the AI", async () => {
+  it("saves the three Federal Bank samples once, with no SMS text in payloads or history (only in the local log), and never calls the AI", async () => {
     mockInbox.current = [msg(S3, "VM-FEDBNK", BASE + 1), msg(S2, "VM-FEDBNK", BASE + 2), msg(S1, "VM-FEDBNK", BASE + 3)];
     const summary = await syncUpiExpenses();
     expect(summary).toMatchObject({ scanned: 3, saved: 3, incomplete: false });
@@ -94,6 +106,10 @@ describe("syncUpiExpenses", () => {
     const history = JSON.stringify(await getUpiHistory());
     expect(history).not.toMatch(/Debited|Not you/);
     expect((await getUpiHistory())[0]).toMatchObject({ status: "saved" });
+    // The text IS kept, but only in the local log file on the phone.
+    const log = await readSmsLog();
+    expect(log).toHaveLength(3);
+    expect(log.map((e) => e.body)).toContain(S1);
   });
 
   it("creates IN transactions as 'UPI from'", async () => {
@@ -143,7 +159,7 @@ describe("syncUpiExpenses", () => {
     expect(summary).toMatchObject({ scanned: total, saved: total });
     expect(rd.readInbox).toHaveBeenCalledTimes(3);
     expect(rd.readInbox.mock.calls[0]).toEqual([0, INBOX_BATCH]);
-    expect(progress).toEqual([200, 400, 450]);
+    expect(progress).toEqual([200, 399, 450]);
     expect(Math.max(...api.createTransactionsBulk.mock.calls.map((c) => c[0].length))).toBeLessThanOrEqual(SAVE_CHUNK);
     expect(created.size).toBe(total);
     expect((await getUpiSettings()).totalSaved).toBe(total);

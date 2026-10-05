@@ -4,15 +4,21 @@ import * as financeApi from "../api/finance";
 import { getJson, setJson } from "../offline/storage";
 import { hasFederalSignature, isAllowedSender } from "./senderAllowList";
 import { hasSmsPermission, onSmsReceived, peekQueuedSms, readInbox, removeQueuedSms, smsReaderAvailable, type SmsMessage } from "./smsReader";
+import { SERVICE_SLICE_MS, startImportService, type ImportServiceHandle } from "./upiImportService";
+import { logSmsBatch, type SmsLogSource } from "./upiSmsLog";
 import { fromExtracted, hash32, looksLikeTransaction, parseUpiSms, type ParsedUpiSms } from "./upiSmsParser";
 
 /**
  * Automatic expense tracking from bank UPI SMS (admin only, per device).
  *
- * Privacy: the SMS text is never stored anywhere (not in the database, not in local history, not in
- * transaction notes). It is parsed on the phone and only the extracted fields are saved. The only time
- * text leaves the phone is the AI fallback (body only, see below). The native retry queue deletes a
- * message as soon as it is processed.
+ * Privacy: the SMS text is never stored in the database, in the local history or in transaction notes; only
+ * the extracted fields are saved to Money. By the owner's decision every allowed-sender message IS written,
+ * verbatim, to a local JSON file on the phone (upiSmsLog.ts) before it is parsed/saved; that file is never
+ * uploaded and only leaves the phone via the screen's Export button. The only time text leaves the phone is
+ * the AI fallback (body only, see below). The native retry queue deletes a message as soon as it is processed.
+ *
+ * Old-message import is resumable: progress (cursor, counts) is persisted after every batch in
+ * settings.backfill, so an interrupted import (app backgrounded/killed) continues where it stopped.
  *
  * Idempotent everywhere: each transaction carries idempotencyKey `upi-<ref>` so re-scans, retries and
  * the headless + foreground paths can never create duplicates.
@@ -48,12 +54,30 @@ const HISTORY_KEY = "upi.expense.history";
 const ACCOUNTS_KEY = "upi.expense.accounts";
 const AI_KEY = "upi.expense.ai";
 
+/** An old-message import in progress. Persisted after every batch so it can resume after an interruption. */
+export interface BackfillState {
+  active: boolean;
+  range: BackfillRange;
+  /** Date of the newest message handled so far; the next read overlaps it by 1 ms (idempotent). */
+  cursorMs: number;
+  /** Inbox ids of the messages at cursorMs already handled (avoids re-processing the overlap). */
+  cursorIds?: string[];
+  scanned: number;
+  saved: number;
+  startedAt: number;
+  /** Earliest date of a message that still needs a retry (blocked by the AI cap / offline). */
+  blockedAt?: number;
+}
+
 export interface UpiSettings {
   enabled: boolean;
   /** Signed-in admin who turned it on (namespaces the cached accounts). */
   userId?: string;
   range: BackfillRange;
   lastScanMs?: number;
+  /** Ids of the messages at lastScanMs already handled. */
+  lastScanIds?: string[];
+  backfill?: BackfillState;
   lastRunAt?: number;
   totalSaved: number;
 }
@@ -82,6 +106,8 @@ export interface SyncSummary {
   failed: number;
   /** True when the run stopped early (e.g. offline); the next run continues. */
   incomplete: boolean;
+  /** True when an old-message import is still unfinished (time ran out / paused); the next run continues it. */
+  backfillActive: boolean;
 }
 
 const DEFAULT_SETTINGS: UpiSettings = { enabled: false, range: DEFAULT_BACKFILL_RANGE, totalSaved: 0 };
@@ -349,7 +375,10 @@ async function saveCandidates(state: RunState, items: Candidate[], result: Batch
   await addHistory(history);
 }
 
-async function processMessages(state: RunState, messages: SmsMessage[]): Promise<BatchResult> {
+async function processMessages(state: RunState, messages: SmsMessage[], source: SmsLogSource): Promise<BatchResult> {
+  // First thing, before any parsing/saving: write the batch to the local message log (one file write;
+  // logSmsBatch never throws, so a logging problem can't affect the sync).
+  await logSmsBatch(messages, source);
   const result: BatchResult = { doneIds: [], blockedAt: null, saved: 0, duplicates: 0, failed: 0, aborted: false };
   const candidates: Candidate[] = [];
   const seenKeys = new Set<string>();
@@ -409,68 +438,235 @@ export function isUpiSyncPossible(): boolean {
 }
 
 export interface SyncOptions {
-  /** Re-read the inbox from this range instead of from the last scan (first run / "Import old messages"). */
+  /** Start (or, if one with the same range is already active, resume) an old-message import over this range. */
   backfillRange?: BackfillRange;
+  /** Progress of the import / scan (cumulative for a resumed import). */
   onProgress?: (p: SyncProgress) => void;
+  /** Stop starting new batches after this epoch-ms time (headless runs are short); progress is persisted. */
+  deadlineMs?: number;
+}
+
+/** Re-reading this many extra messages when the whole batch shares one timestamp (JS-side workaround, see scanInbox). */
+const MAX_BATCH_LIMIT = INBOX_BATCH * 25;
+
+interface BatchInfo {
+  /** Messages of this batch that were not handled before (overlap removed). */
+  fresh: SmsMessage[];
+  result: BatchResult;
+  /** Date of the last message read, and ids of the read messages carrying exactly that date. */
+  last: number;
+  idsAtLast: string[];
+}
+
+interface ScanOutcome {
+  /** The inbox was read to its end. */
+  finished: boolean;
+  /** Stopped because of a network/read failure (nothing past the last persisted batch was committed). */
+  aborted: boolean;
+  /** Stopped because the owner cancelled / the deadline passed. */
+  stopped: boolean;
+}
+
+/**
+ * Reads the inbox from `cursor` on, oldest first, in batches. Robust against many messages sharing one
+ * timestamp: each read starts 1 ms before the cursor (overlap, relying on idempotency + the ids seen at the
+ * cursor), and when a full batch yields nothing new the batch size grows (up to MAX_BATCH_LIMIT) so a
+ * timestamp shared by more than INBOX_BATCH messages can still be crossed. A failed read (null) pauses.
+ * `onBatch` persists progress and returns false to stop (cancelled).
+ */
+async function scanInbox(
+  state: RunState,
+  start: { cursor: number; ids: string[] },
+  deadline: number,
+  onBatch: (b: BatchInfo) => Promise<boolean>
+): Promise<ScanOutcome> {
+  let cursor = start.cursor;
+  let seen = new Set(start.ids);
+  let limit = INBOX_BATCH;
+  for (;;) {
+    if (Date.now() >= deadline) return { finished: false, aborted: false, stopped: true };
+    const used = limit;
+    const raw = await readInbox(Math.max(0, cursor - 1), used);
+    if (raw === null) return { finished: false, aborted: true, stopped: false };
+    const fresh = raw.filter((m) => !(m.date === cursor && seen.has(m.id)));
+    if (!raw.length || (!fresh.length && raw.length < used)) return { finished: true, aborted: false, stopped: false };
+    if (!fresh.length) {
+      // A full batch of messages we already handled (more than `limit` share the cursor's timestamp).
+      if (limit < MAX_BATCH_LIMIT) limit = Math.min(limit * 5, MAX_BATCH_LIMIT);
+      else cursor += 1; // give up on the rest of that millisecond rather than loop forever
+      continue;
+    }
+    const result = await processMessages(state, fresh, "inbox");
+    const last = raw[raw.length - 1].date;
+    const idsAtLast = raw.filter((m) => m.date === last).map((m) => m.id);
+    if (result.aborted) {
+      // Server unreachable: don't move past this batch, the next run redoes it (idempotent).
+      await onBatch({ fresh: [], result, last: cursor, idsAtLast: [...seen] });
+      return { finished: false, aborted: true, stopped: false };
+    }
+    if (!(await onBatch({ fresh, result, last, idsAtLast }))) return { finished: false, aborted: false, stopped: true };
+    if (last > cursor) limit = INBOX_BATCH;
+    cursor = last;
+    seen = new Set(idsAtLast);
+    if (raw.length < used) return { finished: true, aborted: false, stopped: false };
+  }
+}
+
+const minDefined = (...v: Array<number | null | undefined>): number | null => {
+  const f = v.filter((x): x is number => typeof x === "number");
+  return f.length ? Math.min(...f) : null;
+};
+
+function newBackfill(range: BackfillRange): BackfillState {
+  return { active: true, range, cursorMs: rangeStartMs(range), scanned: 0, saved: 0, startedAt: Date.now() };
+}
+
+/** Stops an active old-message import (the loop notices at the next batch). Progress made so far stays saved in Money. */
+export async function cancelUpiBackfill(): Promise<void> {
+  const s = await getUpiSettings();
+  // Without a bookmark the next run would simply start the import again, so set one.
+  await updateUpiSettings({ backfill: undefined, ...(s.lastScanMs === undefined ? { lastScanMs: Date.now(), lastScanIds: [] } : {}) });
+}
+
+/**
+ * Runs the unfinished old-message import in slices, each inside a foreground service (best-effort). Returns
+ * whether the import finished, was cancelled, or just paused.
+ */
+async function runBackfill(
+  state: RunState,
+  initial: BackfillState,
+  opts: SyncOptions,
+  summary: SyncSummary
+): Promise<"finished" | "paused" | "cancelled"> {
+  let bf = initial;
+  let cancelled = false;
+  const deadline = opts.deadlineMs ?? Infinity;
+  for (;;) {
+    const svc: ImportServiceHandle | null = await startImportService({ scanned: bf.scanned, saved: bf.saved }).catch(() => null);
+    const sliceEnd = svc ? Math.min(deadline, Date.now() + SERVICE_SLICE_MS) : deadline;
+    let outcome: ScanOutcome | null = null;
+    try {
+      outcome = await scanInbox(state, { cursor: bf.cursorMs, ids: bf.cursorIds ?? [] }, sliceEnd, async (b) => {
+        const s = await getUpiSettings();
+        if (!s.backfill?.active || s.backfill.startedAt !== bf.startedAt) {
+          cancelled = true;
+          return false;
+        }
+        bf = {
+          ...bf,
+          cursorMs: b.last,
+          cursorIds: b.idsAtLast,
+          scanned: bf.scanned + b.fresh.length,
+          saved: bf.saved + b.result.saved,
+          ...(minDefined(bf.blockedAt, b.result.blockedAt) !== null ? { blockedAt: minDefined(bf.blockedAt, b.result.blockedAt) as number } : {}),
+        };
+        summary.scanned += b.fresh.length;
+        summary.saved += b.result.saved;
+        summary.duplicates += b.result.duplicates;
+        summary.failed += b.result.failed;
+        await updateUpiSettings({ backfill: bf, lastRunAt: Date.now(), totalSaved: s.totalSaved + b.result.saved });
+        svc?.update(bf);
+        opts.onProgress?.({ scanned: bf.scanned, saved: bf.saved });
+        return true;
+      });
+    } catch (err) {
+      await svc?.stop();
+      throw err;
+    }
+    if (outcome.aborted) summary.incomplete = true;
+    if (cancelled) {
+      await svc?.stop();
+      return "cancelled";
+    }
+    if (outcome.finished) {
+      // Move the incremental bookmark past what the import handled; blocked messages are retried from there.
+      const prev = (await getUpiSettings()).lastScanMs;
+      let mark = bf.blockedAt !== undefined ? Math.min(prev ?? Infinity, bf.blockedAt - 1) : Math.max(prev ?? 0, bf.cursorMs);
+      if (prev === undefined && bf.scanned === 0 && bf.blockedAt === undefined) mark = Date.now();
+      await updateUpiSettings({ lastScanMs: mark, lastScanIds: bf.blockedAt === undefined && mark === bf.cursorMs ? bf.cursorIds ?? [] : [], backfill: undefined, lastRunAt: Date.now() });
+      await svc?.stop({ saved: bf.saved });
+      return "finished";
+    }
+    await svc?.stop();
+    // Slice over but time remains (the service has a ~3 min limit): start another slice.
+    if (outcome.aborted || Date.now() >= deadline || !svc) return "paused";
+  }
 }
 
 /**
  * Reads the Federal Bank messages in the inbox (and any left in the native queue), saves the UPI ones to
  * Money and remembers how far it got. Returns null when tracking is off or SMS can't be read here.
- * A run that fails part-way is simply continued by the next one.
+ * An unfinished old-message import (settings.backfill) is resumed first; otherwise the inbox is scanned
+ * incrementally from the last bookmark. A run that stops part-way (offline, deadline, app closed) is simply
+ * continued by the next one.
  */
 export function syncUpiExpenses(opts: SyncOptions = {}): Promise<SyncSummary | null> {
   return exclusive(async () => {
-    const settings = await getUpiSettings();
+    let settings = await getUpiSettings();
     if (!settings.enabled || !isUpiSyncPossible()) return null;
 
-    const backfill = opts.backfillRange !== undefined || settings.lastScanMs === undefined;
-    const state = await newState(settings, { backfill });
-    const summary: SyncSummary = { scanned: 0, saved: 0, duplicates: 0, failed: 0, incomplete: false };
-    const add = (r: BatchResult) => {
-      summary.saved += r.saved;
-      summary.duplicates += r.duplicates;
-      summary.failed += r.failed;
-      if (r.aborted) summary.incomplete = true;
-    };
+    let bf: BackfillState | undefined = settings.backfill?.active ? settings.backfill : undefined;
+    if (opts.backfillRange !== undefined && !(bf && bf.range === opts.backfillRange)) {
+      bf = newBackfill(opts.backfillRange);
+      settings = await updateUpiSettings({ backfill: bf });
+    } else if (!bf && settings.lastScanMs === undefined) {
+      bf = newBackfill(settings.range); // first run: import the old messages too
+      settings = await updateUpiSettings({ backfill: bf });
+    }
+
+    const state = await newState(settings, { backfill: !!bf });
+    const summary: SyncSummary = { scanned: 0, saved: 0, duplicates: 0, failed: 0, incomplete: false, backfillActive: false };
 
     try {
       // 1. Messages that arrived while the app was closed.
       const queued = peekQueuedSms();
       if (queued.length) {
-        const r = await processMessages(state, queued);
+        const r = await processMessages(state, queued, "queue");
         summary.scanned += queued.length;
-        add(r);
+        summary.saved += r.saved;
+        summary.duplicates += r.duplicates;
+        summary.failed += r.failed;
+        if (r.aborted) summary.incomplete = true;
         removeQueuedSms(r.doneIds);
+        if (r.saved) await updateUpiSettings({ totalSaved: (await getUpiSettings()).totalSaved + r.saved });
+        if (r.aborted && bf) {
+          summary.backfillActive = true;
+          return summary;
+        }
       }
 
-      // 2. The inbox, oldest first, in batches.
-      const range = opts.backfillRange ?? settings.range;
-      let since = opts.backfillRange !== undefined || settings.lastScanMs === undefined ? rangeStartMs(range) : settings.lastScanMs;
-      let newest = settings.lastScanMs ?? 0;
+      // 2a. An old-message import (new or resumed): runs batch by batch, persisting after each one.
+      if (bf) {
+        const outcome = await runBackfill(state, bf, opts, summary);
+        summary.backfillActive = outcome === "paused";
+        return summary;
+      }
+
+      // 2b. Normal incremental scan from the bookmark (also persisted after every batch).
+      const prev = settings.lastScanMs ?? 0;
+      let newest = prev;
       let blockedAt: number | null = null;
-      while (!summary.incomplete) {
-        const batch = await readInbox(since, INBOX_BATCH);
-        if (!batch.length) break;
-        const r = await processMessages(state, batch);
-        summary.scanned += batch.length;
-        add(r);
-        if (r.blockedAt !== null) blockedAt = Math.min(blockedAt ?? Infinity, r.blockedAt);
-        const last = batch[batch.length - 1].date;
-        newest = Math.max(newest, last);
+      await scanInbox(state, { cursor: prev, ids: settings.lastScanIds ?? [] }, opts.deadlineMs ?? Infinity, async (b) => {
+        summary.scanned += b.fresh.length;
+        summary.saved += b.result.saved;
+        summary.duplicates += b.result.duplicates;
+        summary.failed += b.result.failed;
+        if (b.result.aborted) summary.incomplete = true;
+        blockedAt = minDefined(blockedAt, b.result.blockedAt);
+        newest = Math.max(newest, b.last);
+        // Only move the bookmark past what was fully handled; anything blocked is retried next time.
+        const mark = blockedAt !== null ? Math.min(newest, blockedAt - 1) : newest;
+        const s = await getUpiSettings();
+        await updateUpiSettings({
+          lastScanMs: Math.max(s.lastScanMs ?? 0, mark),
+          lastScanIds: blockedAt === null ? b.idsAtLast : [],
+          lastRunAt: Date.now(),
+          totalSaved: s.totalSaved + b.result.saved,
+        });
         opts.onProgress?.({ scanned: summary.scanned, saved: summary.saved });
-        if (batch.length < INBOX_BATCH || last <= since) break;
-        since = last;
-      }
-
-      // Only move the bookmark past what was fully handled; anything blocked is retried next time.
-      let mark = blockedAt !== null ? Math.min(newest, blockedAt - 1) : newest;
-      if (settings.lastScanMs === undefined && mark === 0 && blockedAt === null) mark = Date.now();
-      await updateUpiSettings({
-        lastScanMs: Math.max(settings.lastScanMs ?? 0, mark),
-        lastRunAt: Date.now(),
-        totalSaved: settings.totalSaved + summary.saved,
+        return true;
       });
+      await updateUpiSettings({ lastRunAt: Date.now() });
       return summary;
     } finally {
       await finishState(state);
@@ -485,8 +681,8 @@ export function handleIncomingSms(msg: { address: string; body: string; date: nu
     if (!settings.enabled) return;
     const state = await newState(settings, { backfill: false });
     try {
-      const r = await processMessages(state, [{ id: `live-${msg.date}`, ...msg }]);
-      if (r.saved) await updateUpiSettings({ totalSaved: settings.totalSaved + r.saved });
+      const r = await processMessages(state, [{ id: `live-${msg.date}`, ...msg }], "live");
+      if (r.saved) await updateUpiSettings({ totalSaved: (await getUpiSettings()).totalSaved + r.saved });
     } finally {
       await finishState(state);
     }
@@ -525,5 +721,9 @@ export async function saveParsedMessage(p: ParsedUpiSms): Promise<"saved" | "dup
 export async function runUpiHeadlessTask(): Promise<void> {
   const { restoreSession } = await import("../auth/sessionStore");
   if (!(await restoreSession())) return; // signed out: nothing to do
-  await syncUpiExpenses();
+  // Short run (Android gives headless tasks ~1 min): process what fits and persist the cursor; the next
+  // run (or the app opening) continues an unfinished old-message import.
+  await syncUpiExpenses({ deadlineMs: Date.now() + HEADLESS_BUDGET_MS });
 }
+
+export const HEADLESS_BUDGET_MS = 45_000;

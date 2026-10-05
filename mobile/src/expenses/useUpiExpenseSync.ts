@@ -7,7 +7,8 @@ import { smsReaderAvailable } from "./smsReader";
 /**
  * Admin-only. While the toggle is ON (and the app has the native SMS module): scans the inbox when the
  * app opens and each time it comes to the foreground, and saves new SMS the moment they arrive while the
- * app is open. Everything runs in the background of the UI; nothing here blocks rendering. (When the app
+ * app is open. An unfinished old-message import is resumed by the same scan each time the app opens or
+ * comes to the foreground (and by the headless task). Everything runs in the background of the UI; nothing here blocks rendering. (When the app
  * is closed the native receiver starts the headless task instead, see index.ts.)
  */
 export function useUpiExpenseSync(): void {
