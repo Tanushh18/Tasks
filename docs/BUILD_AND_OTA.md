@@ -1,11 +1,14 @@
 # Build the APK and ship updates from GitHub
 
-No Expo account, EAS or third-party service. Two manual workflows (Actions tab → pick one → Run workflow).
-Nothing runs on push.
+No Expo account, EAS or third-party service.
+
+- **Build APK runs by itself** on every push to `main` that changes `mobile/**` (or the workflow) and sends the APK to the
+  Firebase testers. Put `[skip ci]` in a commit message to skip it. It can also be run by hand.
+- **Publish OTA** is manual (Actions tab → Publish OTA → Run workflow).
 
 | Workflow | Use it when | Result |
 | --- | --- | --- |
-| **Build APK** (`build-apk.yml`) | First install, or any native change: new native module, permission, plugin, new images/assets | Signed APK at <https://github.com/Tanushh18/Tasks/releases/download/apk-latest/app-release.apk>, also an Actions artifact. Optionally sent to Firebase testers. |
+| **Build APK** (`build-apk.yml`) | First install, or any native change: new native module, permission, plugin, new images/assets | Signed APK at <https://github.com/Tanushh18/Tasks/releases/download/apk-latest/app-release.apk>, also an Actions artifact. Sent to the Firebase testers on every automatic build. |
 | **Publish OTA** (`publish-ota.yml`) | JavaScript-only change | Hermes bundle uploaded to the `ota-<version>` release. Installed apps download it and run it the launch after. |
 
 Run the workflows on `main` (workflows only appear in the Actions tab once they are on the default branch).
@@ -21,8 +24,8 @@ Run the workflows on `main` (workflows only appear in the Actions tab once they 
    Keep `release.keystore` somewhere safe: every future APK must be signed with the same key to install over the
    previous one. Without the secrets the build still works, signed with the Expo template's debug key (and says so
    in a warning), but switching to a real key later means uninstalling the app once.
-2. **Firebase (optional).** `FIREBASE_ANDROID_APP_ID` and `FIREBASE_SERVICE_ACCOUNT` are already set. Tick
-   "Also send the APK to Firebase" when running Build APK to use them.
+2. **Firebase (optional).** `FIREBASE_ANDROID_APP_ID` and `FIREBASE_SERVICE_ACCOUNT` are already set. The testers are
+   `tanushchawla16@gmail.com` by default (change it in `build-apk.yml`, or type emails when running by hand).
 3. **Repository must stay public.** The app downloads OTA bundles from the release URL without a token.
 
 The first APK built here is signed with a different key than the EAS-built one, so Android will not install it over

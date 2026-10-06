@@ -1,19 +1,30 @@
 name: Build APK
 
-# Manual only: Actions -> Build APK -> Run workflow. Nothing runs on push.
+# Runs by itself on every push to main that changes the app, and sends the APK to the Firebase testers.
+# Also available by hand: Actions -> Build APK -> Run workflow. A commit message containing [skip ci] skips it.
 on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/build-apk.yml"
   workflow_dispatch:
     inputs:
       send_to_firebase:
         description: "Also send the APK to Firebase App Distribution testers"
         type: boolean
-        default: false
+        default: true
       testers:
         description: "Comma-separated tester emails (only used with Firebase)"
         default: "tanushchawla16@gmail.com"
 
 permissions:
   contents: write # publishes the APK to the rolling `apk-latest` release
+
+# A newer push replaces a build that is still running instead of queueing behind it.
+concurrency:
+  group: build-apk
+  cancel-in-progress: true
 
 env:
   EXPO_PUBLIC_API_URLS: https://tasks-g9h1.onrender.com/api, https://we-three-api.onrender.com/api
@@ -102,11 +113,11 @@ jobs:
           gh release upload apk-latest "$RUNNER_TEMP/app-release.apk" --clobber
 
       - name: Send APK to Firebase testers
-        if: ${{ inputs.send_to_firebase }}
+        if: ${{ github.event_name == 'push' || inputs.send_to_firebase }}
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          testers: ${{ inputs.testers }}
+          testers: ${{ inputs.testers || 'tanushchawla16@gmail.com' }}
           file: ${{ runner.temp }}/app-release.apk
-          releaseNotes: Build from ${{ github.sha }}
+          releaseNotes: ${{ github.event.head_commit.message || format('Manual build from {0}', github.sha) }}
