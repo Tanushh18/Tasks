@@ -25,7 +25,7 @@ Run the workflows on `main` (workflows only appear in the Actions tab once they 
    previous one. Without the secrets the build still works, signed with the Expo template's debug key (and says so
    in a warning), but switching to a real key later means uninstalling the app once.
 2. **Firebase (optional).** `FIREBASE_ANDROID_APP_ID` and `FIREBASE_SERVICE_ACCOUNT` are already set. The testers are
-   `tanushchawla16@gmail.com` by default (change it in `build-apk.yml`, or type emails when running by hand).
+   `tanushchawla16@gmail.com` and `tanushchawla21@gmail.com` by default (change it in `build-apk.yml`, or type emails when running by hand).
 3. **Repository must stay public.** The app downloads OTA bundles from the release URL without a token.
 
 The first APK built here is signed with a different key than the EAS-built one, so Android will not install it over

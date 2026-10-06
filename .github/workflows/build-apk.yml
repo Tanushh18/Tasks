@@ -16,7 +16,7 @@ on:
         default: true
       testers:
         description: "Comma-separated tester emails (only used with Firebase)"
-        default: "tanushchawla16@gmail.com"
+        default: "tanushchawla16@gmail.com,tanushchawla21@gmail.com"
 
 permissions:
   contents: write # publishes the APK to the rolling `apk-latest` release
@@ -118,6 +118,6 @@ jobs:
         with:
           appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          testers: ${{ inputs.testers || 'tanushchawla16@gmail.com' }}
+          testers: ${{ inputs.testers || 'tanushchawla16@gmail.com,tanushchawla21@gmail.com' }}
           file: ${{ runner.temp }}/app-release.apk
           releaseNotes: ${{ github.event.head_commit.message || format('Manual build from {0}', github.sha) }}
