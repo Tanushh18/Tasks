@@ -1,6 +1,8 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
+import * as IntentLauncher from "expo-intent-launcher";
 import * as Sharing from "expo-sharing";
+import { Platform } from "react-native";
 import type { WhatsAppTemplate } from "../api/leads";
 
 /** Largest image a template may carry (the server enforces the same cap). */
@@ -54,11 +56,41 @@ export async function pickTemplateImage(): Promise<PickedImage> {
   return { dataUrl };
 }
 
+/** WhatsApp and WhatsApp Business, in the order tried. */
+const WHATSAPP_PACKAGES = ["com.whatsapp", "com.whatsapp.w4b"];
+const FLAG_GRANT_READ_URI_PERMISSION = 1;
+
 /**
- * Saves the template image to the cache and opens the phone's share sheet so the person can send it on WhatsApp.
- * WhatsApp can't be given text and an image together by this app, so this is the second step after the text.
+ * Opens the lead's chat in WhatsApp with the image attached, ready to send. WhatsApp reads the `jid` extra of a plain
+ * SEND intent to pick the chat. It is not a documented API, so any failure (WhatsApp missing, or it ignoring the extra
+ * in a future version) returns false and the caller falls back to the share sheet.
  */
-export async function shareTemplateImage(imageUrl: string): Promise<void> {
+async function openChatWithImage(fileUri: string, mime: string, digits: string): Promise<boolean> {
+  if (Platform.OS !== "android" || !digits) return false;
+  const contentUri = await FileSystem.getContentUriAsync(fileUri);
+  for (const packageName of WHATSAPP_PACKAGES) {
+    try {
+      await IntentLauncher.startActivityAsync("android.intent.action.SEND", {
+        type: mime,
+        packageName,
+        flags: FLAG_GRANT_READ_URI_PERMISSION,
+        extra: { "android.intent.extra.STREAM": contentUri, jid: `${digits}@s.whatsapp.net` },
+      });
+      return true;
+    } catch {
+      // Not installed (or refused): try the next package.
+    }
+  }
+  return false;
+}
+
+/**
+ * Sends the template image to a lead. With the lead's number (digits incl. country code) it opens that WhatsApp chat
+ * directly with the picture attached; otherwise, or if that isn't possible, it opens the phone's share sheet so the person
+ * picks WhatsApp and the chat. WhatsApp can't be given text and an image together by this app, so with a message this is
+ * the second step after the text.
+ */
+export async function shareTemplateImage(imageUrl: string, digits?: string): Promise<void> {
   const mime = /^data:(image\/[a-z+]+);/i.exec(imageUrl)?.[1] ?? "image/jpeg";
   const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
   const uri = `${FileSystem.cacheDirectory}whatsapp-${Date.now()}.${ext}`;
@@ -67,6 +99,13 @@ export async function shareTemplateImage(imageUrl: string): Promise<void> {
     if (res.status < 200 || res.status >= 300) throw new Error(`Download failed (${res.status})`);
   } else {
     await FileSystem.writeAsStringAsync(uri, imageUrl.slice(imageUrl.indexOf(",") + 1), { encoding: FileSystem.EncodingType.Base64 });
+  }
+  if (digits) {
+    try {
+      if (await openChatWithImage(uri, mime, digits.replace(/\D/g, ""))) return;
+    } catch {
+      // Fall through to the share sheet.
+    }
   }
   if (!(await Sharing.isAvailableAsync())) throw new Error("Sharing isn't available on this phone");
   await Sharing.shareAsync(uri, { mimeType: mime, dialogTitle: "Send image on WhatsApp" });

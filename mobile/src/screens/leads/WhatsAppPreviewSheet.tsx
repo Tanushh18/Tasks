@@ -55,7 +55,7 @@ export function WhatsAppPreviewSheet({ visible, onClose, template, lead, onSent 
   const sendImage = async () => {
     setBusy(true);
     try {
-      await shareTemplateImage(template.imageUrl);
+      await shareTemplateImage(template.imageUrl, lead.digits);
       // An image-only template has no text step, so sharing the picture is the send.
       if (imageOnly && !sent) {
         setSent(true);
@@ -84,8 +84,8 @@ export function WhatsAppPreviewSheet({ visible, onClose, template, lead, onSent 
           />
           <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.xs }]}>
             {imageOnly
-              ? 'This template sends only the image. Tap "Send image" and pick WhatsApp and this chat.'
-              : 'WhatsApp can\'t take text and an image together from this app. Send the text first, then tap "Send image" to share the picture to the same chat.'}
+              ? 'This template sends only the image. Tap "Send image" to open this chat in WhatsApp with the picture ready to send.'
+              : 'WhatsApp can\'t take text and an image together from this app. Send the text first, then tap "Send image" to open the same chat with the picture.'}
           </Text>
         </View>
       ) : null}
