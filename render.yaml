@@ -41,6 +41,12 @@ services:
         sync: false
       # Must be IDENTICAL on every server the app can fail over to, or a login made on one
       # server is rejected by the other. Copy the same values from backend/.env.
+      # SMS Service. Phones send SMS_DEVICE_KEY as their bearer token; the ggnHome website's hidden SMS console
+      # sends SMS_CONSOLE_KEY. Use long random values; with either unset, that part of the API refuses everyone.
+      - key: SMS_DEVICE_KEY
+        sync: false
+      - key: SMS_CONSOLE_KEY
+        sync: false
       - key: JWT_ACCESS_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
