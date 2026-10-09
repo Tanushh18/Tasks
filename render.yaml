@@ -39,14 +39,11 @@ services:
         value: https://script.google.com/macros/s/AKfycbxyT4x3lYdTQzG31HZn2D14KZb-lzbkemDtV2Ef5GFHr-6Jm2-otgv0XFWO5mVCp3SI/exec
       - key: MAIL_WEBHOOK_SECRET
         sync: false
+      # SMS Service: one shared key, the same value as SMS_KEY on the ggnHome server and in the Android app.
+      - key: SMS_KEY
+        sync: false
       # Must be IDENTICAL on every server the app can fail over to, or a login made on one
       # server is rejected by the other. Copy the same values from backend/.env.
-      # SMS Service. Phones send SMS_DEVICE_KEY as their bearer token; the ggnHome website's hidden SMS console
-      # sends SMS_CONSOLE_KEY. Use long random values; with either unset, that part of the API refuses everyone.
-      - key: SMS_DEVICE_KEY
-        sync: false
-      - key: SMS_CONSOLE_KEY
-        sync: false
       - key: JWT_ACCESS_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET

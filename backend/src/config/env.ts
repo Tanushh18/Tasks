@@ -42,10 +42,11 @@ export const env = {
   smtpUser: process.env.SMTP_USER ?? "",
   smtpPass: process.env.SMTP_PASS ?? "",
   mailFrom: process.env.MAIL_FROM ?? process.env.SMTP_USER ?? "",
-  // SMS Service: the phones authenticate with SMS_DEVICE_KEY, the website console (ggnHome server) with SMS_CONSOLE_KEY.
-  // Neither has a production default: unset means that part of the SMS API refuses every request.
-  smsDeviceKey: process.env.SMS_DEVICE_KEY ?? (process.env.NODE_ENV === "production" ? "" : "test123"),
-  smsConsoleKey: process.env.SMS_CONSOLE_KEY ?? (process.env.NODE_ENV === "production" ? "" : "console-test"),
+  // SMS Service: ONE shared key (SMS_KEY) is used by the phones and by the ggnHome website console. It must be the same
+  // value on this server, on the ggnHome server and in the Android app. Unset in production = the SMS API refuses
+  // everyone. (SMS_DEVICE_KEY / SMS_CONSOLE_KEY are still read, so an older setup keeps working.)
+  smsDeviceKey: process.env.SMS_KEY ?? process.env.SMS_DEVICE_KEY ?? (process.env.NODE_ENV === "production" ? "" : "test123"),
+  smsConsoleKey: process.env.SMS_KEY ?? process.env.SMS_CONSOLE_KEY ?? (process.env.NODE_ENV === "production" ? "" : "console-test"),
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   geminiModel: process.env.GEMINI_MODEL ?? "gemini-3.6-flash",
   adminMobileNumbers: (
