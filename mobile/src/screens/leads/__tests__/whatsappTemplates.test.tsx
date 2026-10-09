@@ -81,6 +81,7 @@ const mockApi = {
   deleteWhatsAppTemplate: jest.fn(async () => undefined),
 };
 jest.mock("../../../api/leads", () => ({
+  getSmsSummary: jest.fn(async () => ({ state: "idle", window: null, lastSentAt: null, etaDays: null, sentToday: 0, dailyLimit: 90, lunch: "13:00–14:00", night: "21:00–23:00", totals: { total: 0, sent: 0, delivered: 0, failed: 0, invalid: 0, remaining: 0 }, sheets: [] })),
   CATEGORY_OPTIONS: [],
   DEFAULT_STATUS_OPTIONS: ["New"],
   PAGE_SIZE: 10,

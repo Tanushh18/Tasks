@@ -31,6 +31,11 @@ export interface Lead {
   whatsappTemplateId?: string | null;
   /** Each time Send was pressed, oldest first (the server keeps the last 50). */
   whatsappHistory?: { at: string; templateName?: string; byName?: string }[];
+  /** Auto SMS, managed on the SMS Service website (read-only here): "" not yet, sending, sent, delivered, failed, invalid. */
+  smsState?: string;
+  smsSentAt?: string | null;
+  smsError?: string;
+  smsHistory?: { at: string; sheet?: string; status?: string; deviceName?: string }[];
 }
 
 export interface StageCount {
@@ -89,6 +94,39 @@ export async function listLeadsPage(opts: { page: number; status: string; search
       origin: opts.origin && opts.origin !== "all" ? opts.origin : undefined,
     },
   } as object);
+  return data;
+}
+
+export type SmsRunState = "paused" | "sending" | "waiting" | "idle";
+
+export interface SmsSheetProgress {
+  sheet: string;
+  auto: boolean;
+  total: number;
+  sent: number;
+  delivered: number;
+  failed: number;
+  invalid: number;
+  remaining: number;
+  etaDays: number | null;
+}
+
+/** Consolidated Auto SMS numbers. Read-only: it is managed from the SMS Service website. */
+export interface SmsSummary {
+  state: SmsRunState;
+  window: "lunch" | "night" | null;
+  lastSentAt: string | null;
+  etaDays: number | null;
+  sentToday: number;
+  dailyLimit: number;
+  lunch: string;
+  night: string;
+  totals: { total: number; sent: number; delivered: number; failed: number; invalid: number; remaining: number };
+  sheets: SmsSheetProgress[];
+}
+
+export async function getSmsSummary(): Promise<SmsSummary> {
+  const { data } = await apiClient.get<SmsSummary>("/leads/sms-summary", { _noCache: true } as object);
   return data;
 }
 

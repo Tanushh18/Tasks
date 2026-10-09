@@ -456,3 +456,48 @@ export async function statusForDevice(deviceId: string) {
   const pending = await Lead.countDocuments({ smsState: { $in: ["", null] }, archived: false, origin: { $in: (await SmsSheet.find({ auto: true }).lean()).map((s) => s.sheet) } });
   return { role: dev?.role ?? "both", enabled: dev?.enabled ?? true, paused: settings.paused, window: currentWindow(settings), sentToday, dailyLimit: settings.dailyLimit, pending };
 }
+
+export type SmsState = "paused" | "sending" | "waiting" | "idle";
+
+/**
+ * Read-only numbers for the We Three app's SMS status screen: the consolidated totals, what is happening right now, and
+ * one row per sheet that is switched on or has been texted. Everything is changed on the website console, not here.
+ */
+export async function appSummary(now = new Date()) {
+  const [sheets, settingsDoc, sentToday, last] = await Promise.all([
+    sheetOverview(),
+    getStoredSettings(),
+    SmsSend.countDocuments({ kind: "lead", status: "sent", dayKey: dayKeyOf(DateTime.fromJSDate(now).setZone(ZONE)) }),
+    Lead.findOne({ smsSentAt: { $ne: null } }).sort({ smsSentAt: -1 }).select("smsSentAt").lean(),
+  ]);
+  const settings = effective(settingsDoc);
+  const shown = sheets.filter((s) => s.auto || s.sent > 0 || s.failed > 0 || s.invalid > 0);
+  const sum = (k: "total" | "sent" | "delivered" | "failed" | "invalid" | "remaining") => shown.reduce((a, s) => a + s[k], 0);
+  const activeRemaining = shown.filter((s) => s.auto).reduce((a, s) => a + s.remaining, 0);
+  const window = currentWindow(settings, DateTime.fromJSDate(now).setZone(ZONE));
+  let state: SmsState = "idle";
+  if (activeRemaining > 0) state = settings.paused ? "paused" : window ? "sending" : "waiting";
+  const etaDays = activeRemaining ? Math.ceil(activeRemaining / Math.max(1, settings.dailyLimit)) : null;
+  return {
+    state,
+    window,
+    lastSentAt: last?.smsSentAt ?? null,
+    etaDays,
+    sentToday,
+    dailyLimit: settings.dailyLimit,
+    lunch: `${settings.lunchStart}–${settings.lunchEnd}`,
+    night: `${settings.nightStart}–${settings.nightEnd}`,
+    totals: { total: sum("total"), sent: sum("sent"), delivered: sum("delivered"), failed: sum("failed"), invalid: sum("invalid"), remaining: sum("remaining") },
+    sheets: shown.map((s) => ({
+      sheet: s.sheet,
+      auto: s.auto,
+      total: s.total,
+      sent: s.sent,
+      delivered: s.delivered,
+      failed: s.failed,
+      invalid: s.invalid,
+      remaining: s.remaining,
+      etaDays: s.etaDays,
+    })),
+  };
+}

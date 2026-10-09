@@ -255,6 +255,32 @@ describe("results", () => {
   });
 });
 
+describe("app summary (read-only)", () => {
+  it("adds up sent / delivered / failed / left across sheets and says what is happening", async () => {
+    const { appSummary } = await import("../src/services/smsService");
+    await addLeads("Meta Sheet", 4, { smsState: "sent", smsSentAt: new Date() });
+    await addLeads("Meta Sheet", 2, { smsState: "delivered", smsSentAt: new Date() });
+    await addLeads("Meta Sheet", 1, { smsState: "failed" });
+    await addLeads("Meta Sheet", 3);
+    await addLeads("OLF Data", 5); // never switched on, never texted: not listed
+    await switchOn();
+    const s = await appSummary(ist("13:30"));
+    expect(s.totals).toMatchObject({ total: 10, sent: 6, delivered: 2, failed: 1, remaining: 3 });
+    expect(s.sheets.map((x) => x.sheet)).toEqual(["Meta Sheet"]);
+    expect(s.state).toBe("sending");
+    expect((await appSummary(ist("16:00"))).state).toBe("waiting");
+    await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ paused: true });
+    expect((await appSummary(ist("13:30"))).state).toBe("paused");
+  });
+
+  it("is idle when nothing is left to send", async () => {
+    const { appSummary } = await import("../src/services/smsService");
+    await addLeads("Meta Sheet", 2, { smsState: "sent", smsSentAt: new Date() });
+    await switchOn();
+    expect((await appSummary(ist("13:30"))).state).toBe("idle");
+  });
+});
+
 describe("HTTP API", () => {
   it("rejects phones and the console without the right key", async () => {
     expect((await request(app).get("/api/sms-gateway/next").set("X-Device-Id", "x")).status).toBe(401);
