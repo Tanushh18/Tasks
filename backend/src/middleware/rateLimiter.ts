@@ -30,5 +30,6 @@ export const apiRateLimiter = rateLimit({
   limit: 120,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: skipInTests,
+  // The SMS phones poll every ~3 s (20/min each), so they get their own, far looser limit.
+  skip: (req) => skipInTests() || req.originalUrl.startsWith("/api/sms-gateway"),
 });

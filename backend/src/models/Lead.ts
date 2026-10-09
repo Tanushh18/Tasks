@@ -15,11 +15,16 @@ const leadSchema = new Schema({
   // Set when the person pressed "Send" in the WhatsApp preview. We cannot verify delivery: this only records that Send was pressed.
   whatsappSentAt:{type:Date,default:null}, whatsappTemplateId:{type:Schema.Types.ObjectId,ref:"WhatsAppTemplate",default:null},
   // Every time Send was pressed (newest last, capped at 50): shown on the lead's History tab.
-  whatsappHistory:{type:[{_id:false,at:{type:Date,required:true},templateName:{type:String,default:""},byName:{type:String,default:""}}],default:[]}
+  whatsappHistory:{type:[{_id:false,at:{type:Date,required:true},templateName:{type:String,default:""},byName:{type:String,default:""}}],default:[]},
+  // Auto SMS (SMS Service console): ""=not sent yet, sending, sent, delivered, failed (gave up after 3 tries), invalid (bad number).
+  smsState:{type:String,default:""}, smsAttempts:{type:Number,default:0}, smsClaimedAt:{type:Date,default:null}, smsSentAt:{type:Date,default:null}, smsError:{type:String,default:""},
+  smsHistory:{type:[{_id:false,at:{type:Date,required:true},sheet:{type:String,default:""},status:{type:String,default:""},deviceName:{type:String,default:""}}],default:[]}
 },{timestamps:true});
 leadSchema.index({ownerId:1,phone:1},{unique:true}); leadSchema.index({ownerId:1,archived:1,sheetDate:-1}); leadSchema.index({archived:1,createdAt:-1}); leadSchema.index({sourceIds:1});
 // The list sorts newest first inside an owner or a source: these let Mongo read a page without sorting in memory.
 leadSchema.index({ownerId:1,archived:1,createdAt:-1,_id:-1}); leadSchema.index({sourceIds:1,archived:1,createdAt:-1,_id:-1});
 // A sheet page is read as "unsent first, then sent" (two range reads on whatsappSentAt), each newest first.
 leadSchema.index({origin:1,archived:1,whatsappSentAt:1,createdAt:-1,_id:-1});
+// Auto SMS picks the oldest unsent lead of a sheet.
+leadSchema.index({origin:1,archived:1,smsState:1,createdAt:1,_id:1});
 export type LeadDocument=HydratedDocument<InferSchemaType<typeof leadSchema>>; export const Lead=model("Lead",leadSchema);
