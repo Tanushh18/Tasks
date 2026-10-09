@@ -15,7 +15,7 @@ describe("lists to file leads under", () => {
     expect(made.body).toEqual({ name: "Referrals", created: true });
 
     const origins = (await api.get("/api/leads/origins")).body.origins;
-    expect(origins).toEqual([{ name: "Referrals", count: 0 }]);
+    expect(origins).toEqual([{ name: "Referrals", count: 0, sent: 0 }]);
   });
 
   it("a name that exists in any spelling isn't created twice", async () => {
@@ -50,7 +50,7 @@ describe("lists to file leads under", () => {
     const filtered = await api.get("/api/leads?status=all&origin=Calling%20Data");
     expect(filtered.body.leads.map((l: { name: string }) => l.name)).toEqual(["Anil"]);
     const origins = (await api.get("/api/leads/origins")).body.origins;
-    expect(origins).toContainEqual({ name: "Calling Data", count: 1 });
+    expect(origins).toContainEqual({ name: "Calling Data", count: 1, sent: 0 });
   });
 
   it("with no list chosen a lead still goes to My contacts, and a typed new name creates the list", async () => {
@@ -78,11 +78,11 @@ describe("lists to file leads under", () => {
     const api = authed(app, u.token);
     await api.post("/api/leads/lists").send({ name: "Old Name" });
     await api.post("/api/leads/origins/rename").send({ from: "Old Name", to: "New Name" });
-    expect((await api.get("/api/leads/origins")).body.origins).toEqual([{ name: "New Name", count: 0 }]);
+    expect((await api.get("/api/leads/origins")).body.origins).toEqual([{ name: "New Name", count: 0, sent: 0 }]);
 
     await api.post("/api/leads/lists").send({ name: "Other" });
     await api.post("/api/leads/origins/rename").send({ from: "Other", to: "New Name" });
-    expect((await api.get("/api/leads/origins")).body.origins).toEqual([{ name: "New Name", count: 0 }]);
+    expect((await api.get("/api/leads/origins")).body.origins).toEqual([{ name: "New Name", count: 0, sent: 0 }]);
   });
 
   it("requires sign-in", async () => {

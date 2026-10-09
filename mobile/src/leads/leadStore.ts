@@ -32,7 +32,7 @@ let cache: { scope: string; leads: Lead[]; meta: Meta } | null = null;
 /** Lower-cased text each lead is searched against, built once per lead instead of on every keystroke. */
 const haystack = new Map<string, string>();
 /** Stage counts per (list, search), reused while paging and switching stages; cleared on any change. */
-const countMemo = new Map<string, { stageCounts: { stage: string; count: number }[]; totalAll: number; base: Lead[] }>();
+const countMemo = new Map<string, { stageCounts: { stage: string; count: number }[]; totalAll: number; whatsappSent: number; base: Lead[] }>();
 
 const byNewest = (a: Lead, b: Lead) => (b.createdAt ?? "").localeCompare(a.createdAt ?? "") || b.id.localeCompare(a.id);
 
@@ -182,6 +182,7 @@ export async function queryLocalLeads(opts: {
     memo = {
       base,
       totalAll: base.length,
+      whatsappSent: base.filter((l) => !!l.whatsappSentAt).length,
       stageCounts: [...counts.entries()].map(([stage, count]) => ({ stage, count })).sort((a, b) => b.count - a.count),
     };
     countMemo.set(memoKey, memo);
@@ -201,17 +202,24 @@ export async function queryLocalLeads(opts: {
     total: filtered.length,
     totalPages,
     totalAll: memo.totalAll,
+    whatsappSent: memo.whatsappSent,
     stageCounts: memo.stageCounts,
   };
 }
 
 /** The sheet filter's options from the copy on the phone (used when the server can't be reached). */
-export async function getLocalOrigins(): Promise<{ name: string; count: number }[]> {
+export async function getLocalOrigins(): Promise<{ name: string; count: number; sent: number }[]> {
   const store = await load();
   if (!store) return [];
-  const counts = new Map<string, number>();
-  for (const l of store.leads) if (!l.archived && l.origin) counts.set(l.origin, (counts.get(l.origin) ?? 0) + 1);
-  return [...counts.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+  const counts = new Map<string, { count: number; sent: number }>();
+  for (const l of store.leads) {
+    if (l.archived || !l.origin) continue;
+    const c = counts.get(l.origin) ?? { count: 0, sent: 0 };
+    c.count += 1;
+    if (l.whatsappSentAt) c.sent += 1;
+    counts.set(l.origin, c);
+  }
+  return [...counts.entries()].map(([name, c]) => ({ name, ...c })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** After a sheet name is renamed on the server, do the same to the copy on the phone. */

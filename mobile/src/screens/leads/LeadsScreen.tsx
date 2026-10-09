@@ -380,6 +380,7 @@ export function LeadsScreen({ navigation }: any) {
   /** Send was pressed in the preview. We can't verify delivery, so this only records "marked as sent". */
   const markSent = (lead: api.Lead, template: api.WhatsAppTemplate) => {
     const stamp = new Date().toISOString();
+    if (!lead.whatsappSentAt) bumpSent(lead, 1);
     patchLead(lead.id, {
       whatsappSentAt: stamp,
       whatsappTemplateId: template.id,
@@ -394,6 +395,7 @@ export function LeadsScreen({ navigation }: any) {
       {
         text: "Mark as not sent",
         onPress: () => {
+          if (lead.whatsappSentAt) bumpSent(lead, -1);
           patchLead(lead.id, { whatsappSentAt: null, whatsappTemplateId: null, whatsappHistory: (lead.whatsappHistory ?? []).slice(0, -1) });
           api.setWhatsAppSent(lead.id, false).catch((e) => Alert.alert("Couldn't update", getApiErrorMessage(e)));
         },
@@ -402,6 +404,14 @@ export function LeadsScreen({ navigation }: any) {
 
   const patchLead = (id: string, patch: Partial<api.Lead>) =>
     setData((d) => (d ? { ...d, leads: d.leads.map((l) => (l.id === id ? { ...l, ...patch } : l)) } : d));
+
+  /** Keeps the "WhatsApp sent" counts in step right away when a lead is marked sent / not sent. */
+  const bumpSent = (lead: api.Lead, delta: number) => {
+    setData((d) => (d ? { ...d, whatsappSent: Math.max(0, (d.whatsappSent ?? 0) + delta) } : d));
+    if (lead.origin) {
+      setSheets((list) => list.map((x) => (x.name === lead.origin ? { ...x, sent: Math.max(0, (x.sent ?? 0) + delta) } : x)));
+    }
+  };
 
   const sync = async () => {
     setSyncing(true);
@@ -506,6 +516,9 @@ export function LeadsScreen({ navigation }: any) {
   };
 
   const totalAll = data?.totalAll ?? 0;
+  // Older servers don't send this; the line stays hidden until they do.
+  const whatsappSent = data?.whatsappSent ?? 0;
+  const sentPct = totalAll ? Math.round((whatsappSent / totalAll) * 100) : 0;
 
   const header = (
     <View>
@@ -563,6 +576,27 @@ export function LeadsScreen({ navigation }: any) {
         </Text>
         <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
       </Pressable>
+
+      {data?.whatsappSent !== undefined ? (
+        <Pressable
+          onPress={() => setPickingSource(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`WhatsApp sent to ${whatsappSent} of ${totalAll} leads in ${sheetName(sheet)}. Tap to see each sheet.`}
+          style={[
+            styles.autoRow,
+            { marginTop: spacing.sm, backgroundColor: colors.successMuted, borderColor: colors.success, borderRadius: radius.md, padding: spacing.sm },
+          ]}
+        >
+          <Ionicons name="logo-whatsapp" size={18} color={colors.success} />
+          <Text style={[typography.captionStrong, { color: colors.text, flex: 1 }]} numberOfLines={2}>
+            {`WhatsApp sent: ${whatsappSent.toLocaleString("en-IN")} of ${totalAll.toLocaleString("en-IN")} (${sentPct}%)`}
+            <Text style={[typography.caption, { color: colors.textMuted }]}>{sheet === ALL ? " · all sheets combined" : ` · ${sheet}`}</Text>
+          </Text>
+          <Text style={[typography.caption, { color: colors.textMuted }]}>
+            {`${Math.max(0, totalAll - whatsappSent).toLocaleString("en-IN")} left`}
+          </Text>
+        </Pressable>
+      ) : null}
 
       <View style={{ marginTop: spacing.md }}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Search name, phone, stage or notes" />
@@ -837,7 +871,16 @@ export function LeadsScreen({ navigation }: any) {
       />
 
       <BottomSheet visible={pickingSource}onClose={() => setPickingSource(false)} title="Show leads from" scrollable>
-        {[{ name: ALL, label: "All leads", count: undefined as number | undefined }, ...sheets.map((x) => ({ name: x.name, label: x.name, count: x.count }))].map((opt) => (
+        {[
+          // "All leads" shows every sheet combined; while it is the open view its sent count comes from the list itself.
+          {
+            name: ALL,
+            label: "All leads",
+            count: undefined as number | undefined,
+            sent: sheet === ALL && !query && data ? data.whatsappSent : (undefined as number | undefined),
+          },
+          ...sheets.map((x) => ({ name: x.name, label: x.name, count: x.count, sent: x.sent })),
+        ].map((opt) => (
           <Pressable
             key={opt.name}
             onPress={() => {
@@ -848,7 +891,17 @@ export function LeadsScreen({ navigation }: any) {
             accessibilityState={{ selected: sheet === opt.name }}
             style={[styles.dropdownRow, { minHeight: touchTarget.min, paddingVertical: spacing.sm }]}
           >
-            <Text style={[sheet === opt.name ? typography.bodyStrong : typography.body, { color: colors.text, flex: 1 }]}>{opt.label}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[sheet === opt.name ? typography.bodyStrong : typography.body, { color: colors.text }]}>{opt.label}</Text>
+              {opt.sent !== undefined ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  <Ionicons name="logo-whatsapp" size={12} color={colors.success} />
+                  <Text style={[typography.caption, { color: colors.textMuted }]}>
+                    {`WhatsApp sent to ${opt.sent.toLocaleString("en-IN")}`}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
             {opt.count !== undefined ? (
               <Text style={[typography.caption, { color: colors.textMuted }]}>{opt.count.toLocaleString("en-IN")}</Text>
             ) : null}

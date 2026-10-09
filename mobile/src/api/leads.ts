@@ -45,6 +45,8 @@ export interface LeadPage {
   total: number;
   totalPages: number;
   totalAll: number;
+  /** Leads in this sheet / search (any stage) whose WhatsApp was sent. Missing from older servers. */
+  whatsappSent?: number;
   stageCounts: StageCount[];
 }
 
@@ -93,6 +95,8 @@ export async function listLeadsPage(opts: { page: number; status: string; search
 export interface OriginCount {
   name: string;
   count: number;
+  /** How many of this sheet's leads had WhatsApp sent. Missing from older servers. */
+  sent?: number;
 }
 
 /** Every sheet name leads came from, with counts: the options of the sheet filter. */

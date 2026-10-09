@@ -73,6 +73,7 @@ const mockListPage = jest.fn(async (opts: { page: number; status: string }) => (
   total: 12,
   totalPages: 2,
   totalAll: 14,
+  whatsappSent: 5,
   stageCounts: [
     { stage: "New", count: 12 },
     { stage: "Interested", count: 2 },
@@ -99,8 +100,8 @@ jest.mock("../../../api/leads", () => ({
   setSourceSync: jest.fn(),
   renameOrigin: jest.fn(async () => ({ renamed: 12 })),
   listOrigins: jest.fn(async () => [
-    { name: "Calling Data", count: 2 },
-    { name: "Meta Sheet", count: 12 },
+    { name: "Calling Data", count: 2, sent: 1 },
+    { name: "Meta Sheet", count: 12, sent: 4 },
   ]),
   listWhatsAppTemplates: jest.fn(async () => []),
   getAiStatus: jest.fn(async () => ({ connected: false, provider: "Gemini" })),
@@ -243,6 +244,17 @@ describe("lead screens render", () => {
     expect(textOf(normal)).not.toContain("Share");
     expect(textOf(normal)).not.toContain("SHEETS AND FILES");
     await act(async () => normal.unmount());
+  });
+
+  it("shows how many leads had WhatsApp sent, combined and per sheet", async () => {
+    const r = await renderLeads();
+    expect(textOf(r)).toContain("WhatsApp sent: 5 of 14 (36%)");
+    expect(textOf(r)).toContain("all sheets combined");
+    await act(async () => byLabel(r, "Sheet: All leads. Tap to change.").props.onPress());
+    const text = textOf(r);
+    expect(text).toContain("WhatsApp sent to 1");
+    expect(text).toContain("WhatsApp sent to 4");
+    await act(async () => r.unmount());
   });
 
   it("filters by sheet name, shows each sheet's count, and lets anyone delete", async () => {

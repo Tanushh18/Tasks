@@ -29,7 +29,7 @@ describe("one shared My contacts pool", () => {
     const sheets = (await authed(app, users[2].token).get("/api/leads/sources/list")).body.sources;
     expect(sheets.filter((s: { kind: string }) => s.kind === "manual")).toHaveLength(1);
     const origins = (await authed(app, users[1].token).get("/api/leads/origins")).body.origins;
-    expect(origins).toEqual([{ name: "My contacts", count: 4 }]);
+    expect(origins).toEqual([{ name: "My contacts", count: 4, sent: 0 }]);
   });
 
   it("lists made earlier per person stay untouched; new contacts join the oldest and the list shows one row", async () => {
@@ -51,6 +51,6 @@ describe("one shared My contacts pool", () => {
     const sheets = (await authed(app, c.token).get("/api/leads/sources/list")).body.sources;
     expect(sheets.filter((s: { kind: string }) => s.kind === "manual")).toHaveLength(1);
     const origins = (await authed(app, c.token).get("/api/leads/origins")).body.origins;
-    expect(origins).toEqual([{ name: "My contacts", count: 3 }]);
+    expect(origins).toEqual([{ name: "My contacts", count: 3, sent: 0 }]);
   });
 });

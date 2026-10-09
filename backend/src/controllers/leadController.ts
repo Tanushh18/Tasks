@@ -109,6 +109,8 @@ export async function listLeads(req: Request, res: Response) {
 
   const counts = new Map<string, number>();
   let totalAll = 0;
+  // How many leads in this sheet / search had WhatsApp sent (any stage): the "WhatsApp sent" line in the app.
+  let whatsappSent = 0;
   let total = 0;
   let frontInFilter = 0;
   const wantAll = !status || status.toLowerCase() === "all";
@@ -118,6 +120,7 @@ export async function listLeads(req: Request, res: Response) {
     const key = NEW_STATUS.test(raw) ? "New" : String(raw).trim();
     counts.set(key, (counts.get(key) ?? 0) + g.count);
     totalAll += g.count;
+    if (g._id.sent) whatsappSent += g.count;
     if (wantAll || (wantNew ? NEW_STATUS.test(raw) : raw === status)) {
       total += g.count;
       if (!(g._id.sent && NEW_STATUS.test(raw))) frontInFilter += g.count;
@@ -142,6 +145,7 @@ export async function listLeads(req: Request, res: Response) {
     total,
     totalPages: Math.max(1, Math.ceil(total / limit)),
     totalAll,
+    whatsappSent,
     stageCounts: [...counts.entries()]
       .map(([stage, count]) => ({ stage, count }))
       .sort((a, b) => b.count - a.count),
@@ -149,19 +153,26 @@ export async function listLeads(req: Request, res: Response) {
 }
 
 /**
- * Every sheet name leads came from, with how many active leads each has: the options of the sheet filter. Lists created
+ * Every sheet name leads came from, with how many active leads each has and how many of those had WhatsApp sent: the options of the sheet filter. Lists created
  * in the app but still empty are included too (count 0), so they can be picked right away.
  */
 export async function listOrigins(_req: Request, res: Response) {
-  const rows = await Lead.aggregate<{ _id: string; count: number }>([
+  const rows = await Lead.aggregate<{ _id: string; count: number; sent: number }>([
     { $match: { archived: false, origin: { $nin: ["", null] } } },
-    { $group: { _id: "$origin", count: { $sum: 1 } } },
+    {
+      $group: {
+        _id: "$origin",
+        count: { $sum: 1 },
+        // Leads in this sheet whose WhatsApp Send was pressed at least once.
+        sent: { $sum: { $cond: [{ $ne: [{ $ifNull: ["$whatsappSentAt", null] }, null] }, 1, 0] } },
+      },
+    },
     { $sort: { _id: 1 } },
   ]);
-  const origins = rows.map((r) => ({ name: r._id, count: r.count }));
+  const origins = rows.map((r) => ({ name: r._id, count: r.count, sent: r.sent }));
   const have = new Set(origins.map((o) => o.name.toLowerCase()));
   for (const l of await LeadList.find({}).lean()) {
-    if (!have.has(l.name.toLowerCase())) origins.push({ name: l.name, count: 0 });
+    if (!have.has(l.name.toLowerCase())) origins.push({ name: l.name, count: 0, sent: 0 });
   }
   origins.sort((a, b) => a.name.localeCompare(b.name));
   res.json({ origins });

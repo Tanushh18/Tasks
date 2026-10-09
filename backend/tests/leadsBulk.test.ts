@@ -378,12 +378,23 @@ describe("one shared pool with a sheet filter", () => {
     expect((await p.get("/api/leads?page=1&status=all")).body.total).toBe(3);
     const origins = (await p.get("/api/leads/origins")).body.origins;
     expect(origins).toEqual([
-      { name: "Calling Data", count: 2 },
-      { name: "Meta Sheet", count: 1 },
+      { name: "Calling Data", count: 2, sent: 0 },
+      { name: "Meta Sheet", count: 1, sent: 0 },
     ]);
     const meta = (await p.get("/api/leads?page=1&status=all&origin=Meta%20Sheet")).body;
     expect(meta.total).toBe(1);
     expect(meta.leads[0]).toMatchObject({ name: "Jitender Yadav", origin: "Meta Sheet" });
+
+    // WhatsApp sent counts: per sheet in /origins, and for the open view (all sheets or one) in the list.
+    expect(meta.whatsappSent).toBe(0);
+    expect((await p.patch(`/api/leads/${meta.leads[0].id}`).send({ whatsappSent: true })).status).toBe(200);
+    expect((await p.get("/api/leads/origins")).body.origins).toEqual([
+      { name: "Calling Data", count: 2, sent: 0 },
+      { name: "Meta Sheet", count: 1, sent: 1 },
+    ]);
+    expect((await p.get("/api/leads?page=1&status=all")).body.whatsappSent).toBe(1);
+    expect((await p.get("/api/leads?page=1&status=all&origin=Calling%20Data")).body.whatsappSent).toBe(0);
+    await p.patch(`/api/leads/${meta.leads[0].id}`).send({ whatsappSent: false });
 
     // She can edit a lead the admin imported.
     const res = await p.patch(`/api/leads/${meta.leads[0].id}`).send({ status: "Follow-up" });
@@ -442,8 +453,8 @@ describe("renaming a sheet name from the filter", () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ renamed: 2, from: "Central Park II buyers", to: "Calling Data" });
     expect((await a.get("/api/leads/origins")).body.origins).toEqual([
-      { name: "Calling Data", count: 2 },
-      { name: "Meta Sheet", count: 1 },
+      { name: "Calling Data", count: 2, sent: 0 },
+      { name: "Meta Sheet", count: 1, sent: 0 },
     ]);
     expect(await Lead.countDocuments({ origin: "Calling Data", status: "Follow-up", notes: "keep me" })).toBe(2);
     // The import list itself carries the new name, so later leads from it use it too.
@@ -451,7 +462,7 @@ describe("renaming a sheet name from the filter", () => {
 
     // Renaming into an existing name merges the groups.
     await a.post("/api/leads/origins/rename").send({ from: "Calling Data", to: "Meta Sheet" });
-    expect((await a.get("/api/leads/origins")).body.origins).toEqual([{ name: "Meta Sheet", count: 3 }]);
+    expect((await a.get("/api/leads/origins")).body.origins).toEqual([{ name: "Meta Sheet", count: 3, sent: 0 }]);
   });
 });
 
