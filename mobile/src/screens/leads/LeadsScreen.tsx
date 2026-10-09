@@ -30,6 +30,7 @@ import { isUnreachableError } from "../../offline/httpQueue";
 import { bypassCacheBriefly } from "../../offline/httpCache";
 import { templateForOrigin } from "../../leads/whatsapp";
 import { useTheme, type Theme } from "../../theme/useTheme";
+import { SmsHistory } from "./SmsHistory";
 import { WhatsAppHistory } from "./WhatsAppHistory";
 import { WhatsAppPreviewSheet } from "./WhatsAppPreviewSheet";
 
@@ -133,18 +134,38 @@ export function LeadsScreen({ navigation }: any) {
   useLayoutEffect(() => {
     navigation.setOptions?.({
       headerRight: () => (
-        <Pressable
-          onPress={() => navigation.navigate("LeadSettings")}
-          accessibilityRole="button"
-          accessibilityLabel="Leads settings"
-          hitSlop={8}
-          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}
-        >
-          <Ionicons name="settings-outline" size={24} color={colors.text} />
-        </Pressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <Pressable
+            onPress={() => navigation.navigate("LeadSms")}
+            accessibilityRole="button"
+            accessibilityLabel="SMS status"
+            hitSlop={8}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, flexDirection: "row", alignItems: "center", gap: 4, padding: 4 })}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontWeight: "600" }}>SMS</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => navigation.navigate("LeadSettings")}
+            accessibilityRole="button"
+            accessibilityLabel="Leads settings"
+            hitSlop={8}
+            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 4 })}
+          >
+            <Ionicons name="settings-outline" size={24} color={colors.text} />
+          </Pressable>
+        </View>
       ),
     });
   }, [navigation, colors.text]);
+
+  // Consolidated Auto SMS numbers (read-only; the website console runs the sending). Hidden if the server has no SMS yet.
+  const [sms, setSms] = useState<api.SmsSummary | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      api.getSmsSummary().then(setSms).catch(() => setSms(null));
+    }, [])
+  );
 
   const listRef = useRef<FlatList<api.Lead>>(null);
   const request = useRef(0);
@@ -598,6 +619,28 @@ export function LeadsScreen({ navigation }: any) {
         </Pressable>
       ) : null}
 
+      {sms && sms.totals.total > 0 ? (
+        <Pressable
+          onPress={() => navigation.navigate("LeadSms")}
+          accessibilityRole="button"
+          accessibilityLabel={`SMS: ${sms.totals.sent + sms.totals.delivered} sent, ${sms.totals.failed + sms.totals.invalid} failed, ${sms.totals.remaining} left. Tap for details.`}
+          style={[
+            styles.autoRow,
+            { marginTop: spacing.sm, backgroundColor: colors.primaryMuted, borderColor: colors.primary, borderRadius: radius.md, padding: spacing.sm },
+          ]}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
+          <Text style={[typography.captionStrong, { color: colors.text, flex: 1 }]} numberOfLines={2}>
+            {`SMS sent: ${(sms.totals.sent + sms.totals.delivered).toLocaleString("en-IN")} · ${sms.totals.remaining.toLocaleString("en-IN")} left`}
+            <Text style={[typography.caption, { color: colors.textMuted }]}>
+              {sms.totals.failed + sms.totals.invalid ? ` · ${(sms.totals.failed + sms.totals.invalid).toLocaleString("en-IN")} failed` : ""}
+              {` · ${sms.state === "sending" ? "sending now" : sms.state === "waiting" ? "next sending time soon" : sms.state === "paused" ? "paused" : "all done"}`}
+            </Text>
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </Pressable>
+      ) : null}
+
       <View style={{ marginTop: spacing.md }}>
         <SearchBar value={search} onChangeText={setSearch} placeholder="Search name, phone, stage or notes" />
       </View>
@@ -975,7 +1018,10 @@ export function LeadsScreen({ navigation }: any) {
           />
         </View>
         {editorTab === "history" ? (
-          <WhatsAppHistory entries={(data?.leads.find((l) => l.id === editing?.id) ?? editing)?.whatsappHistory ?? []} />
+          <>
+            <WhatsAppHistory entries={(data?.leads.find((l) => l.id === editing?.id) ?? editing)?.whatsappHistory ?? []} />
+            <SmsHistory lead={data?.leads.find((l) => l.id === editing?.id) ?? editing} />
+          </>
         ) : (
         <>
         <Text style={[typography.captionStrong, { color: colors.textMuted, marginBottom: spacing.sm }]}>Stage</Text>

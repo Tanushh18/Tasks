@@ -38,6 +38,9 @@ router.post("/whatsapp-templates", validateRequest({ body: createTemplateSchema 
 router.patch("/whatsapp-templates/:id", validateRequest({ params: idParamSchema, body: updateTemplateSchema }), t.updateTemplate);
 router.delete("/whatsapp-templates/:id", validateRequest({ params: idParamSchema }), t.deleteTemplate);
 
+// Read-only Auto SMS numbers for the SMS status screen. Registered before "/:id".
+router.get("/sms-summary", c.smsSummary);
+
 router.patch("/:id", c.updateLead);
 router.delete("/:id", c.deleteLead);
 router.get("/sources/list", c.listSources);

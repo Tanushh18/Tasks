@@ -26,6 +26,7 @@ import {
 } from "../services/leadService";
 import { OLF_LIST, seedOlfData } from "../services/olfSeed";
 import { escapeRegex } from "../services/rules/text";
+import { appSummary as smsAppSummary } from "../services/smsService";
 
 /** Owner of leads sent to the no-auth bulk import when no `ownerMobile` is given. */
 const DEFAULT_IMPORT_OWNER = "8130483894";
@@ -48,7 +49,17 @@ function serializeLead(l: any) {
     whatsappSentAt: l.whatsappSentAt ?? null,
     whatsappTemplateId: l.whatsappTemplateId ? String(l.whatsappTemplateId) : null,
     whatsappHistory: l.whatsappHistory ?? [],
+    // Auto SMS (managed on the SMS Service website console; read-only here).
+    smsState: l.smsState ?? "",
+    smsSentAt: l.smsSentAt ?? null,
+    smsError: l.smsError ?? "",
+    smsHistory: l.smsHistory ?? [],
   };
+}
+
+/** Consolidated Auto SMS numbers (sent / delivered / failed / left, per sheet) for the SMS status screen. Read-only. */
+export async function smsSummary(_req: Request, res: Response) {
+  res.json(await smsAppSummary());
 }
 
 export async function listLeads(req: Request, res: Response) {

@@ -81,6 +81,7 @@ const mockListPage = jest.fn(async (opts: { page: number; status: string }) => (
 }));
 const mockUpdateLead = jest.fn(async () => lead);
 jest.mock("../../../api/leads", () => ({
+  getSmsSummary: jest.fn(async () => ({ state: "idle", window: null, lastSentAt: null, etaDays: null, sentToday: 0, dailyLimit: 90, lunch: "13:00–14:00", night: "21:00–23:00", totals: { total: 0, sent: 0, delivered: 0, failed: 0, invalid: 0, remaining: 0 }, sheets: [] })),
   CATEGORY_OPTIONS: ["Construction", "Interior", "Sale / Purchase"],
   DEFAULT_STATUS_OPTIONS: ["New", "Interested", "Converted"],
   listLeadsPage: (opts: { page: number; status: string }) => mockListPage(opts),
