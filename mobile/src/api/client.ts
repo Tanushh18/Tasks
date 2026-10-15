@@ -148,7 +148,11 @@ async function refreshAccessToken(): Promise<RefreshResult> {
     } catch (err) {
       // Signing someone out because their signal dropped mid-refresh would break "log in once, stay
       // logged in". Only an explicit refusal from a working server counts.
-      const refused = axios.isAxiosError(err) && err.response && [400, 401, 403, 404].includes(err.response.status);
+      const refused =
+        axios.isAxiosError(err) &&
+        err.response &&
+        [400, 401, 403, 404].includes(err.response.status) &&
+        !isRenderNoServer(err.response);
       if (refused) return { status: "rejected" };
     }
   }
@@ -160,10 +164,22 @@ async function refreshAccessToken(): Promise<RefreshResult> {
 // and retrying either one against the other server is harmless even on the rare chance it did.
 const SAFE_TO_REPLAY_ON_TIMEOUT_URLS = ["/auth/login", "/auth/register"];
 
+/**
+ * Render answers a deleted or suspended service with a bare 404 and `x-render-routing: no-server`.
+ * That is the platform saying nobody is home, not the API saying a route is missing.
+ */
+function isRenderNoServer(response: { headers?: unknown } | undefined): boolean {
+  const headers = response?.headers as { get?: (name: string) => unknown; [key: string]: unknown } | undefined;
+  if (!headers) return false;
+  const value = typeof headers.get === "function" ? headers.get("x-render-routing") : headers["x-render-routing"];
+  return value === "no-server";
+}
+
 /** True when the server itself looks unreachable (as opposed to it answering with an error). */
 function isServerDown(error: AxiosError): boolean {
   const status = error.response?.status;
   if (status === 502 || status === 503 || status === 504) return true;
+  if (status === 404 && isRenderNoServer(error.response)) return true;
   if (error.response) return false;
   if (error.code === "ERR_CANCELED") return false;
   // A timeout may mean the server did receive a write, so only replay reads (and the handful of

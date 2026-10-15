@@ -492,11 +492,11 @@ All configuration is via environment variables in `mobile/.env`:
 
 **Production URLs** (with automatic fallover):
 ```
-EXPO_PUBLIC_API_URLS=https://tasks-g9h1.onrender.com/api, https://we-three-api.onrender.com/api
+EXPO_PUBLIC_API_URLS=https://we-three-api.onrender.com/api
 ```
 
 **Server Failover Logic**:
-- The app tries the primary server (`tasks-g9h1.onrender.com`) first
+- The app tries the first server in the list first
 - If it's unreachable or returns 502/503/504, the app automatically switches to the fallback (`we-three-api.onrender.com`)
 - The client stays on whichever server is working until it fails
 - Requests are queued offline if both servers fail and synced when connectivity returns
@@ -992,7 +992,7 @@ npm run build && docker build -t we-three-api . # Build Docker image
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Backend API (Production) | https://tasks-g9h1.onrender.com/api | Main REST API |
+| Backend API (Production) | https://we-three-api.onrender.com/api | Main REST API |
 | Backend API (Fallback) | https://we-three-api.onrender.com/api | Backup REST API |
 | Backend API (Local Dev) | http://localhost:4000 | Local REST API |
 | Health Check | http://localhost:4000/health | Liveness probe |
