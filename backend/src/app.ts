@@ -57,7 +57,8 @@ export function createApp(): Express {
   app.use(apiRateLimiter);
   app.use("/api", idempotency);
 
-  app.get("/health", (_req, res) => {
+  // /api/health is an alias: Render dashboards often point the check there, and a 404 marks the service down.
+  app.get(["/health", "/api/health"], (_req, res) => {
     // Render sets RENDER_GIT_COMMIT, so a URL check shows which version is live.
     res.json({ status: "ok", commit: process.env.RENDER_GIT_COMMIT ?? null, timestamp: new Date().toISOString() });
   });
