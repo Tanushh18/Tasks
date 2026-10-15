@@ -45,6 +45,39 @@ describe("apiClient server failover", () => {
     expect(seen[seen.length - 1]).toBe("https://backup.test/api");
   });
 
+  it("treats Render's no-server 404 (deleted/suspended service) as a dead server", async () => {
+    // Reset to the primary so this case starts from the dead server.
+    apiClient.defaults.adapter = async (config) => {
+      if (config.baseURL === "https://backup.test/api") {
+        const response: AxiosResponse = {
+          status: 404,
+          data: "Not Found",
+          statusText: "Not Found",
+          headers: { "x-render-routing": "no-server" },
+          config,
+        };
+        const error = new Error("Request failed with status code 404") as Error & { isAxiosError: true; config: unknown; response: AxiosResponse };
+        error.isAxiosError = true;
+        error.config = config;
+        error.response = response;
+        throw error;
+      }
+      return ok(config);
+    };
+    expect(getActiveBaseUrl()).toBe("https://backup.test/api");
+    const res = await apiClient.get("/tasks");
+    expect(res.status).toBe(200);
+    expect(getActiveBaseUrl()).toBe("https://primary.test/api");
+
+    // Leave the shared client on the backup, where the following cases expect it.
+    apiClient.defaults.adapter = async (config) => {
+      if (config.baseURL === "https://primary.test/api") throw networkError(config);
+      return ok(config);
+    };
+    await apiClient.get("/tasks");
+    expect(getActiveBaseUrl()).toBe("https://backup.test/api");
+  });
+
   it("gives up after trying every server", async () => {
     let calls = 0;
     apiClient.defaults.adapter = async (config) => {
