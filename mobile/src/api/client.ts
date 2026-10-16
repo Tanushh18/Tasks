@@ -164,6 +164,8 @@ const SAFE_TO_REPLAY_ON_TIMEOUT_URLS = ["/auth/login", "/auth/register"];
 function isServerDown(error: AxiosError): boolean {
   const status = error.response?.status;
   if (status === 502 || status === 503 || status === 504) return true;
+  // Render answers 404 + "no-server" for a service that was deleted. That's a dead server, not a missing record.
+  if (status === 404 && String(error.response?.headers?.["x-render-routing"] ?? "") === "no-server") return true;
   if (error.response) return false;
   if (error.code === "ERR_CANCELED") return false;
   // A timeout may mean the server did receive a write, so only replay reads (and the handful of
