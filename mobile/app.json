@@ -2,7 +2,7 @@
   "expo": {
     "name": "We Three",
     "slug": "we-three-t23",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -65,6 +65,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/ionicons.ttf"
+          ]
+        }
+      ],
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       [
