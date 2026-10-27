@@ -60,18 +60,15 @@ export function getActiveBaseUrl(): string {
 
 export const API_BASE_URL = API_BASE_URLS[0];
 
-/** The build-time list: the bootstrap that registry results are layered on top of. */
-const BOOTSTRAP_URLS: string[] = [...API_BASE_URLS];
-
 /**
- * Swap in the server list from the Stashr registry (see api/registry.ts). The build-time URLs stay at
- * the end as a last resort. The list is edited in place so existing imports of API_BASE_URLS stay
- * valid, and the server currently in use is kept when it is still listed.
+ * Swap in the server list managed on the web (see api/registry.ts). It replaces the build-time URLs,
+ * which only serve to reach the list the first time. The list is edited in place so existing imports
+ * of API_BASE_URLS stay valid, and the server currently in use is kept when it is still listed.
  */
 export function applyServerList(fresh: string[]): void {
   const cleaned = fresh.map((url) => url.trim().replace(/\/+$/, "")).filter(Boolean);
   if (cleaned.length === 0) return;
-  const list = [...cleaned, ...BOOTSTRAP_URLS].filter((url, i, all) => all.indexOf(url) === i);
+  const list = cleaned.filter((url, i, all) => all.indexOf(url) === i);
   const current = API_BASE_URLS[activeServerIndex];
   API_BASE_URLS.splice(0, API_BASE_URLS.length, ...list);
   const kept = API_BASE_URLS.indexOf(current);

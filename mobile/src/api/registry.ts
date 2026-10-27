@@ -5,7 +5,7 @@ import { API_BASE_URLS, applyServerList } from "./client";
  * Server registry: the backend URLs for this app are managed on the server's admin page (/admin/servers) or
  * on Stashr (Servers page), so changing one needs no rebuild or redeploy. On every start the cached list is
  * applied at once, then a fresh one is fetched in the background. If nothing can be reached the build-time
- * URLs (EXPO_PUBLIC_API_URLS) keep working.
+ * URLs (EXPO_PUBLIC_API_URLS) keep working until the first list arrives; after that the web list is the only one used.
  */
 const APP = "wethree";
 const CACHE_KEY = "registry.wethree";
