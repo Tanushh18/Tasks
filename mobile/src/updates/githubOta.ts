@@ -92,3 +92,21 @@ export async function downloadOtaUpdate(): Promise<boolean> {
     throw error;
   }
 }
+
+export type OtaCheckResult = "downloaded" | "latest" | "offline";
+
+/** What Settings shows: the APK's version and when the running JavaScript was built. */
+export function describeBuild(): string {
+  const built = OWN_VERSION ? new Date(OWN_VERSION * 1000).toISOString().slice(0, 16).replace("T", " ") + " UTC" : "unknown";
+  return `Version ${RUNTIME_VERSION || "dev"} · built ${built}`;
+}
+
+/** "Check for updates" in Settings: asks GitHub right now (no 30 minute wait) and says what happened. */
+export async function checkForOtaUpdate(): Promise<OtaCheckResult> {
+  try {
+    if (await downloadOtaUpdate()) return "downloaded";
+    return (await readNumber("current.meta", 1)) > OWN_VERSION ? "downloaded" : "latest";
+  } catch {
+    return "offline";
+  }
+}

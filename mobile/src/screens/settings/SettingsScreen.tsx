@@ -15,6 +15,7 @@ import { TextField } from "../../components/TextField";
 import { pingLocalServer, type LocalHealth } from "../../localServer/client";
 import { DEFAULT_LOCAL_SERVER_URL, getLocalServerUrl, setLocalServerUrl } from "../../localServer/config";
 import { listPendingScans } from "../../localServer/pendingScans";
+import { checkForOtaUpdate, describeBuild } from "../../updates/githubOta";
 import type { SettingsStackParamList } from "../../navigation/types";
 import { darkColors, lightColors, midnightColors } from "../../theme/colors";
 import { useTheme, type ThemeMode } from "../../theme/useTheme";
@@ -299,6 +300,22 @@ export function SettingsScreen({ navigation }: Props) {
         />
       ) : null}
 
+      <SettingRow
+        label="Check for updates"
+        detail={describeBuild()}
+        icon="cloud-download-outline"
+        onPress={async () => {
+          const result = await checkForOtaUpdate();
+          Alert.alert(
+            result === "downloaded" ? "Update ready" : result === "latest" ? "You're up to date" : "Couldn't check",
+            result === "downloaded"
+              ? "The new version was downloaded. Close the app completely and open it again to use it."
+              : result === "latest"
+                ? "This is the newest version."
+                : "Check your internet connection and try again."
+          );
+        }}
+      />
       <SettingRow label="Log out" icon="log-out-outline" onPress={() => setConfirmingLogout(true)} />
       <SettingRow
         label="Delete account"
