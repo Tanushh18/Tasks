@@ -1,10 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { applyServerList } from "./client";
+import { API_BASE_URLS, applyServerList } from "./client";
 
 /**
- * Server registry: the backend URLs for this app live on Stashr (Servers page), so changing one needs
- * no rebuild or redeploy. On start the cached list is applied at once, then a fresh one is fetched in
- * the background. If Stashr can't be reached the build-time URLs (EXPO_PUBLIC_API_URLS) keep working.
+ * Server registry: the backend URLs for this app are managed on the server's admin page (/admin/servers) or
+ * on Stashr (Servers page), so changing one needs no rebuild or redeploy. On every start the cached list is
+ * applied at once, then a fresh one is fetched in the background. If nothing can be reached the build-time
+ * URLs (EXPO_PUBLIC_API_URLS) keep working.
  */
 const APP = "wethree";
 const CACHE_KEY = "registry.wethree";
@@ -42,10 +43,12 @@ export async function refreshServerList(): Promise<string[] | null> {
     /* no cache yet */
   }
 
-  for (const host of REGISTRY_HOSTS) {
+  // The list managed on the server's own admin page (/admin/servers) comes first, then the Stashr registry.
+  const sources = [...API_BASE_URLS.map((base) => `${base}/servers`), ...REGISTRY_HOSTS.map((host) => `${host}/registry/${APP}`)].filter((url, i, all) => all.indexOf(url) === i);
+  for (const source of sources) {
     try {
       // Long enough for a sleeping free-tier server to wake up.
-      const res = await fetchWithTimeout(`${host}/registry/${APP}`, 60000);
+      const res = await fetchWithTimeout(source, 60000);
       if (!res.ok) continue;
       const urls = cleanList(((await res.json()) as { urls?: unknown }).urls);
       if (urls.length === 0) continue;
@@ -53,7 +56,7 @@ export async function refreshServerList(): Promise<string[] | null> {
       void AsyncStorage.setItem(CACHE_KEY, JSON.stringify(urls)).catch(() => undefined);
       return urls;
     } catch {
-      /* try the next registry host */
+      /* try the next source */
     }
   }
   return null;
