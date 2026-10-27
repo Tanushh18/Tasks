@@ -6,7 +6,7 @@ jest.mock("expo-secure-store", () => ({
   deleteItemAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
-import { apiClient } from "../client";
+import { apiClient, applyServerList } from "../client";
 import * as sessionStore from "../../auth/sessionStore";
 
 function unauthorizedError(config: InternalAxiosRequestConfig) {
@@ -26,6 +26,9 @@ function unauthorizedError(config: InternalAxiosRequestConfig) {
  * access token (not an actually-dead 30-day session) forced a full re-login on every app open
  * more than 15 minutes apart. Only the token-issuing endpoints should be excluded. */
 describe("apiClient 401 refresh-and-retry", () => {
+  // There is no built-in server; the list normally comes from Stashr.
+  beforeAll(() => applyServerList(["https://server.test/api"]));
+
   const originalAdapter = apiClient.defaults.adapter;
 
   afterEach(() => {

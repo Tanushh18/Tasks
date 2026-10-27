@@ -38,14 +38,15 @@ function cachedReply(config: ClientConfig, data: unknown, note: string): AxiosRe
 }
 
 /**
- * Backend servers in priority order. EXPO_PUBLIC_API_URLS is a comma-separated list; the single
- * EXPO_PUBLIC_API_URL still works for local development. If the active server is down the client
- * moves on to the next one and stays there until that one fails too.
+ * Backend servers in priority order, exactly as the Stashr registry lists them (see api/registry.ts): the list is
+ * empty until the first one arrives, and empty again when everything is switched off there. There is no built-in
+ * server. EXPO_PUBLIC_API_URLS / EXPO_PUBLIC_API_URL exist only for local development and tests (production builds
+ * set neither). If the active server is down the client moves on to the next one and stays there until that one fails.
  */
 export const API_BASE_URLS: string[] = (
   process.env.EXPO_PUBLIC_API_URLS ??
   process.env.EXPO_PUBLIC_API_URL ??
-  "http://localhost:4000/api"
+  ""
 )
   .split(",")
   .map((url: string) => url.trim().replace(/\/+$/, ""))
@@ -53,9 +54,12 @@ export const API_BASE_URLS: string[] = (
 
 let activeServerIndex = 0;
 
+/** Used as the address when there is no server (switched off, or Stashr never reached): requests fail at once. */
+export const NO_SERVER = "https://stashr-no-server.invalid";
+
 /** The server requests are currently sent to. */
 export function getActiveBaseUrl(): string {
-  return API_BASE_URLS[activeServerIndex];
+  return API_BASE_URLS[activeServerIndex] ?? NO_SERVER;
 }
 
 export const API_BASE_URL = API_BASE_URLS[0];
@@ -67,7 +71,7 @@ export const API_BASE_URL = API_BASE_URLS[0];
  */
 export function applyServerList(fresh: string[]): void {
   const cleaned = fresh.map((url) => url.trim().replace(/\/+$/, "")).filter(Boolean);
-  if (cleaned.length === 0) return;
+  // An empty list is valid: it means the servers are switched off on Stashr.
   const list = cleaned.filter((url, i, all) => all.indexOf(url) === i);
   const current = API_BASE_URLS[activeServerIndex];
   API_BASE_URLS.splice(0, API_BASE_URLS.length, ...list);
@@ -79,7 +83,7 @@ export function applyServerList(fresh: string[]): void {
 // 30-50s; a shorter timeout would give up (and, for non-safe-to-replay requests, report failure)
 // before the server ever gets a chance to answer.
 export const apiClient = axios.create({
-  baseURL: API_BASE_URLS[0],
+  baseURL: getActiveBaseUrl(),
   timeout: 30000,
 });
 

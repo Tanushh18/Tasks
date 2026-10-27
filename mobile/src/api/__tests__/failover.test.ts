@@ -101,10 +101,13 @@ describe("applyServerList (registry)", () => {
     expect(getActiveBaseUrl()).toBe("https://backup.test/api");
   });
 
-  it("ignores an empty list", () => {
-    const { applyServerList } = require("../client") as typeof import("../client");
-    const before = [...API_BASE_URLS];
+  it("an empty list means switched off: no servers, and requests go nowhere", () => {
+    const { applyServerList, NO_SERVER, getActiveBaseUrl } = require("../client") as typeof import("../client");
     applyServerList([]);
-    expect(API_BASE_URLS).toEqual(before);
+    expect(API_BASE_URLS).toEqual([]);
+    expect(getActiveBaseUrl()).toBe(NO_SERVER);
+    applyServerList(["https://back.test/api"]);
+    expect(API_BASE_URLS).toEqual(["https://back.test/api"]);
+    expect(getActiveBaseUrl()).toBe("https://back.test/api");
   });
 });

@@ -2,19 +2,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { applyServerList } from "./client";
 
 /**
- * Server registry: the backend URLs for this app are managed on Stashr (each project's Server URLs section), so changing one needs no
- * rebuild or redeploy. On every start the cached list is applied at once, then a fresh one is fetched in the background. If nothing can be reached the build-time
- * URLs (EXPO_PUBLIC_API_URLS) keep working until the first list arrives; after that the web list is the only one used.
+ * Server registry: the backend URLs for this app are managed on Stashr (each project's Server URLs section), so
+ * changing one needs no rebuild or redeploy. On every start the cached list is applied at once, then a fresh one is
+ * fetched in the background. Stashr is the only source: there is no built-in server. If everything is switched off there, the list is empty and
+ * the app does not connect; if Stashr cannot be reached, the last list it gave (cached on the phone) is kept.
  */
 const APP = "wethree";
 const CACHE_KEY = "registry.wethree";
-const REGISTRY_HOSTS: string[] = (
-  process.env.EXPO_PUBLIC_REGISTRY_URLS ??
-  "https://password-manager-server-xxdr.onrender.com,https://password-manager-server-8gvj.onrender.com"
-)
-  .split(",")
-  .map((url: string) => url.trim().replace(/\/+$/, ""))
-  .filter(Boolean);
+const REGISTRY_HOST = "https://password-manager-server-xxdr.onrender.com";
 
 function cleanList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -36,26 +31,21 @@ async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
 
 export async function refreshServerList(): Promise<string[] | null> {
   try {
-    const cached = cleanList(JSON.parse((await AsyncStorage.getItem(CACHE_KEY)) ?? "[]"));
-    if (cached.length) applyServerList(cached);
+    const saved = await AsyncStorage.getItem(CACHE_KEY);
+    if (saved !== null) applyServerList(cleanList(JSON.parse(saved))); // "[]" = switched off
   } catch {
     /* no cache yet */
   }
 
-  const sources = REGISTRY_HOSTS.map((host) => `${host}/registry/${APP}`);
-  for (const source of sources) {
-    try {
-      // Long enough for a sleeping free-tier server to wake up.
-      const res = await fetchWithTimeout(source, 60000);
-      if (!res.ok) continue;
-      const urls = cleanList(((await res.json()) as { urls?: unknown }).urls);
-      if (urls.length === 0) continue;
-      applyServerList(urls);
-      void AsyncStorage.setItem(CACHE_KEY, JSON.stringify(urls)).catch(() => undefined);
-      return urls;
-    } catch {
-      /* try the next source */
-    }
+  try {
+    // Long enough for a sleeping free-tier server to wake up.
+    const res = await fetchWithTimeout(`${REGISTRY_HOST}/registry/${APP}`, 60000);
+    if (!res.ok) return null;
+    const urls = cleanList(((await res.json()) as { urls?: unknown }).urls);
+    applyServerList(urls);
+    void AsyncStorage.setItem(CACHE_KEY, JSON.stringify(urls)).catch(() => undefined);
+    return urls;
+  } catch {
+    return null;
   }
-  return null;
 }

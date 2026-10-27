@@ -9,9 +9,6 @@ on:
 permissions:
   contents: write # uploads the bundle to the ota-<version> release
 
-env:
-  EXPO_PUBLIC_API_URLS: https://we-three-api-r310.onrender.com/api
-
 jobs:
   publish:
     runs-on: ubuntu-latest
