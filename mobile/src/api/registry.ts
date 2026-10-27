@@ -1,10 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { API_BASE_URLS, applyServerList } from "./client";
+import { applyServerList } from "./client";
 
 /**
- * Server registry: the backend URLs for this app are managed on the server's admin page (/admin/servers) or
- * on Stashr (Servers page), so changing one needs no rebuild or redeploy. On every start the cached list is
- * applied at once, then a fresh one is fetched in the background. If nothing can be reached the build-time
+ * Server registry: the backend URLs for this app are managed on Stashr (each project's Server URLs section), so changing one needs no
+ * rebuild or redeploy. On every start the cached list is applied at once, then a fresh one is fetched in the background. If nothing can be reached the build-time
  * URLs (EXPO_PUBLIC_API_URLS) keep working until the first list arrives; after that the web list is the only one used.
  */
 const APP = "wethree";
@@ -43,8 +42,7 @@ export async function refreshServerList(): Promise<string[] | null> {
     /* no cache yet */
   }
 
-  // The list managed on the server's own admin page (/admin/servers) comes first, then the Stashr registry.
-  const sources = [...API_BASE_URLS.map((base) => `${base}/servers`), ...REGISTRY_HOSTS.map((host) => `${host}/registry/${APP}`)].filter((url, i, all) => all.indexOf(url) === i);
+  const sources = REGISTRY_HOSTS.map((host) => `${host}/registry/${APP}`);
   for (const source of sources) {
     try {
       // Long enough for a sleeping free-tier server to wake up.

@@ -34,7 +34,6 @@ import sharedDocumentRoutes from "./routes/sharedDocumentRoutes";
 import vehicleRoutes from "./routes/vehicleRoutes";
 import weeklySummaryRoutes from "./routes/weeklySummaryRoutes";
 import leadRoutes from "./routes/leadRoutes";
-import { serverAdminPageRouter, serverApiRouter } from "./routes/serverRoutes";
 import { smsConsoleRouter, smsGatewayRouter } from "./routes/smsRoutes";
 import shineMediaRoutes, { shinePublicRouter } from "./routes/shineMediaRoutes";
 
@@ -90,8 +89,6 @@ export function createApp(): Express {
   app.use("/api/polls", pollRoutes);
   app.use("/api/weekly-summary", weeklySummaryRoutes);
   app.use("/api/activity-feed", activityFeedRoutes);
-  app.use("/api/servers", serverApiRouter);
-  app.use("/admin/servers", serverAdminPageRouter);
   app.use("/api/leads", leadRoutes);
   app.use("/api/public/shine", shinePublicRouter);
   app.use("/api/shine-media", shineMediaRoutes);
