@@ -3,8 +3,9 @@ import React, { useEffect, useRef } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as locationApi from "./src/api/location";
-import { refreshServerList } from "./src/api/registry";
+import { startServerWatch } from "./src/api/registry";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
+import { ServerOffGate } from "./src/components/ServerOffGate";
 import { FeatureFlagsProvider, useFeatureFlags } from "./src/features/FeatureFlagsContext";
 import { CallFollowUpHost, ContactSuggestionsHost } from "./src/leads/LeadPopups";
 import { useUpiExpenseSync } from "./src/expenses/useUpiExpenseSync";
@@ -18,8 +19,8 @@ import { RootNavigator } from "./src/navigation/RootNavigator";
 import { ThemeProvider } from "./src/theme/ThemeProvider";
 import { useTheme } from "./src/theme/useTheme";
 
-// Pick up the latest server list from the Stashr registry (background; never blocks start-up).
-void refreshServerList();
+// Ask the Stashr registry at start and keep asking while the app is open: if the servers are switched off there, the app stops.
+startServerWatch();
 
 function AppContent() {
   useNotificationResponseHandler();
@@ -50,12 +51,12 @@ function AppContent() {
   }, [isAuthenticated, flags.location]);
 
   return (
-    <>
+    <ServerOffGate>
       <RootNavigator />
       {/* Lead popups sit above every screen. */}
       <CallFollowUpHost />
       <ContactSuggestionsHost />
-    </>
+    </ServerOffGate>
   );
 }
 

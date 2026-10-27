@@ -1,4 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppState } from "react-native";
+import { clearHttpCache } from "../offline/httpCache";
 import { applyServerList } from "./client";
 
 /**
@@ -19,33 +21,110 @@ function cleanList(value: unknown): string[] {
     .filter((url) => /^https?:\/\//i.test(url));
 }
 
+/**
+ * Whether the app may be used. "off" means the servers are switched off on Stashr: the app shows a blocked screen
+ * and nothing else (no cached data). "checking" lasts only until the first answer (or CHECK_GRACE_MS).
+ */
+export type ServerStatus = "checking" | "on" | "off";
+
+/** Registry polling while the app is open: a switch-off on Stashr takes effect within about this long. */
+export const WATCH_INTERVAL_MS = 15000;
+/** At start-up the app waits this long for the registry before falling back to the list cached on the phone. */
+export const CHECK_GRACE_MS = 8000;
+
+let status: ServerStatus = "checking";
+const listeners = new Set<(next: ServerStatus) => void>();
+
+function setStatus(next: ServerStatus): void {
+  if (next === status) return;
+  status = next;
+  if (next === "off") void clearHttpCache().catch(() => undefined);
+  listeners.forEach((fn) => fn(next));
+}
+
+export function getServerStatus(): ServerStatus {
+  return status;
+}
+
+export function subscribeServerStatus(fn: (next: ServerStatus) => void): () => void {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
 async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   try {
-    return await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+    return await fetch(url, {
+      headers: { Accept: "application/json", "Cache-Control": "no-cache" },
+      signal: controller.signal,
+    });
   } finally {
     clearTimeout(timer);
   }
 }
 
-export async function refreshServerList(): Promise<string[] | null> {
-  try {
-    const saved = await AsyncStorage.getItem(CACHE_KEY);
-    if (saved !== null) applyServerList(cleanList(JSON.parse(saved))); // "[]" = switched off
-  } catch {
-    /* no cache yet */
-  }
+let inFlight: Promise<string[] | null> | null = null;
 
+/** Reads the list from Stashr (one request at a time) and applies it. Returns null when Stashr could not be reached. */
+export function refreshServerList(timeoutMs = 60000): Promise<string[] | null> {
+  if (!inFlight) {
+    inFlight = fetchList(timeoutMs).finally(() => {
+      inFlight = null;
+    });
+  }
+  return inFlight;
+}
+
+async function fetchList(timeoutMs: number): Promise<string[] | null> {
   try {
-    // Long enough for a sleeping free-tier server to wake up.
-    const res = await fetchWithTimeout(`${REGISTRY_HOST}/registry/${APP}`, 60000);
+    // Long enough for a sleeping free-tier server to wake up (first call only; later polls are shorter).
+    const res = await fetchWithTimeout(`${REGISTRY_HOST}/registry/${APP}?t=${Date.now()}`, timeoutMs);
     if (!res.ok) return null;
     const urls = cleanList(((await res.json()) as { urls?: unknown }).urls);
     applyServerList(urls);
+    setStatus(urls.length ? "on" : "off");
     void AsyncStorage.setItem(CACHE_KEY, JSON.stringify(urls)).catch(() => undefined);
     return urls;
   } catch {
     return null;
   }
+}
+
+async function applyCachedList(): Promise<void> {
+  try {
+    const saved = await AsyncStorage.getItem(CACHE_KEY);
+    if (saved === null) return;
+    const urls = cleanList(JSON.parse(saved));
+    applyServerList(urls); // "[]" = switched off
+    if (urls.length === 0) setStatus("off");
+  } catch {
+    /* no cache yet */
+  }
+}
+
+let watching = false;
+
+/**
+ * Start-up check plus a live watch: the cached list is applied at once (an "off" cached list blocks immediately), the
+ * registry is asked right away, and then again every WATCH_INTERVAL_MS and whenever the app comes back to the
+ * foreground, so switching the servers off on Stashr stops an open app too. Calling it twice does nothing.
+ */
+export function startServerWatch(): void {
+  if (watching) return;
+  watching = true;
+  void applyCachedList().then(async () => {
+    const grace = setTimeout(() => {
+      if (status === "checking") setStatus("on"); // registry slow or unreachable: keep working from the cached list
+    }, CHECK_GRACE_MS);
+    await refreshServerList();
+    clearTimeout(grace);
+    if (status === "checking") setStatus("on");
+  });
+  setInterval(() => void refreshServerList(15000), WATCH_INTERVAL_MS);
+  AppState.addEventListener("change", (state) => {
+    if (state === "active") void refreshServerList(15000);
+  });
 }
