@@ -492,12 +492,12 @@ All configuration is via environment variables in `mobile/.env`:
 
 **Production URLs** (with automatic fallover):
 ```
-EXPO_PUBLIC_API_URLS=https://tasks-g9h1.onrender.com/api, https://we-three-api.onrender.com/api
+EXPO_PUBLIC_API_URLS=https://your-server.example/api
 ```
 
 **Server Failover Logic**:
-- The app tries the primary server (`tasks-g9h1.onrender.com`) first
-- If it's unreachable or returns 502/503/504, the app automatically switches to the fallback (`we-three-api.onrender.com`)
+- The app tries the primary server (first in the Stashr list) first
+- If it's unreachable or returns 502/503/504, the app automatically switches to the fallback (next in the Stashr list)
 - The client stays on whichever server is working until it fails
 - Requests are queued offline if both servers fail and synced when connectivity returns
 
@@ -607,17 +607,17 @@ Body (JSON). Send one of `sheetUrl`, `csv`, `files` or `rows`:
 
 ```bash
 # 1. Preview (writes nothing)
-curl -X POST https://we-three-api.onrender.com/api/leads/bulk-import \
+curl -X POST <server-url>/api/leads/bulk-import \
   -H "Content-Type: application/json" \
   -d '{"sheetUrl":"https://docs.google.com/spreadsheets/d/<id>/edit","label":"Central Park II buyers","dryRun":true}'
 
 # 2. Import for real (same body without dryRun)
-curl -X POST https://we-three-api.onrender.com/api/leads/bulk-import \
+curl -X POST <server-url>/api/leads/bulk-import \
   -H "Content-Type: application/json" \
   -d '{"sheetUrl":"https://docs.google.com/spreadsheets/d/<id>/edit","label":"Central Park II buyers"}'
 
 # Upload a CSV file directly (options go in the query string)
-curl -X POST "https://we-three-api.onrender.com/api/leads/bulk-import?label=My%20CSV" \
+curl -X POST "<server-url>/api/leads/bulk-import?label=My%20CSV" \
   -H "Content-Type: text/csv" --data-binary @leads.csv
 ```
 
@@ -992,8 +992,8 @@ npm run build && docker build -t we-three-api . # Build Docker image
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Backend API (Production) | https://tasks-g9h1.onrender.com/api | Main REST API |
-| Backend API (Fallback) | https://we-three-api.onrender.com/api | Backup REST API |
+| Backend API (Production) | (from the Stashr registry) | Main REST API |
+| Backend API (Fallback) | (from the Stashr registry) | Backup REST API |
 | Backend API (Local Dev) | http://localhost:4000 | Local REST API |
 | Health Check | http://localhost:4000/health | Liveness probe |
 | Local Server | http://localhost:3000 | Optional local AI (OCR/voice) |
