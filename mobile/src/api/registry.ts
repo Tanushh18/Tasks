@@ -11,9 +11,10 @@ import { applyServerList } from "./client";
  */
 const APP = "wethree";
 const CACHE_KEY = "registry.wethree";
-// The Stashr address comes from the build env (EXPO_PUBLIC_STASHR_SERVER_URL, written by Stashr when its main
-// server changes). The old address is only the default when that variable is not set.
-const REGISTRY_HOST = String(process.env.EXPO_PUBLIC_STASHR_SERVER_URL || "https://password-manager-server-xxdr.onrender.com").trim().replace(/\/+$/, "");
+// Stashr addresses, tried in order: the build env (EXPO_PUBLIC_STASHR_SERVER_URL, written by Stashr when its main
+// server changes), then the current main server, then the old one as a last resort.
+const trim = (u: string) => u.trim().replace(/\/+$/, "");
+const REGISTRY_HOSTS = [...new Set([process.env.EXPO_PUBLIC_STASHR_SERVER_URL || "", "https://password-manager-server-g305.onrender.com", "https://password-manager-server-xxdr.onrender.com"].map((u) => trim(String(u))).filter(Boolean))];
 
 function cleanList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -81,18 +82,21 @@ export function refreshServerList(timeoutMs = 60000): Promise<string[] | null> {
 }
 
 async function fetchList(timeoutMs: number): Promise<string[] | null> {
-  try {
-    // Long enough for a sleeping free-tier server to wake up (first call only; later polls are shorter).
-    const res = await fetchWithTimeout(`${REGISTRY_HOST}/registry/${APP}?t=${Date.now()}`, timeoutMs);
-    if (!res.ok) return null;
-    const urls = cleanList(((await res.json()) as { urls?: unknown }).urls);
-    applyServerList(urls);
-    setStatus(urls.length ? "on" : "off");
-    void AsyncStorage.setItem(CACHE_KEY, JSON.stringify(urls)).catch(() => undefined);
-    return urls;
-  } catch {
-    return null;
+  for (const host of REGISTRY_HOSTS) {
+    try {
+      // Long enough for a sleeping free-tier server to wake up (first call only; later polls are shorter).
+      const res = await fetchWithTimeout(`${host}/registry/${APP}?t=${Date.now()}`, timeoutMs);
+      if (!res.ok) continue;
+      const urls = cleanList(((await res.json()) as { urls?: unknown }).urls);
+      applyServerList(urls);
+      setStatus(urls.length ? "on" : "off");
+      void AsyncStorage.setItem(CACHE_KEY, JSON.stringify(urls)).catch(() => undefined);
+      return urls;
+    } catch {
+      /* try the next Stashr address */
+    }
   }
+  return null;
 }
 
 async function applyCachedList(): Promise<void> {
