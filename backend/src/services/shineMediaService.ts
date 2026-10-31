@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from "cloudinary";
 import { env } from "../config/env";
+import { ShineSector } from "../models/ShineSector";
 import { ApiError } from "../utils/ApiError";
 
 /**
@@ -59,8 +60,35 @@ function creds() {
   return { cloud_name: env.shineCloudName, api_key: env.shineApiKey, api_secret: env.shineApiSecret, secure: true };
 }
 
-export function findProject(key: string): ShineProject | undefined {
-  return SHINE_PROJECTS.find((p) => p.key === key);
+/** Built-in sectors plus any added from an app (Stashr or this one), in the order they were added. */
+export async function getShineProjects(): Promise<ShineProject[]> {
+  const extra = await ShineSector.find({}).sort({ createdAt: 1 }).lean();
+  const known = new Set(SHINE_PROJECTS.map((p) => p.key));
+  return [
+    ...SHINE_PROJECTS,
+    ...extra.filter((s) => !known.has(s.key)).map((s) => ({ key: s.key, label: s.label, tag: s.tag, extraIds: [] as string[] })),
+  ];
+}
+
+export async function findProject(key: string): Promise<ShineProject | undefined> {
+  return (await getShineProjects()).find((p) => p.key === key);
+}
+
+/** "Sector 12" -> { key: "sector 12" (the Cloudinary folder), label, tag }; null when no usable name is left. */
+export function sectorFromLabel(input: unknown): { key: string; label: string; tag: string } | null {
+  const label = String(input ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
+  const key = label.toLowerCase().replace(/[^a-z0-9 -]/g, "").replace(/\s+/g, " ").trim();
+  if (key.length < 2) return null;
+  return { key, label, tag: key.replace(/[^a-z0-9]/g, "") };
+}
+
+export async function addShineSector(input: unknown): Promise<ShineProject> {
+  const sector = sectorFromLabel(input);
+  if (!sector) throw ApiError.badRequest("Give the sector or area a name.");
+  if (await findProject(sector.key)) throw new ApiError(409, "CONFLICT", "That sector already exists.");
+  await ShineSector.create(sector);
+  clearShineCache();
+  return { ...sector, extraIds: [] };
 }
 
 export function clearShineCache(): void {
@@ -115,8 +143,9 @@ async function listKind(project: ShineProject, kind: MediaKind): Promise<ShineMe
 export async function listAllShineMedia(): Promise<Map<string, ShineMediaItem[]>> {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.data;
   const data = new Map<string, ShineMediaItem[]>();
+  const projects = await getShineProjects();
   await Promise.all(
-    SHINE_PROJECTS.map(async (p) => {
+    projects.map(async (p) => {
       const [images, videos] = await Promise.all([listKind(p, "image"), listKind(p, "video")]);
       data.set(
         p.key,

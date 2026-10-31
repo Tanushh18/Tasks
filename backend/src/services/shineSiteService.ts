@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ShineSite } from "../models/ShineSite";
+import { getShineProjects } from "./shineMediaService";
 import { ApiError } from "../utils/ApiError";
 
 /**
@@ -51,9 +52,14 @@ export function clearShineSiteCache() {
 }
 
 /** Saved values over the defaults, in the defaults' order (new default projects appear automatically). */
-function merge(saved: Partial<ShineSiteProject>[] | undefined): ShineSiteProject[] {
+function merge(saved: Partial<ShineSiteProject>[] | undefined, added: { key: string; label: string }[] = []): ShineSiteProject[] {
   const byKey = new Map((saved ?? []).map((p) => [p.key, p]));
-  return DEFAULT_SHINE_PROJECTS.map((d) => {
+  const known = new Set(DEFAULT_SHINE_PROJECTS.map((d) => d.key));
+  // Sectors added from an app start as an ongoing project at 0% until someone sets their status.
+  const extras: ShineSiteProject[] = added
+    .filter((a) => !known.has(a.key))
+    .map((a) => ({ key: a.key, name: a.label, status: "Ongoing", area: "", progress: 0, stage: "", eta: "" }));
+  return [...DEFAULT_SHINE_PROJECTS, ...extras].map((d) => {
     const s = byKey.get(d.key) ?? {};
     const merged: ShineSiteProject = {
       ...d,
@@ -71,14 +77,14 @@ function merge(saved: Partial<ShineSiteProject>[] | undefined): ShineSiteProject
 export async function getShineSite() {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.data;
   const doc = await ShineSite.findById("shine").lean();
-  const data = { projects: merge(doc?.projects as Partial<ShineSiteProject>[] | undefined), updatedAt: doc?.updatedAt ? new Date(doc.updatedAt).toISOString() : null };
+  const data = { projects: merge(doc?.projects as Partial<ShineSiteProject>[] | undefined, await getShineProjects()), updatedAt: doc?.updatedAt ? new Date(doc.updatedAt).toISOString() : null };
   cache = { at: Date.now(), data };
   return data;
 }
 
 export async function updateShineProject(key: string, update: ProjectUpdate) {
-  if (!DEFAULT_SHINE_PROJECTS.some((p) => p.key === key)) throw ApiError.badRequest("Unknown project");
   const current = (await getShineSite()).projects;
+  if (!current.some((p) => p.key === key)) throw ApiError.badRequest("Unknown project");
   const projects = current.map((p) => (p.key === key ? { ...p, ...update } : p));
   await ShineSite.findByIdAndUpdate("shine", { projects }, { upsert: true, setDefaultsOnInsert: true });
   clearShineSiteCache();

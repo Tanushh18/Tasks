@@ -16,6 +16,7 @@ shinePublicRouter.get("/site", cors({ origin: true, methods: ["GET"] }), c.publi
 const router = Router();
 router.use(requireAuth);
 router.get("/projects", c.listProjects);
+router.post("/projects", c.addProject);
 router.post("/sign", c.signUpload);
 router.post("/uploaded", c.uploaded);
 router.post("/delete", c.removeMedia);

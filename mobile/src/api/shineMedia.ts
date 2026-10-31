@@ -40,6 +40,12 @@ export async function listProjects(): Promise<{ configured: boolean; projects: M
   return data;
 }
 
+/** Adds a new sector / area; its photos then upload like any other project's. */
+export async function addProject(label: string): Promise<MediaProject> {
+  const { data } = await apiClient.post("/shine-media/projects", { label });
+  return data;
+}
+
 export async function signUpload(project: string, kind: MediaKind): Promise<UploadSignature> {
   const { data } = await apiClient.post("/shine-media/sign", { project, kind });
   return data;

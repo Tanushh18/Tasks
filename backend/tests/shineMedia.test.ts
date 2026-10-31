@@ -166,3 +166,38 @@ describe("shine media - app routes", () => {
     expect(mockResources.mock.calls.length).toBeGreaterThan(calls);
   });
 });
+
+describe("shine media - adding a sector / area", () => {
+  it("adds a new sector that then lists, uploads and shows in the website feed and status", async () => {
+    mockResources.mockResolvedValue({ resources: [] });
+    mockByIds.mockResolvedValue({ resources: [] });
+    const { token } = await registerUser(app);
+    const a = authed(app, token);
+
+    const added = await a.post("/api/shine-media/projects").send({ label: "  Sector   12 " });
+    expect(added.status).toBe(201);
+    expect(added.body).toMatchObject({ key: "sector 12", label: "Sector 12", items: [] });
+
+    expect((await a.post("/api/shine-media/projects").send({ label: "sector 12" })).status).toBe(409);
+    expect((await a.post("/api/shine-media/projects").send({ label: "sec 4" })).status).toBe(409);
+    expect((await a.post("/api/shine-media/projects").send({ label: "!" })).status).toBe(400);
+
+    const list = await a.get("/api/shine-media/projects");
+    expect(list.body.projects.map((p: { key: string }) => p.key)).toContain("sector 12");
+
+    const sign = await a.post("/api/shine-media/sign").send({ project: "sector 12", kind: "image" });
+    expect(sign.status).toBe(200);
+    expect(sign.body.folder).toBe("ShineOne/sector 12");
+    expect(sign.body.tags).toBe("sector12");
+
+    const pub = await request(app).get("/api/public/shine/media");
+    expect(Object.keys(pub.body.folders)).toContain("sector 12");
+
+    const site = await request(app).get("/api/public/shine/site");
+    expect(site.body.projects.find((p: { key: string }) => p.key === "sector 12")).toMatchObject({ name: "Sector 12", status: "Ongoing", progress: 0 });
+  });
+
+  it("needs sign-in", async () => {
+    expect((await request(app).post("/api/shine-media/projects").send({ label: "Sector 13" })).status).toBe(401);
+  });
+});

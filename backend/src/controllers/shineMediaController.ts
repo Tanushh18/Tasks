@@ -1,7 +1,8 @@
 import type { Request, Response } from "express";
 import { ApiError } from "../utils/ApiError";
 import {
-  SHINE_PROJECTS,
+  addShineSector,
+  getShineProjects,
   deleteShineMedia,
   findProject,
   isShineConfigured,
@@ -20,19 +21,26 @@ const kindOf = (v: unknown): MediaKind => {
 
 /** Signed-in: projects with their files, for the app's Media tab. */
 export async function listProjects(_req: Request, res: Response) {
+  const projects = await getShineProjects();
   if (!isShineConfigured()) {
-    res.json({ configured: false, projects: SHINE_PROJECTS.map((p) => ({ key: p.key, label: p.label, items: [] })) });
+    res.json({ configured: false, projects: projects.map((p) => ({ key: p.key, label: p.label, items: [] })) });
     return;
   }
   const all = await listAllShineMedia();
   res.json({
     configured: true,
-    projects: SHINE_PROJECTS.map((p) => ({ key: p.key, label: p.label, items: all.get(p.key) ?? [] })),
+    projects: projects.map((p) => ({ key: p.key, label: p.label, items: all.get(p.key) ?? [] })),
   });
 }
 
+/** Signed-in: add a new sector / area (its photos then upload into ShineOne/<key>/). */
+export async function addProject(req: Request, res: Response) {
+  const p = await addShineSector(req.body?.label);
+  res.status(201).json({ key: p.key, label: p.label, items: [] });
+}
+
 export async function signUpload(req: Request, res: Response) {
-  const project = findProject(String(req.body?.project ?? ""));
+  const project = await findProject(String(req.body?.project ?? ""));
   if (!project) throw ApiError.badRequest("Unknown project");
   const kind = kindOf(req.body?.kind);
   res.json(signShineUpload(project, kind));
@@ -56,7 +64,7 @@ export async function publicMedia(_req: Request, res: Response) {
   if (!isShineConfigured()) throw new ApiError(503, "NOT_CONFIGURED", "Website media is not set up.");
   const all = await listAllShineMedia();
   const folders: Record<string, string[]> = {};
-  for (const p of SHINE_PROJECTS) folders[p.key] = (all.get(p.key) ?? []).map((i) => i.url);
+  for (const p of await getShineProjects()) folders[p.key] = (all.get(p.key) ?? []).map((i) => i.url);
   res.set("Cache-Control", "public, max-age=60");
   res.json({ folders });
 }
