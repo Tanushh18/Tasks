@@ -1,0 +1,3 @@
+<resources>
+  <string name="whatsapp_auto_description">Used only by the We Three Leads screen: when you start WhatsApp auto send, it presses Send in WhatsApp for the message and image the app has just opened. It does not read your chats.</string>
+</resources>

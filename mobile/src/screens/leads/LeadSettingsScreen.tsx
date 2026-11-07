@@ -322,6 +322,12 @@ export function LeadSettingsScreen({ navigation }: any) {
         onPress={() => navigation.navigate("LeadWhatsApp")}
       />
       <Row
+        icon="paper-plane-outline"
+        title="WhatsApp auto send"
+        subtitle="Tablet: sends 12-13 built-in messages a day to unsent leads through an accessibility service"
+        onPress={() => navigation.navigate("LeadWhatsAppAuto")}
+      />
+      <Row
         icon="sparkles-outline"
         title="Connect AI model"
         subtitle={ai === null ? "Checking…" : ai.connected ? "Connected: Improve with AI is on" : "Not set up on the server"}

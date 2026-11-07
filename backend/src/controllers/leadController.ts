@@ -270,7 +270,9 @@ export async function updateLead(req: Request, res: Response) {
         tid ? WhatsAppTemplate.findById(tid).select("name").lean() : null,
         User.findById(req.userId).select("name").lean(),
       ]);
-      lead.whatsappHistory.push({ at: lead.whatsappSentAt!, templateName: tpl?.name ?? "", byName: who?.name ?? "" } as any);
+      // Auto send on the tablet uses built-in templates that have no database id, so it passes the name instead.
+      const builtInName = typeof b.whatsappTemplateName === "string" ? b.whatsappTemplateName.trim().slice(0, 80) : "";
+      lead.whatsappHistory.push({ at: lead.whatsappSentAt!, templateName: tpl?.name ?? builtInName, byName: who?.name ?? "" } as any);
       if (lead.whatsappHistory.length > 50) lead.whatsappHistory.splice(0, lead.whatsappHistory.length - 50);
     } else {
       lead.whatsappHistory.pop(); // un-marking undoes the most recent entry

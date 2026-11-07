@@ -1,0 +1,6 @@
+{
+  "name": "whatsapp-auto-sender",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android-only: opens a lead's WhatsApp chat with a message and image, and presses Send through an accessibility service."
+}

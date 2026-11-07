@@ -362,7 +362,11 @@ export async function getAiStatus(): Promise<AiStatus> {
  * Marks a lead's WhatsApp as sent (or not sent). "Sent" only means the person pressed Send in the preview: the app can't
  * see whether WhatsApp actually delivered anything.
  */
-export async function setWhatsAppSent(id: string, sent: boolean, templateId?: string | null): Promise<void> {
-  await apiClient.patch(`/leads/${id}`, { whatsappSent: sent, ...(sent && templateId ? { whatsappTemplateId: templateId } : {}) });
+export async function setWhatsAppSent(id: string, sent: boolean, templateId?: string | null, templateName?: string): Promise<void> {
+  await apiClient.patch(`/leads/${id}`, {
+    whatsappSent: sent,
+    ...(sent && templateId ? { whatsappTemplateId: templateId } : {}),
+    ...(sent && !templateId && templateName ? { whatsappTemplateName: templateName } : {}),
+  });
   void applyLocalEdit(id, { whatsappSentAt: sent ? new Date().toISOString() : null, whatsappTemplateId: sent ? templateId ?? null : null }).catch(() => undefined);
 }
