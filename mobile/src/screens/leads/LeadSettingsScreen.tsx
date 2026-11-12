@@ -324,7 +324,7 @@ export function LeadSettingsScreen({ navigation }: any) {
       <Row
         icon="paper-plane-outline"
         title="WhatsApp auto send"
-        subtitle="Tablet: sends 12-13 built-in messages a day to unsent leads through an accessibility service"
+        subtitle="Managed in Stashr (website): on/off, sheets, limits and tests"
         onPress={() => navigation.navigate("LeadWhatsAppAuto")}
       />
       <Row
