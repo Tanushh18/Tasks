@@ -1,9 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <!-- Lets the app see whether WhatsApp / WhatsApp Business is installed. -->
+  <!-- Lets the app see whether WhatsApp Business is installed. -->
   <queries>
-    <package android:name="com.whatsapp" />
     <package android:name="com.whatsapp.w4b" />
   </queries>
+
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
   <application>
     <service
@@ -18,5 +22,22 @@
         android:name="android.accessibilityservice"
         android:resource="@xml/whatsapp_auto_accessibility" />
     </service>
+
+    <service
+      android:name="expo.modules.whatsappautosender.AutoSendService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Sends the saved WhatsApp messages to leads on a schedule while the user does other things on the tablet" />
+    </service>
+
+    <receiver
+      android:name="expo.modules.whatsappautosender.AutoSendBootReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+      </intent-filter>
+    </receiver>
   </application>
 </manifest>

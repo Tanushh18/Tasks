@@ -21,34 +21,57 @@ const Native: Native | null = Platform.OS === "android" ? requireOptionalNativeM
 export const autoSendSupported = !!Native;
 export const isServiceEnabled = (): boolean => { try { return !!Native?.isServiceEnabled(); } catch { return false; } };
 export const openAccessibilitySettings = (): void => { try { Native?.openAccessibilitySettings(); } catch { /* ignore */ } };
-/** "com.whatsapp.w4b" if WhatsApp Business is installed, else "com.whatsapp", else "". */
+/** "com.whatsapp.w4b" when WhatsApp Business is installed, else "". Normal WhatsApp is never used. */
 export const whatsappPackage = (): string => { try { return Native?.whatsappPackage() ?? ""; } catch { return ""; } };
 export const cancelJob = (): void => { try { Native?.cancelJob(); } catch { /* ignore */ } };
 
 /** The folder the image lives in. Anything pushed here (or picked in the app) is what gets sent. */
 export const imageDir = (): string => `${FileSystem.documentDirectory ?? ""}whatsapp-auto/`;
 
-/** First run: saves the bundled ad picture (assets/whatsapp/ad01.png) into the folder so there is always an image to send. */
-async function seedBundledImage(): Promise<void> {
+const BUNDLE_VERSION = "bundle-v2";
+const BUNDLED = [
+  { file: "ad1.webp", mod: () => require("../../assets/whatsapp/ad1.webp") },
+  { file: "ad2.webp", mod: () => require("../../assets/whatsapp/ad2.webp") },
+  { file: "ad3.webp", mod: () => require("../../assets/whatsapp/ad3.webp") },
+];
+
+/**
+ * First run (or after an app update that changes the bundled set): saves the three bundled ad pictures into the folder.
+ * A marker file records the version so the copy isn't repeated on every run.
+ */
+async function seedBundledImages(): Promise<void> {
   const dir = imageDir();
   const names = await FileSystem.readDirectoryAsync(dir).catch(() => [] as string[]);
-  if (names.some((n) => /\.(jpe?g|png|webp)$/i.test(n))) return;
+  if (names.includes(`.${BUNDLE_VERSION}`)) return;
   await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => undefined);
-  const asset = Asset.fromModule(require("../../assets/whatsapp/ad01.png"));
-  await asset.downloadAsync();
-  if (asset.localUri) await FileSystem.copyAsync({ from: asset.localUri, to: `${dir}ad01.png` });
+  for (const n of names) await FileSystem.deleteAsync(dir + n, { idempotent: true });
+  for (const b of BUNDLED) {
+    const asset = Asset.fromModule(b.mod());
+    await asset.downloadAsync();
+    if (asset.localUri) await FileSystem.copyAsync({ from: asset.localUri, to: dir + b.file });
+  }
+  await FileSystem.writeAsStringAsync(dir + `.${BUNDLE_VERSION}`, "1");
 }
 
-/** Newest image file in the folder, or null. */
-export async function findImage(): Promise<{ uri: string; mime: string } | null> {
+/** All images in the folder, sorted by name. */
+async function imageFiles(): Promise<string[]> {
   const dir = imageDir();
+  const names = await FileSystem.readDirectoryAsync(dir).catch(() => [] as string[]);
+  return names.filter((n) => /\.(jpe?g|png|webp)$/i.test(n)).sort();
+}
+
+/**
+ * One image for the next send, chosen at random from the folder (so the three ads rotate), or null when the folder is
+ * empty. Each send re-reads the folder, so a changed image is used right away.
+ */
+export async function findImage(random: () => number = Math.random): Promise<{ uri: string; mime: string } | null> {
   try {
-    await seedBundledImage().catch(() => undefined);
-    const names = (await FileSystem.readDirectoryAsync(dir)).filter((n) => /\.(jpe?g|png|webp)$/i.test(n)).sort();
+    await seedBundledImages().catch(() => undefined);
+    const names = await imageFiles();
     if (!names.length) return null;
-    const name = names[names.length - 1];
+    const name = names[Math.min(names.length - 1, Math.floor(random() * names.length))];
     const mime = /\.png$/i.test(name) ? "image/png" : /\.webp$/i.test(name) ? "image/webp" : "image/jpeg";
-    return { uri: dir + name, mime };
+    return { uri: imageDir() + name, mime };
   } catch {
     return null;
   }
@@ -59,6 +82,8 @@ export async function saveImageToFolder(sourceUri: string, mime: string): Promis
   await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => undefined);
   // Only one image is kept: a new pick replaces the old one.
   for (const n of await FileSystem.readDirectoryAsync(dir).catch(() => [] as string[])) await FileSystem.deleteAsync(dir + n, { idempotent: true });
+  // Uploaded image replaces the bundled set; keep the marker so the bundle isn't copied back on the next run.
+  await FileSystem.writeAsStringAsync(dir + `.${BUNDLE_VERSION}`, "1").catch(() => undefined);
   const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
   await FileSystem.copyAsync({ from: sourceUri, to: `${dir}promo.${ext}` });
 }
@@ -82,7 +107,7 @@ export async function sendOne(req: SendRequest): Promise<SendResult> {
   if (!Native) return { ok: false, error: "Auto send isn't available in this build" };
   if (!isServiceEnabled()) return { ok: false, error: "Turn on the accessibility service first" };
   const pkg = whatsappPackage();
-  if (!pkg) return { ok: false, error: "WhatsApp isn't installed" };
+  if (!pkg) return { ok: false, error: "WhatsApp Business isn't installed" };
   const contentUri = req.image ? await FileSystem.getContentUriAsync(req.image.uri) : null;
   const started = Native.startJob(pkg, contentUri, req.image?.mime ?? "image/jpeg", req.text, req.digits ?? null, req.chatName ?? null);
   if (!started) return { ok: false, error: "The accessibility service isn't running" };
@@ -95,4 +120,14 @@ export async function sendOne(req: SendRequest): Promise<SendResult> {
   }
   Native.cancelJob();
   return { ok: false, error: "Timed out" };
+}
+
+/** Every image in the folder (for the screen), newest rotation pool. */
+export async function listImages(): Promise<{ uri: string; name: string }[]> {
+  try {
+    await seedBundledImages().catch(() => undefined);
+    return (await imageFiles()).map((name) => ({ uri: imageDir() + name, name }));
+  } catch {
+    return [];
+  }
 }

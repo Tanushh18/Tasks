@@ -28,9 +28,9 @@ class WhatsAppAutoSenderModule : Module() {
       context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
-    /** WhatsApp Business when installed, otherwise WhatsApp, otherwise "". */
+    /** WhatsApp Business only (no fallback to normal WhatsApp), or "" when it is not installed. */
     Function("whatsappPackage") {
-      listOf("com.whatsapp.w4b", "com.whatsapp").firstOrNull { pkg ->
+      listOf("com.whatsapp.w4b").firstOrNull { pkg ->
         try {
           context.packageManager.getPackageInfo(pkg, 0)
           true
@@ -50,5 +50,41 @@ class WhatsAppAutoSenderModule : Module() {
     }
 
     Function("cancelJob") { WhatsAppAutoService.cancel() }
+
+    /** Starts the background sender. `config` is JSON from JS: baseUrl, access/refresh tokens, origin, templates. */
+    Function("startBackground") { config: String ->
+      val j = org.json.JSONObject(config)
+      expo.modules.whatsappautosender.Store.saveConfig(
+        context,
+        j.getString("baseUrl"),
+        j.getString("accessToken"),
+        j.optString("refreshToken"),
+        j.optString("origin", "all"),
+        j.getJSONArray("templates").toString(),
+        j.optBoolean("testMode", false)
+      )
+      expo.modules.whatsappautosender.Store.setEnabled(context, true)
+      expo.modules.whatsappautosender.AutoSendService.start(context)
+    }
+
+    Function("stopBackground") { expo.modules.whatsappautosender.AutoSendService.stop(context) }
+
+    Function("backgroundState") {
+      val c = context
+      mapOf(
+        "enabled" to expo.modules.whatsappautosender.Store.enabled(c),
+        "running" to expo.modules.whatsappautosender.Store.running(c),
+        "sentToday" to expo.modules.whatsappautosender.Store.sentToday(c),
+        "sentTotal" to expo.modules.whatsappautosender.Store.sentTotal(c),
+        "status" to expo.modules.whatsappautosender.Store.status(c)
+      )
+    }
+
+    /** Opens the battery screen for We Three so Android doesn't stop the background sender. */
+    Function("openBatterySettings") {
+      val i = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, android.net.Uri.parse("package:${context.packageName}"))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      context.startActivity(i)
+    }
   }
 }

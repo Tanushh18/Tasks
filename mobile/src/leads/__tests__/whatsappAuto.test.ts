@@ -6,16 +6,18 @@ jest.mock("../../api/leads", () => ({}));
 jest.mock("../whatsappAuto", () => ({}));
 
 describe("whatsapp auto send", () => {
-  it("has 12 distinct templates", () => {
-    expect(AUTO_TEMPLATES).toHaveLength(12);
-    expect(new Set(AUTO_TEMPLATES.map((t) => t.text)).size).toBe(12);
+  it("has 25 distinct SHINE ONE ESTATE quotes", () => {
+    expect(AUTO_TEMPLATES).toHaveLength(25);
+    expect(new Set(AUTO_TEMPLATES.map((t) => t.text)).size).toBe(25);
+    for (const t of AUTO_TEMPLATES) expect(t.text.includes("9310994032") || t.text.includes("SHINE ONE ESTATE")).toBe(true);
   });
   it("never repeats the last template", () => {
-    for (const t of AUTO_TEMPLATES) for (let i = 0; i < 20; i++) expect(pickAutoTemplate(t.id).id).not.toBe(t.id);
+    for (const t of AUTO_TEMPLATES) for (let i = 0; i < 20; i++) expect(pickAutoTemplate(t.id, AUTO_TEMPLATES).id).not.toBe(t.id);
   });
   it("fills the first name and tidies a missing one", () => {
     expect(renderAutoTemplate("Hi {name}, hello", "Ravi Kumar")).toBe("Hi Ravi, hello");
     expect(renderAutoTemplate("Hi {name}, hello", "")).toBe("Hi, hello");
+    expect(renderAutoTemplate("A\n{name}", "Ravi")).toBe("A\nRavi");
   });
   it("targets 12 or 13 a day, fixed per date", () => {
     for (let d = 1; d <= 28; d++) {
