@@ -681,7 +681,9 @@ export function LeadsScreen({ navigation }: any) {
     const tone = stageTone(item.status, colors);
     const details = [item.requirement, item.address, item.budget].filter(Boolean).join(" • ");
     const added = formatStamp(item.createdAt || item.sheetDate);
-    const updated = item.updatedByName && item.updatedAt ? `Updated by ${item.updatedByName} · ${formatStamp(item.updatedAt)}` : "";
+    // Use editedAt (real human edits) – updatedAt is also bumped by system jobs and would show a wrong date.
+    const editedAt = item.editedAt || item.statusUpdatedAt;
+    const updated = item.updatedByName && editedAt ? `Updated by ${item.updatedByName} · ${formatStamp(editedAt)}` : "";
     const daysLeft = api.isNotInterestedStatus(item.status) ? daysUntilDeleted(item.notInterestedAt, ttlDays) : null;
     return (
       <Pressable

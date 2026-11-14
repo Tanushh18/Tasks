@@ -247,7 +247,7 @@ export async function applyLocalEdit(id: string, patch: Partial<Lead>): Promise<
       const digits = patch.phone.replace(/\D/g, "").slice(-10);
       patch = { ...patch, phone: `+91${digits}` };
     }
-    const leads = store.leads.map((l) => (l.id === id ? { ...l, ...extra, ...patch, updatedAt: now } : l));
+    const leads = store.leads.map((l) => (l.id === id ? { ...l, ...extra, ...patch, updatedAt: now, editedAt: now } : l));
     await persist(store.scope, leads, store.meta.sources);
   });
 }

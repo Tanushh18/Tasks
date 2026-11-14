@@ -10,6 +10,8 @@ const leadSchema = new Schema({
   alternatePhones:{type:[String],default:[]}, email:{type:String,default:""}, info:{type:String,default:""},
   // Who last changed the lead and when the stage last changed; drives "Updated by X at …" on the card.
   updatedById:{type:Schema.Types.ObjectId,ref:"User",default:null}, updatedByName:{type:String,default:""}, statusUpdatedAt:{type:Date,default:null},
+  // When a person last edited the lead by hand. Unlike updatedAt, system jobs (sync, backfills, SMS/WhatsApp state) never touch it.
+  editedAt:{type:Date,default:null},
   // Set while the stage is "Not interested"; the cleanup job deletes the lead 30 days after this.
   notInterestedAt:{type:Date,default:null,index:true},
   // Set when the person pressed "Send" in the WhatsApp preview. We cannot verify delivery: this only records that Send was pressed.

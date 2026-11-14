@@ -18,6 +18,8 @@ export interface Lead {
   createdAt?: string;
   updatedAt?: string;
   updatedByName?: string;
+  /** When a person last edited this lead by hand (not bumped by system jobs). */
+  editedAt?: string | null;
   statusUpdatedAt?: string | null;
   notInterestedAt?: string | null;
   alternatePhones?: string[];

@@ -298,6 +298,7 @@ export async function updateLead(req: Request, res: Response) {
   const me = await User.findById(req.userId).select("name").lean();
   lead.updatedById = new Types.ObjectId(req.userId!);
   lead.updatedByName = me?.name ?? "";
+  lead.editedAt = new Date();
 
   try {
     await lead.save();

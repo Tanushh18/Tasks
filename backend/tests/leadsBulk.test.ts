@@ -563,6 +563,7 @@ describe("lead list, edits and cleanup", () => {
     const ok = await a.patch(`/api/leads/${one.id}`).send({ name: "Renamed", phone: "+91 91234 56789" });
     expect(ok.status).toBe(200);
     expect(ok.body.lead).toMatchObject({ name: "Renamed", phone: "+919123456789", updatedByName: "Admin" });
+    expect(ok.body.lead.editedAt).toBeTruthy();
     expect(ok.body.lead.alternatePhones).toContain(one.phone);
     expect(ok.body.lead.updatedAt).toBeDefined();
     expect(ok.body.lead.ownerId).toBeUndefined();

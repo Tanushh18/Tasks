@@ -62,6 +62,7 @@ const lead = {
   archived: false,
   createdAt: "2026-10-02T10:45:00.000Z",
   updatedAt: "2026-10-03T04:30:00.000Z",
+  editedAt: "2026-10-03T04:30:00.000Z",
   updatedByName: "Tanush",
   origin: "Meta Sheet",
 };
