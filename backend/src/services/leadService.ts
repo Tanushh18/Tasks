@@ -269,6 +269,33 @@ export async function backfillLeadOrigins(){
   return filled;
 }
 
+const MONTHS=["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+/** Newest "21 Oct, 5:01 pm" style stamp found in a lead's notes (year taken from createdAt), or null. */
+function lastNoteStamp(notes:string,createdAt:Date):Date|null{
+  let best:Date|null=null;
+  for(const m of notes.matchAll(/(\d{1,2})\s+([A-Za-z]{3}),\s*(\d{1,2}):(\d{2})\s*(am|pm)/gi)){
+    const mon=MONTHS.indexOf(m[2].toLowerCase()); if(mon<0)continue;
+    let h=Number(m[3])%12; if(m[5].toLowerCase()==="pm")h+=12;
+    let d=new Date(Date.UTC(createdAt.getUTCFullYear(),mon,Number(m[1]),h-5,Number(m[4])-30)); // IST -> UTC
+    if(d<createdAt)d=new Date(Date.UTC(createdAt.getUTCFullYear()+1,mon,Number(m[1]),h-5,Number(m[4])-30));
+    if(!best||d>best)best=d;
+  }
+  return best;
+}
+/**
+ * One-off, additive: leads edited before editedAt existed carry a polluted updatedAt (bumped by system jobs). Give each a
+ * truthful editedAt: stage change time, else newest dated note, else when it was added. Only writes editedAt.
+ */
+export async function backfillLeadEditedAt(){
+  const leads=await Lead.find({editedAt:null,updatedByName:{$ne:""}},{statusUpdatedAt:1,notes:1,createdAt:1}).lean();
+  const ops=leads.map((l:any)=>{
+    const created=new Date(l.createdAt);
+    let at:Date=l.statusUpdatedAt?new Date(l.statusUpdatedAt):(lastNoteStamp(l.notes||"",created)??created);
+    return{updateOne:{filter:{_id:l._id,editedAt:null},update:{$set:{editedAt:at}}}};
+  });
+  for(let i=0;i<ops.length;i+=500)await Lead.bulkWrite(ops.slice(i,i+500) as any,{ordered:false,timestamps:false});
+  return ops.length;
+}
 
 /**
  * Leads first loaded from a CSV / file import keep that import's name as their origin. When the same leads also belong to

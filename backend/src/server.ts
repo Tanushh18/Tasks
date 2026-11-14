@@ -3,7 +3,7 @@ import { connectDatabase } from "./config/db";
 import { env } from "./config/env";
 import { logger } from "./utils/logger";
 import { seedOlfDataOnBoot } from "./services/olfSeed";
-import { backfillLeadOrigins, relabelImportedLeadsToSheets, startLeadCleanupScheduler, startLeadSyncScheduler } from "./services/leadService";
+import { backfillLeadOrigins, relabelImportedLeadsToSheets, backfillLeadEditedAt, startLeadCleanupScheduler, startLeadSyncScheduler } from "./services/leadService";
 
 async function main() {
   await connectDatabase();
@@ -12,6 +12,7 @@ async function main() {
   // One-off, additive: label existing leads with the list they came from (only the new origin fields are written).
   await backfillLeadOrigins().then((n) => n && logger.info(`Labelled ${n} leads with their source list`)).catch((err) => logger.error("Lead origin backfill failed", { message: err instanceof Error ? err.message : String(err) }));
   await relabelImportedLeadsToSheets().then((n) => n && logger.info(`Relabelled ${n} imported leads with their sheet name`)).catch((err) => logger.error("Lead relabel failed", { message: err instanceof Error ? err.message : String(err) }));
+  await backfillLeadEditedAt().then((n) => n && logger.info(`Set edit date on ${n} leads`)).catch((err) => logger.error("Lead editedAt backfill failed", { message: err instanceof Error ? err.message : String(err) }));
   await seedOlfDataOnBoot(); // never throws
   startLeadSyncScheduler(15);
   startLeadCleanupScheduler(6);
