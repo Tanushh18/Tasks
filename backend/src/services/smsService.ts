@@ -234,7 +234,7 @@ export async function claimNext(h: DeviceHello, nowDate = new Date()): Promise<C
   if (window === "lunch" && lunchToday >= settings.lunchQuota) return null;
 
   // Sheets that are switched on and have a message, least recently served first (fair between sheets).
-  const sheets = await SmsSheet.find({ auto: true, text: { $ne: "" } }).sort({ lastServedAt: 1, _id: 1 });
+  const sheets = await SmsSheet.find({ auto: true, $or: [{ text: { $ne: "" } }, { "texts.0": { $exists: true } }] }).sort({ lastServedAt: 1, _id: 1 });
   for (const sheet of sheets) {
     for (let tries = 0; tries < 25; tries++) {
       const lead = await Lead.findOneAndUpdate(
@@ -252,7 +252,7 @@ export async function claimNext(h: DeviceHello, nowDate = new Date()): Promise<C
         kind: "lead",
         leadId: lead._id,
         phone,
-        message: fillTemplate(sheet.text, lead.name),
+        message: fillTemplate(pickText(sheet), lead.name),
         sheet: sheet.sheet,
         deviceId: device.deviceId,
         deviceName: device.name,
@@ -324,6 +324,17 @@ export async function reportDelivery(id: string, status: "delivered" | "undelive
 
 // ------------------------------------------------------------------ console ----
 
+/** The messages of a sheet: the list from Stashr when there is one, else the single message. */
+export const textsOf = (sheet: { text?: string | null; texts?: string[] | null }) => {
+  const list = (sheet.texts ?? []).map((t) => String(t).trim()).filter(Boolean);
+  return list.length ? list : sheet.text ? [sheet.text] : [];
+};
+/** One message, picked at random, for one SMS. */
+export const pickText = (sheet: { text?: string | null; texts?: string[] | null }, rnd = Math.random) => {
+  const list = textsOf(sheet);
+  return list.length ? list[Math.floor(rnd() * list.length)] : "";
+};
+
 export async function sheetOverview() {
   const [configs, counts, settingsDoc, devices] = await Promise.all([
     SmsSheet.find({}).lean(),
@@ -354,6 +365,7 @@ export async function sheetOverview() {
     return {
       sheet: name,
       text: c?.text ?? "",
+      texts: c ? textsOf(c) : [],
       auto: !!c?.auto,
       onlyNewSince: c?.onlyNewSince ?? null,
       total,
@@ -367,14 +379,23 @@ export async function sheetOverview() {
   });
 }
 
-export async function saveSheet(sheet: string, input: { text?: string; auto?: boolean; onlyNew?: boolean }) {
+export async function saveSheet(sheet: string, input: { text?: string; texts?: string[]; auto?: boolean; onlyNew?: boolean }) {
   const name = String(sheet ?? "").trim();
   if (!name) throw ApiError.badRequest("Sheet name is required");
   if (input.text !== undefined && input.text.length > 600) throw ApiError.badRequest("Message is too long (600 characters max)");
+  if (input.texts !== undefined) {
+    if (!Array.isArray(input.texts) || input.texts.length > 50) throw ApiError.badRequest("Send up to 50 messages");
+    if (input.texts.some((t) => typeof t !== "string" || t.trim().length > 600)) throw ApiError.badRequest("Each message must be text of 600 characters or less");
+  }
   const doc = (await SmsSheet.findOne({ sheet: name })) ?? new SmsSheet({ sheet: name });
   if (input.text !== undefined) doc.text = input.text.trim();
+  if (input.texts !== undefined) {
+    const list = input.texts.map((t) => t.trim()).filter(Boolean);
+    doc.texts = list as any;
+    doc.text = list[0] ?? "";                              // the older console and app still read the first message
+  }
   if (input.auto !== undefined) {
-    if (input.auto && !doc.text) throw ApiError.badRequest("Write the message for this sheet before switching Auto-send on");
+    if (input.auto && !textsOf(doc).length) throw ApiError.badRequest("Write the message for this sheet before switching Auto-send on");
     if (input.auto && !doc.auto) doc.onlyNewSince = input.onlyNew ? new Date() : null;
     doc.auto = input.auto;
   }

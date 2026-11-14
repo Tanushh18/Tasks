@@ -6,6 +6,8 @@ const schema = new Schema(
     sheet: { type: String, required: true, trim: true, unique: true, maxlength: 120 },
     /** {name} becomes the lead's name. */
     text: { type: String, default: "", trim: true, maxlength: 600 },
+    /** Several messages: one is picked at random for each SMS (managed from Stashr). When empty, `text` is used. */
+    texts: { type: [String], default: [] },
     auto: { type: Boolean, default: false },
     /** When set, only leads created at/after this moment are texted (the "only new leads" choice when switching on). */
     onlyNewSince: { type: Date, default: null },

@@ -336,3 +336,56 @@ describe("HTTP API", () => {
     expect((await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ dailyLimit: -1 })).status).toBe(400);
   });
 });
+
+describe("several messages per sheet (managed from Stashr)", () => {
+  it("picks one of the sheet's messages at random for each SMS, and the first one stays as the old single message", async () => {
+    const { pickText, textsOf, saveSheet } = await import("../src/services/smsService");
+    expect(pickText({ text: "", texts: ["A", "B", "C"] }, () => 0)).toBe("A");
+    expect(pickText({ text: "", texts: ["A", "B", "C"] }, () => 0.99)).toBe("C");
+    expect(pickText({ text: "Only", texts: [] })).toBe("Only");
+    expect(textsOf({ text: "", texts: [" ", ""] })).toEqual([]);
+    const doc = await saveSheet("Meta Sheet", { texts: ["  Hi {name} one ", "Hi {name} two", ""] });
+    expect(textsOf(doc)).toEqual(["Hi {name} one", "Hi {name} two"]);
+    expect(doc.text).toBe("Hi {name} one");
+  });
+
+  it("sends with the random messages and refuses Auto-send without any message", async () => {
+    const { saveSheet } = await import("../src/services/smsService");
+    await expect(saveSheet("Meta Sheet", { texts: [], auto: true })).rejects.toThrow(/Write the message/);
+    await saveSheet("Meta Sheet", { texts: ["First {name}", "Second {name}"], auto: true });
+    await addLeads("Meta Sheet", 6);
+    const seen = new Set<string>();
+    for (let i = 0; i < 6; i++) {
+      await skipGap();
+      const m = await claimNext(hello, ist("13:10"));
+      expect(m).not.toBeNull();
+      seen.add(m!.message.split(" ")[0]);
+    }
+    expect([...seen].every((w) => w === "First" || w === "Second")).toBe(true);
+  });
+
+  it("rejects too many or too long messages", async () => {
+    const { saveSheet } = await import("../src/services/smsService");
+    await expect(saveSheet("Meta Sheet", { texts: Array.from({ length: 51 }, () => "x") })).rejects.toThrow(/50/);
+    await expect(saveSheet("Meta Sheet", { texts: ["x".repeat(601)] })).rejects.toThrow(/600/);
+  });
+});
+
+describe("the console with a We Three admin login (Stashr)", () => {
+  it("lets the admin use the console with a Bearer token, refuses other users, and still takes the console key", async () => {
+    const { registerUser } = await import("./helpers");
+    const { token: admin } = await registerUser(app, "8130483894", "4821", "Admin");
+    const { token: other } = await registerUser(app, "9876545099", "4821", "Bob");
+    const ok = await request(app).get("/api/sms-console/overview").set("Authorization", `Bearer ${admin}`);
+    expect(ok.status).toBe(200);
+    expect(ok.body.settings).toBeDefined();
+    expect((await request(app).get("/api/sms-console/overview").set("Authorization", `Bearer ${other}`)).status).toBe(403);
+    expect((await request(app).get("/api/sms-console/overview").set("Authorization", "Bearer nonsense")).status).toBe(401);
+    expect((await request(app).get("/api/sms-console/overview").set(CONSOLE)).status).toBe(200);
+    const put = await request(app).put("/api/sms-console/sheets").set("Authorization", `Bearer ${admin}`).send({ sheet: "Meta Sheet", texts: ["Hi {name}", "Hello {name}"] });
+    expect(put.status).toBe(200);
+    expect(put.body.sheet.texts).toEqual(["Hi {name}", "Hello {name}"]);
+    const over = await request(app).get("/api/sms-console/overview").set("Authorization", `Bearer ${admin}`);
+    expect(over.body.sheets.find((s: { sheet: string }) => s.sheet === "Meta Sheet").texts).toEqual(["Hi {name}", "Hello {name}"]);
+  });
+});

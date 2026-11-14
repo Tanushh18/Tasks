@@ -2,6 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import { env } from "../config/env";
 import * as sms from "../services/smsService";
 import { ApiError } from "../utils/ApiError";
+import { requireAuth } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 
 /** Phones (the SMS Service Android app): "Authorization: Bearer <SMS_DEVICE_KEY>" plus an X-Device-Id header. */
@@ -72,7 +73,19 @@ smsGatewayRouter.post(
 export const smsConsoleRouter = Router();
 const misses = new Map<string, { n: number; until: number }>();
 
+// Stashr manages Shine One SMS with the signed-in admin's We Three login (a Bearer token) instead of the console key.
+smsConsoleRouter.use((req, res, next) => {
+  if (!/^Bearer\s+/i.test(req.headers.authorization || "")) return next();
+  requireAuth(req, res, (err?: unknown) => {
+    if (err) return next(err);
+    if (!req.isAdmin) return next(ApiError.forbidden("Admin access required"));
+    (req as Request & { consoleOk?: boolean }).consoleOk = true;
+    next();
+  });
+});
+
 smsConsoleRouter.use((req, _res, next) => {
+  if ((req as Request & { consoleOk?: boolean }).consoleOk) return next();
   const ip = req.ip || "unknown";
   const m = misses.get(ip);
   if (m && m.until > Date.now() && m.n >= 10) return next(ApiError.tooManyRequests("Too many wrong keys. Try again later."));
@@ -110,8 +123,8 @@ smsConsoleRouter.put(
   "/sheets",
   asyncHandler(async (req, res) => {
     const b = req.body ?? {};
-    const doc = await sms.saveSheet(b.sheet, { text: typeof b.text === "string" ? b.text : undefined, auto: typeof b.auto === "boolean" ? b.auto : undefined, onlyNew: !!b.onlyNew });
-    res.json({ sheet: { sheet: doc.sheet, text: doc.text, auto: doc.auto, onlyNewSince: doc.onlyNewSince } });
+    const doc = await sms.saveSheet(b.sheet, { text: typeof b.text === "string" ? b.text : undefined, texts: Array.isArray(b.texts) ? b.texts : undefined, auto: typeof b.auto === "boolean" ? b.auto : undefined, onlyNew: !!b.onlyNew });
+    res.json({ sheet: { sheet: doc.sheet, text: doc.text, texts: sms.textsOf(doc), auto: doc.auto, onlyNewSince: doc.onlyNewSince } });
   })
 );
 
