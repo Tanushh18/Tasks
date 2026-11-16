@@ -104,7 +104,7 @@ smsConsoleRouter.get(
   asyncHandler(async (_req, res) => {
     const [sheets, devices, settings] = await Promise.all([sms.sheetOverview(), sms.deviceList(), sms.getStoredSettings()]);
     res.json({
-      settings: { ...settings.toObject(), effective: sms.effective(settings), hardCaps: sms.HARD_CAPS },
+      settings: { ...settings.toObject(), effective: sms.effective(settings) },
       sheets,
       ...devices,
     });
@@ -115,7 +115,7 @@ smsConsoleRouter.put(
   "/settings",
   asyncHandler(async (req, res) => {
     const doc = await sms.updateSettings(req.body ?? {});
-    res.json({ settings: { ...doc.toObject(), effective: sms.effective(doc), hardCaps: sms.HARD_CAPS } });
+    res.json({ settings: { ...doc.toObject(), effective: sms.effective(doc) } });
   })
 );
 

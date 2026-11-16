@@ -5,6 +5,7 @@ import { Lead } from "../src/models/Lead";
 import { SmsDevice } from "../src/models/SmsDevice";
 import { SmsSend } from "../src/models/SmsSend";
 import { SmsSheet } from "../src/models/SmsSheet";
+import { SmsSettings } from "../src/models/SmsSettings";
 import { claimNext, currentWindow, effective, fillTemplate, getStoredSettings, reportResult, ZONE } from "../src/services/smsService";
 import { Types } from "mongoose";
 
@@ -30,6 +31,11 @@ async function switchOn(sheet = "Meta Sheet", text = "Hi {name}, thanks for your
 const skipGap = () => SmsDevice.updateMany({}, { nextAllowedAt: null });
 const hello = { deviceId: "phone-1", name: "Test phone" };
 
+/** The server has no limits of its own; Stashr saves these. Most tests below run with the numbers Stashr suggests. */
+beforeEach(async () => {
+  await SmsSettings.create({ key: "shine", dailyLimit: 90, hourlyLimit: 30, gapMinSec: 8, gapMaxSec: 14, lunchQuota: 30 });
+});
+
 describe("fillTemplate", () => {
   it("fills {name} and tidies spacing", () => {
     expect(fillTemplate("Hi {name}, thanks", "Ravi")).toBe("Hi Ravi, thanks");
@@ -40,7 +46,7 @@ describe("fillTemplate", () => {
 
 describe("sending windows", () => {
   it("opens at lunch and at night (IST) and nowhere else", () => {
-    const s = effective({ mode: "auto", paused: false } as any);
+    const s = effective({ paused: false } as any);
     expect(currentWindow(s, DateTime.fromJSDate(ist("13:00")).setZone(ZONE))).toBe("lunch");
     expect(currentWindow(s, DateTime.fromJSDate(ist("13:59")).setZone(ZONE))).toBe("lunch");
     expect(currentWindow(s, DateTime.fromJSDate(ist("14:00")).setZone(ZONE))).toBeNull();
@@ -52,7 +58,7 @@ describe("sending windows", () => {
   });
 
   it("respects switched-off days", () => {
-    const s = { ...effective({ mode: "auto", paused: false } as any), days: [0] }; // Sunday only
+    const s = { ...effective({ paused: false } as any), days: [0] }; // Sunday only
     expect(currentWindow(s, DateTime.fromJSDate(ist("13:30")).setZone(ZONE))).toBeNull(); // a Monday
     expect(currentWindow(s, DateTime.fromJSDate(ist("13:30", "2030-01-06")).setZone(ZONE))).toBe("lunch"); // a Sunday
   });
@@ -185,23 +191,24 @@ describe("auto-send engine", () => {
     await switchOn();
     await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ paused: true });
     expect(await claimNext(hello, ist("13:30"))).toBeNull();
-    await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ paused: false, mode: "custom", dailyLimit: 5, hourlyLimit: 5, lunchQuota: 5 });
+    await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ paused: false, dailyLimit: 5, hourlyLimit: 5, lunchQuota: 5 });
     let sent = 0;
     for (let i = 0; i < 20; i++) {
       await skipGap();
       if (await claimNext(hello, ist("13:30"))) sent++;
     }
     expect(sent).toBe(5);
+    // Nothing is capped here: the numbers are whatever Stashr saved.
     await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ dailyLimit: 9999, hourlyLimit: 9999 });
     const e = effective(await getStoredSettings());
-    expect(e.dailyLimit).toBe(200);
-    expect(e.hourlyLimit).toBe(60);
+    expect(e.dailyLimit).toBe(9999);
+    expect(e.hourlyLimit).toBe(9999);
   });
 
   it("lets the console change the sending times in auto mode too, and rejects impossible ones", async () => {
     expect((await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ lunchStart: "12:30", lunchEnd: "13:30", nightStart: "20:00", nightEnd: "22:00" })).status).toBe(200);
     const e = effective(await getStoredSettings());
-    expect(e).toMatchObject({ mode: "auto", dailyLimit: 90, lunchStart: "12:30", nightEnd: "22:00" });
+    expect(e).toMatchObject({ dailyLimit: 90, hourlyLimit: 30, lunchStart: "12:30", nightEnd: "22:00" });
     expect(currentWindow(e, DateTime.fromJSDate(ist("12:45")).setZone(ZONE))).toBe("lunch");
     expect(currentWindow(e, DateTime.fromJSDate(ist("13:45")).setZone(ZONE))).toBeNull();
     expect(currentWindow(e, DateTime.fromJSDate(ist("20:10")).setZone(ZONE))).toBe("night");
@@ -209,10 +216,14 @@ describe("auto-send engine", () => {
     expect((await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ lunchEnd: "21:30" })).status).toBe(400);
   });
 
-  it("auto mode ignores any stored custom values", async () => {
-    await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ mode: "custom", dailyLimit: 5 });
-    await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ mode: "auto" });
-    expect(effective(await getStoredSettings()).dailyLimit).toBe(90);
+  it("has no built-in limits: nothing set means no limit, and null switches a limit off", async () => {
+    await SmsSettings.deleteMany({});
+    const fresh = effective(await getStoredSettings());
+    expect(fresh).toMatchObject({ dailyLimit: null, hourlyLimit: null, gapMinSec: null, gapMaxSec: null, lunchQuota: null });
+    await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ dailyLimit: 5 });
+    expect(effective(await getStoredSettings()).dailyLimit).toBe(5);
+    await request(app).put("/api/sms-console/settings").set(CONSOLE).send({ dailyLimit: null });
+    expect(effective(await getStoredSettings()).dailyLimit).toBeNull();
   });
 });
 

@@ -1,19 +1,18 @@
 import { Schema, model } from "mongoose";
 
-/** The single Shine One SMS settings document (key "shine"). Edited from the SMS console. */
+/** The single Shine One SMS settings document (key "shine"). Edited from Stashr's SMS sender. */
 const schema = new Schema(
   {
     key: { type: String, required: true, unique: true },
-    /** auto = built-in safe defaults; custom = the values below (always clamped to the hard caps). */
-    mode: { type: String, enum: ["auto", "custom"], default: "auto" },
     paused: { type: Boolean, default: false },
-    dailyLimit: { type: Number, default: 90 },
-    hourlyLimit: { type: Number, default: 30 },
-    gapMinSec: { type: Number, default: 8 },
-    gapMaxSec: { type: Number, default: 14 },
+    /** Limits are set from Stashr's SMS sender only. null = no limit. */
+    dailyLimit: { type: Number, default: null },
+    hourlyLimit: { type: Number, default: null },
+    gapMinSec: { type: Number, default: null },
+    gapMaxSec: { type: Number, default: null },
     lunchStart: { type: String, default: "13:00" },
     lunchEnd: { type: String, default: "14:00" },
-    lunchQuota: { type: Number, default: 30 },
+    lunchQuota: { type: Number, default: null },
     nightStart: { type: String, default: "21:00" },
     nightEnd: { type: String, default: "23:00" },
     /** 0 = Sunday … 6 = Saturday. */

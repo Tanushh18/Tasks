@@ -9,45 +9,44 @@ import { ApiError } from "../utils/ApiError";
 import { normalizePhone } from "./leadImport";
 
 export const ZONE = "Asia/Kolkata";
-/** A typo in the console can never push a SIM past these. */
-export const HARD_CAPS = { hourly: 60, daily: 200 };
 export const MAX_ATTEMPTS = 3;
 /** A lead a phone claimed but never reported on (phone died mid-send) goes back to the pool after this long. */
 const RECLAIM_AFTER_MS = 2 * 60 * 1000;
 const ONLINE_WINDOW_MS = 20 * 1000;
 const NOT_INTERESTED = /not\s*int[e]?rest/i;
 
+/**
+ * No limit is built into this server. dailyLimit / hourlyLimit / gap / lunchQuota are whatever Stashr's SMS sender has
+ * saved; a value that was never set (null) means "no limit" (gap: no wait).
+ */
 export interface EffectiveSettings {
-  mode: "auto" | "custom";
   paused: boolean;
-  dailyLimit: number;
-  hourlyLimit: number;
-  gapMinSec: number;
-  gapMaxSec: number;
+  dailyLimit: number | null;
+  hourlyLimit: number | null;
+  gapMinSec: number | null;
+  gapMaxSec: number | null;
   lunchStart: string;
   lunchEnd: string;
-  lunchQuota: number;
+  lunchQuota: number | null;
   nightStart: string;
   nightEnd: string;
   days: number[];
 }
 
-export const AUTO_DEFAULTS: Omit<EffectiveSettings, "mode" | "paused"> = {
-  dailyLimit: 90,
-  hourlyLimit: 30,
-  gapMinSec: 8,
-  gapMaxSec: 14,
+/** Only the default sending TIMES live here (not limits). Stashr changes them. */
+const TIME_DEFAULTS = {
   lunchStart: "13:00",
   lunchEnd: "14:00",
-  lunchQuota: 30,
   nightStart: "21:00",
   nightEnd: "23:00",
   days: [0, 1, 2, 3, 4, 5, 6],
 };
 
-const clamp = (n: unknown, lo: number, hi: number, fallback: number) => {
+/** A saved positive number, or null when none was set. */
+const limitOf = (n: unknown): number | null => {
+  if (n === null || n === undefined || n === "") return null;
   const v = Number(n);
-  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : fallback;
+  return Number.isFinite(v) && v >= 0 ? Math.round(v) : null;
 };
 const hhmm = (v: unknown, fallback: string) => (typeof v === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : fallback);
 const minutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
@@ -56,48 +55,35 @@ export async function getStoredSettings() {
   return (await SmsSettings.findOneAndUpdate({ key: "shine" }, { $setOnInsert: { key: "shine" } }, { upsert: true, new: true }))!;
 }
 
-/**
- * What the engine actually uses. The limits come from the built-in defaults in auto mode and from the clamped custom
- * values otherwise; the sending TIMES (lunch/night windows, days) are always the ones set in the console.
- */
+/** What the engine actually uses: exactly what Stashr saved, with nothing added or capped here. */
 export function effective(doc: Awaited<ReturnType<typeof getStoredSettings>>): EffectiveSettings {
-  const custom = doc.mode === "custom";
   const days = [...new Set((doc.days ?? []).map(Number).filter((d) => d >= 0 && d <= 6))].sort();
-  const gapMin = clamp(doc.gapMinSec, 1, 600, AUTO_DEFAULTS.gapMinSec);
-  const daily = clamp(doc.dailyLimit, 1, HARD_CAPS.daily, AUTO_DEFAULTS.dailyLimit);
-  const limits = custom
-    ? {
-        dailyLimit: daily,
-        hourlyLimit: clamp(doc.hourlyLimit, 1, HARD_CAPS.hourly, AUTO_DEFAULTS.hourlyLimit),
-        gapMinSec: gapMin,
-        gapMaxSec: Math.max(gapMin, clamp(doc.gapMaxSec, 1, 900, AUTO_DEFAULTS.gapMaxSec)),
-        lunchQuota: clamp(doc.lunchQuota, 0, daily, AUTO_DEFAULTS.lunchQuota),
-      }
-    : {
-        dailyLimit: AUTO_DEFAULTS.dailyLimit,
-        hourlyLimit: AUTO_DEFAULTS.hourlyLimit,
-        gapMinSec: AUTO_DEFAULTS.gapMinSec,
-        gapMaxSec: AUTO_DEFAULTS.gapMaxSec,
-        lunchQuota: AUTO_DEFAULTS.lunchQuota,
-      };
+  const gapMin = limitOf(doc.gapMinSec);
+  const gapMax = limitOf(doc.gapMaxSec);
   return {
-    mode: custom ? "custom" : "auto",
     paused: !!doc.paused,
-    ...limits,
-    lunchStart: hhmm(doc.lunchStart, AUTO_DEFAULTS.lunchStart),
-    lunchEnd: hhmm(doc.lunchEnd, AUTO_DEFAULTS.lunchEnd),
-    nightStart: hhmm(doc.nightStart, AUTO_DEFAULTS.nightStart),
-    nightEnd: hhmm(doc.nightEnd, AUTO_DEFAULTS.nightEnd),
-    days: days.length ? days : AUTO_DEFAULTS.days,
+    dailyLimit: limitOf(doc.dailyLimit),
+    hourlyLimit: limitOf(doc.hourlyLimit),
+    gapMinSec: gapMin,
+    gapMaxSec: gapMin !== null && gapMax !== null ? Math.max(gapMin, gapMax) : gapMax,
+    lunchQuota: limitOf(doc.lunchQuota),
+    lunchStart: hhmm(doc.lunchStart, TIME_DEFAULTS.lunchStart),
+    lunchEnd: hhmm(doc.lunchEnd, TIME_DEFAULTS.lunchEnd),
+    nightStart: hhmm(doc.nightStart, TIME_DEFAULTS.nightStart),
+    nightEnd: hhmm(doc.nightEnd, TIME_DEFAULTS.nightEnd),
+    days: days.length ? days : TIME_DEFAULTS.days,
   };
 }
 
 export async function updateSettings(input: Record<string, unknown>) {
   const doc = await getStoredSettings();
-  if (input.mode === "auto" || input.mode === "custom") doc.mode = input.mode;
   if (typeof input.paused === "boolean") doc.paused = input.paused;
   for (const k of ["dailyLimit", "hourlyLimit", "gapMinSec", "gapMaxSec", "lunchQuota"] as const) {
     if (input[k] !== undefined) {
+      if (input[k] === null || input[k] === "") {
+        doc[k] = null as any; // cleared: no limit
+        continue;
+      }
       const v = Number(input[k]);
       if (!Number.isFinite(v) || v < 0) throw ApiError.badRequest(`${k} must be a positive number`);
       doc[k] = Math.round(v);
@@ -139,7 +125,7 @@ export type WindowName = "lunch" | "night";
 export function currentWindow(s: EffectiveSettings, now = DateTime.now().setZone(ZONE)): WindowName | null {
   if (!s.days.includes(now.weekday % 7)) return null;
   const m = now.hour * 60 + now.minute;
-  if (m >= minutes(s.lunchStart) && m < minutes(s.lunchEnd) && s.lunchQuota > 0) return "lunch";
+  if (m >= minutes(s.lunchStart) && m < minutes(s.lunchEnd) && (s.lunchQuota === null || s.lunchQuota > 0)) return "lunch";
   if (m >= minutes(s.nightStart) && m < minutes(s.nightEnd)) return "night";
   return null;
 }
@@ -153,7 +139,11 @@ export function verifyKey(given: unknown, expected: string): boolean {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-const randomGapMs = (s: EffectiveSettings) => (s.gapMinSec + Math.random() * (s.gapMaxSec - s.gapMinSec)) * 1000;
+const randomGapMs = (s: EffectiveSettings) => {
+  const lo = s.gapMinSec ?? s.gapMaxSec ?? 0;
+  const hi = s.gapMaxSec ?? lo;
+  return (lo + Math.random() * (hi - lo)) * 1000;
+};
 
 export interface DeviceHello {
   deviceId: string;
@@ -230,8 +220,9 @@ export async function claimNext(h: DeviceHello, nowDate = new Date()): Promise<C
     SmsSend.countDocuments({ ...counted, claimedAt: { $gt: new Date(nowDate.getTime() - 3600_000) } }),
     SmsSend.countDocuments({ ...counted, dayKey, window: "lunch" }),
   ]);
-  if (today >= settings.dailyLimit || lastHour >= settings.hourlyLimit) return null;
-  if (window === "lunch" && lunchToday >= settings.lunchQuota) return null;
+  if (settings.dailyLimit !== null && today >= settings.dailyLimit) return null;
+  if (settings.hourlyLimit !== null && lastHour >= settings.hourlyLimit) return null;
+  if (window === "lunch" && settings.lunchQuota !== null && lunchToday >= settings.lunchQuota) return null;
 
   // Sheets that are switched on and have a message, least recently served first (fair between sheets).
   const sheets = await SmsSheet.find({ auto: true, $or: [{ text: { $ne: "" } }, { "texts.0": { $exists: true } }] }).sort({ lastServedAt: 1, _id: 1 });
@@ -361,7 +352,7 @@ export async function sheetOverview() {
     const total = Object.values(r).reduce((a, b) => a + b, 0);
     const sent = (r.sent ?? 0) + (r.delivered ?? 0);
     const remaining = (r.unsent ?? 0) + (r.sending ?? 0);
-    const perDay = Math.max(1, phones) * settings.dailyLimit;
+    const perDay = settings.dailyLimit === null ? null : Math.max(1, phones) * settings.dailyLimit;
     return {
       sheet: name,
       text: c?.text ?? "",
@@ -374,7 +365,7 @@ export async function sheetOverview() {
       failed: r.failed ?? 0,
       invalid: r.invalid ?? 0,
       remaining,
-      etaDays: c?.auto && remaining ? Math.ceil(remaining / perDay) : null,
+      etaDays: c?.auto && remaining && perDay ? Math.ceil(remaining / perDay) : null,
     };
   });
 }
@@ -498,7 +489,7 @@ export async function appSummary(now = new Date()) {
   const window = currentWindow(settings, DateTime.fromJSDate(now).setZone(ZONE));
   let state: SmsState = "idle";
   if (activeRemaining > 0) state = settings.paused ? "paused" : window ? "sending" : "waiting";
-  const etaDays = activeRemaining ? Math.ceil(activeRemaining / Math.max(1, settings.dailyLimit)) : null;
+  const etaDays = activeRemaining && settings.dailyLimit ? Math.ceil(activeRemaining / settings.dailyLimit) : null;
   return {
     state,
     window,
